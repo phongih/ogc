@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { background: var(--ogc-bg); color: var(--ogc-fg); }
+
+/* Accessibility: visible focus + skip link */
+:focus-visible { outline: 2px solid var(--ogc-brand); outline-offset: 2px; }
+.ogc-skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 50;
+  background: var(--ogc-brand); color: var(--ogc-brand-fg); padding: 0.5rem 0.75rem; border-radius: 0 0 0.5rem 0;
+}
+.ogc-skip-link:focus { left: 0; }

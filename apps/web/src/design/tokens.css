@@ -1,0 +1,23 @@
+/* OGC v2 design tokens. Colors defined as CSS variables; dark mode via media query. */
+:root {
+  --ogc-bg: #f6f7f9;
+  --ogc-surface: #ffffff;
+  --ogc-border: #e3e6ea;
+  --ogc-fg: #14181f;
+  --ogc-muted: #5b6672;
+  --ogc-brand: #1f6feb;
+  --ogc-brand-fg: #ffffff;
+  --ogc-danger: #b42318;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ogc-bg: #0d1117;
+    --ogc-surface: #161b22;
+    --ogc-border: #2b313a;
+    --ogc-fg: #e6edf3;
+    --ogc-muted: #9aa5b1;
+    --ogc-brand: #4f93ff;
+    --ogc-brand-fg: #0d1117;
+    --ogc-danger: #ff6b5e;
+  }
+}
