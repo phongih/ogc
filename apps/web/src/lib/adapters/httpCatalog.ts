@@ -16,20 +16,19 @@ import { organizations } from "../../fixtures/directory";
  */
 interface CatalogConfig {
   base: string;
-  defaultOrgSlug: string;
 }
 
 function config(): CatalogConfig {
   const g = (globalThis as unknown as { __OGC_CATALOG__?: Partial<CatalogConfig> }).__OGC_CATALOG__;
   const base = g?.base ?? (import.meta.env.VITE_CATALOG_API_BASE as string | undefined) ?? "http://127.0.0.1:8787/api/v1";
-  const defaultOrgSlug = g?.defaultOrgSlug ?? (import.meta.env.VITE_CATALOG_ORG_SLUG as string | undefined) ?? "nova-learning";
-  return { base, defaultOrgSlug };
+  return { base };
 }
 
-// Explicit org context → public org slug. Falls back to the configured public org only
-// when the id is unknown to the directory (still an explicit, non-authoritative mapping).
-function slugForOrg(orgId: string, fallback: string): string {
-  return organizations.find((o) => o.id === orgId)?.slug ?? fallback;
+// Explicit, deterministic orgId → public org slug via the directory. FAIL-CLOSED:
+// an unknown orgId resolves to null and NEVER falls back to a default organization,
+// so a bad/unknown id can never reach another tenant's public catalog.
+function slugForOrg(orgId: string): string | null {
+  return organizations.find((o) => o.id === orgId)?.slug ?? null;
 }
 
 async function getJson(url: string): Promise<{ status: number; body: unknown }> {
@@ -40,8 +39,10 @@ async function getJson(url: string): Promise<{ status: number; body: unknown }> 
 
 export const httpCatalog: CatalogPort = {
   async listCourses(orgId: string, filter?: CourseFilter, page?: CatalogPageRequest): Promise<CatalogPage> {
-    const { base, defaultOrgSlug } = config();
-    const slug = slugForOrg(orgId, defaultOrgSlug);
+    const slug = slugForOrg(orgId);
+    // Fail-closed: unknown org → empty page, and NO request is issued to any backend.
+    if (slug === null) return { items: [], nextCursor: null };
+    const { base } = config();
     const qs = new URLSearchParams();
     if (filter?.level) qs.set("level", filter.level);
     if (filter?.format) qs.set("format", filter.format);
@@ -57,8 +58,10 @@ export const httpCatalog: CatalogPort = {
   },
 
   async getCourse(orgId: string, courseId: string): Promise<PublicCourse | null> {
-    const { base, defaultOrgSlug } = config();
-    const slug = slugForOrg(orgId, defaultOrgSlug);
+    const slug = slugForOrg(orgId);
+    // Fail-closed: unknown org → not found, and NO request is issued.
+    if (slug === null) return null;
+    const { base } = config();
     const { status, body } = await getJson(
       `${base}/public/orgs/${encodeURIComponent(slug)}/courses/${encodeURIComponent(courseId)}`,
     );
