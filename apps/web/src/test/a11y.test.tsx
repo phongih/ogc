@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { waitFor } from "@testing-library/react";
 import axe from "axe-core";
 import { renderApp } from "./harness";
+import { courses } from "../fixtures/catalog";
+import { classes } from "../fixtures/teaching";
 
 // Automated accessibility checks (S3-E). Fail on serious/critical violations only.
 // color-contrast is disabled: jsdom has no layout engine, so it cannot be evaluated here.
@@ -16,6 +18,8 @@ const views: Array<{ name: string; path: string; role: Parameters<typeof renderA
   { name: "catalog", path: "/app/catalog", role: "learner", ready: /catalog/i },
   { name: "AI tutor", path: "/app/tutor", role: "learner", ready: /AI Tutor/i },
   { name: "guardian workspace", path: "/app/guardian", role: "guardian", ready: /guardian workspace/i },
+  { name: "course learning", path: `/app/learning/courses/${courses[0].id}`, role: "learner", ready: /Learning activities/i },
+  { name: "teacher class detail", path: `/app/teaching/classes/${classes[0].id}`, role: "teacher", ready: /Learner overview/i },
 ];
 
 describe("accessibility (axe-core)", () => {

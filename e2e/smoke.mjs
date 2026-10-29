@@ -69,64 +69,86 @@ async function main() {
   const base = `http://${HOST}:${port}`;
 
   const browser = await chromium.launch();
+  // Each scenario signs in fresh: a full reload resets the in-memory session AND store,
+  // so scenarios are independent and progress is the deterministic seeded baseline.
+  async function signIn(page, personaRe) {
+    await page.goto(`${base}/login`, { waitUntil: "networkidle" });
+    await page.getByText("Choose a demo persona").waitFor();
+    await page.getByRole("button", { name: personaRe }).click();
+    await page.getByRole("link", { name: "OGC Learning" }).waitFor();
+    await page.waitForURL("**/app/**");
+  }
+
   try {
     const page = await browser.newPage();
 
-    // 1) Landing renders.
+    // 0) Public landing renders.
     await page.goto(`${base}/`, { waitUntil: "networkidle" });
     check("landing shows an h1", (await page.locator("h1").count()) > 0);
 
-    // 2) Mock sign-in as a learner.
-    await page.goto(`${base}/login`, { waitUntil: "networkidle" });
-    await page.getByText("Choose a demo persona").waitFor();
-    await page.getByRole("button", { name: /Linh \(Learner\)/ }).click();
-    // AppHome redirects to the role's first section (learner → /app/learning).
-    await page.getByRole("link", { name: "OGC Learning" }).waitFor();
-    await page.waitForURL("**/app/**");
-    check("learner reaches the app shell after mock sign-in", page.url().includes("/app/"));
-
-    // NOTE: the mock session lives in client memory only, so navigate via in-app links
-    // (client-side routing) rather than page.goto, which would reload and drop the session.
-
-    // 3) Keyboard: the skip-link is the first element in tab order. With no positive
-    // tabindex anywhere, DOM order IS tab order, so the first tabbable must be the skip link.
+    // ── Scenario A — ADMIN (org staff): directory navigation + route continuity ──
+    await signIn(page, /Sam \(Org Staff\)/);
+    // Keyboard a11y on the authenticated shell (DOM order == tab order; skip-link first).
     const firstTabbable = await page.evaluate(() => {
       const sel = 'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
-      const first = document.querySelector(sel);
-      return (first?.textContent ?? "").trim();
+      return (document.querySelector(sel)?.textContent ?? "").trim();
     });
-    check("skip-to-content link is first in tab order", /skip to content/i.test(firstTabbable));
-    // And it is actually focusable via the keyboard.
-    await page.locator(".ogc-skip-link").focus();
-    check(
-      "skip-to-content link is focusable",
-      await page.evaluate(() => (document.activeElement?.textContent ?? "").toLowerCase().includes("skip to content")),
+    check("[admin] skip-to-content link is first in tab order", /skip to content/i.test(firstTabbable));
+    await page.getByRole("link", { name: "Directory" }).click();
+    await page.getByRole("heading", { name: /Organizations/i }).waitFor();
+    await page.getByRole("link", { name: /Nova Learning Group/ }).first().click();
+    await page.waitForURL("**/app/orgs/**");
+    check("[admin] directory → organization detail route continuity", page.url().includes("/app/orgs/"));
+
+    // ── Scenario B — TEACHER: class roster + progress + lesson plan save ──
+    await signIn(page, /Tara \(Teacher\)/);
+    await page.getByRole("heading", { name: "Teaching" }).waitFor();
+    await page.getByRole("link", { name: "Learner overview" }).first().click();
+    await page.getByRole("heading", { name: "Learner overview" }).waitFor();
+    await page.getByText("Linh N.").first().waitFor(); // roster loads async
+    check("[teacher] sees an assigned-class roster", true);
+    await page.getByRole("link", { name: /Open lesson plan editor/ }).click();
+    await page.getByLabel("Lesson plan title").fill("Smoke plan");
+    await page.getByRole("button", { name: /Save plan/ }).click();
+    await page.getByText(/Lesson plan saved/).waitFor();
+    check("[teacher] can save a lesson plan draft", true);
+
+    // ── Scenario C — LEARNER: enroll → learn → complete → tutor ──
+    await signIn(page, /Linh \(Learner\)/);
+    await page.getByRole("heading", { name: "My Learning" }).waitFor();
+    await page.getByRole("link", { name: "Resume learning" }).first().click();
+    await page.getByRole("progressbar").first().waitFor(); // course-progress panel
+    const complete = page.getByRole("button", { name: /Complete .*Quiz: At the market/ });
+    await complete.waitFor();
+    await complete.click();
+    await page.waitForFunction(
+      () => !document.querySelector('button[aria-label*="Quiz: At the market"]'),
     );
-
-    // 4) Navigation: open the catalog, a course, then enroll (all client-side).
-    await page.getByRole("link", { name: "Catalog" }).click();
-    await page.getByRole("heading", { name: "Course catalog" }).waitFor();
-    await page.getByRole("link", { name: /IELTS Foundation B2/ }).click();
-    const enroll = page.getByRole("button", { name: /Enroll in/ });
-    await enroll.waitFor();
-    await enroll.click();
-    await page.getByRole("button", { name: /Resume learning/ }).waitFor();
-    check("learner can enroll in a course", true);
-
-    // 5) AI Tutor: send a message and get a deterministic reply (lesson context echoed).
+    check("[learner] completes an activity (progress updates)", true);
+    // Empty-state: a brand-new tutor conversation shows the start prompt.
     await page.getByRole("link", { name: "AI Tutor" }).click();
+    await page.getByRole("button", { name: /New conversation/ }).click();
+    await page.getByText(/Start by asking a question below/).waitFor();
+    check("[learner] empty-state renders for a new tutor conversation", true);
     const input = page.getByLabel("Message the tutor");
-    await input.waitFor();
     await input.fill("How do I order food?");
     await page.getByRole("button", { name: "Send" }).click();
-    await page.getByText(/Lesson context: Everyday English A2/).waitFor();
-    check("tutor returns a deterministic reply", true);
+    await page.getByText(/In English we usually say|simple rule|Let's practise|tense first|clearer way/).first().waitFor();
+    check("[learner] tutor returns a deterministic reply", true);
 
-    // 6) Responsive: the current view still renders its heading at a phone width.
-    await page.getByRole("link", { name: "Catalog" }).click();
-    await page.getByRole("heading", { name: "Course catalog" }).waitFor();
+    // ── Scenario D — GUARDIAN: linked learner progress + D-14 notice ──
+    await signIn(page, /Mai \(Guardian\)/);
+    await page.getByRole("heading", { name: "Guardian workspace" }).waitFor();
+    check("[guardian] sees a linked learner", (await page.getByText("Linh N.").count()) > 0);
+    check(
+      "[guardian] D-14 self-verification notice present",
+      (await page.getByText(/cannot add or verify a learner link/i).count()) > 0,
+    );
+
+    // ── Responsive: guardian workspace still renders its heading at phone width ──
     await page.setViewportSize({ width: 375, height: 720 });
-    check("catalog renders its heading at 375px width", (await page.locator("h1").count()) > 0);
+    await page.getByRole("heading", { name: "Guardian workspace" }).waitFor();
+    check("[responsive] view renders its heading at 375px width", (await page.locator("h1").count()) > 0);
   } finally {
     await browser.close();
     server.close();

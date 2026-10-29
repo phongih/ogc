@@ -50,9 +50,12 @@ export function LearnerHome() {
                     <span className="text-sm text-muted">{e.progressPct}%</span>
                   </div>
                   <ProgressBar pct={e.progressPct} />
-                  <div className="mt-3">
-                    <Link to={`/app/catalog/${e.course.id}`}>
+                  <div className="mt-3 flex gap-2">
+                    <Link to={`/app/learning/courses/${e.course.id}`}>
                       <Button variant="ghost">Resume learning</Button>
+                    </Link>
+                    <Link to={`/app/catalog/${e.course.id}`}>
+                      <Button variant="ghost">Course details</Button>
                     </Link>
                   </div>
                 </Card>

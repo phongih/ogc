@@ -2,7 +2,7 @@ import type { LearnerPort, LearnerDashboard, EnrolledCourse } from "@ogc/contrac
 import { personaMap } from "../../fixtures/personas";
 import { lessons } from "../../fixtures/learning";
 import { courses } from "../../fixtures/catalog";
-import { enrollmentStore } from "./store";
+import { enrollmentStore, learningStore } from "./store";
 
 const latency = <T>(v: T, ms = 100): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -18,10 +18,12 @@ export const mockLearner: LearnerPort = {
         const course = courses.find((c) => c.id === rec.courseId);
         if (!course) return null;
         const nextLesson = lessons.find((l) => l.courseId === course.id && l.scheduledAt !== null);
+        // Progress is the activity-derived value (single source of truth), not the seed.
+        const progressPct = learningStore.courseProgress(personaId, course.id).progressPct;
         return {
           course,
           state: rec.state,
-          progressPct: rec.progressPct,
+          progressPct,
           nextLessonId: nextLesson?.id ?? null,
         } satisfies EnrolledCourse;
       })

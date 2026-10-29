@@ -1,10 +1,14 @@
 import { Link, useParams } from "react-router-dom";
 import { Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { useSession } from "../../app/session";
 import { useClassRoster } from "./queries";
+import { useClassProgress } from "../learning/queries";
 
 export function ClassDetail() {
   const { classId = "" } = useParams();
+  const { session } = useSession();
   const q = useClassRoster(classId);
+  const progress = useClassProgress(session?.personaId ?? "", (q.data ?? []).map((r) => r.learnerId));
 
   return (
     <section className="space-y-6">
@@ -21,16 +25,25 @@ export function ClassDetail() {
             <thead>
               <tr className="text-left text-muted">
                 <th className="pb-2 font-medium">Learner</th>
-                <th className="pb-2 font-medium">Progress</th>
+                <th className="pb-2 font-medium">Progress (activities)</th>
               </tr>
             </thead>
             <tbody>
-              {q.data.map((r) => (
-                <tr key={r.learnerId} className="border-t border-border">
-                  <td className="py-2">{r.displayName}</td>
-                  <td className="py-2">{r.progressPct}%</td>
-                </tr>
-              ))}
+              {q.data.map((r) => {
+                const overall = progress.data?.[r.learnerId];
+                return (
+                  <tr key={r.learnerId} className="border-t border-border">
+                    <td className="py-2">{r.displayName}</td>
+                    <td className="py-2">
+                      {overall === null
+                        ? "—"
+                        : overall === undefined
+                          ? "…"
+                          : `${overall}%`}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Card>

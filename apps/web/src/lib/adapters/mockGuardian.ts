@@ -2,7 +2,7 @@ import type { GuardianPort, GuardianDashboard, GuardianLinkView } from "@ogc/con
 import { personaMap } from "../../fixtures/personas";
 import { rosters } from "../../fixtures/teaching";
 import { lessons } from "../../fixtures/learning";
-import { learnerEnrollments } from "../../fixtures/learning";
+import { enrollmentStore, learningStore } from "./store";
 
 const latency = <T>(v: T, ms = 80): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -11,6 +11,22 @@ const latency = <T>(v: T, ms = 80): Promise<T> =>
 const displayNames: Record<string, string> = Object.values(rosters)
   .flat()
   .reduce((acc, r) => ((acc[r.learnerId] = r.displayName), acc), {} as Record<string, string>);
+
+// learnerId → backing personaId (only personas carry progress state).
+const personaByLearner: Record<string, string> = Object.entries(personaMap).reduce(
+  (acc, [pid, m]) => (m.learnerId ? ((acc[m.learnerId] = pid), acc) : acc),
+  {} as Record<string, string>,
+);
+
+// A linked learner's overall progress = mean of their enrolled-course progress (store-derived).
+function overallProgress(learnerId: string): number {
+  const pid = personaByLearner[learnerId];
+  if (!pid) return 0;
+  const courseIds = enrollmentStore.list(pid).map((e) => e.courseId);
+  if (courseIds.length === 0) return 0;
+  const sum = courseIds.reduce((s, cid) => s + learningStore.courseProgress(pid, cid).progressPct, 0);
+  return Math.round(sum / courseIds.length);
+}
 
 export const mockGuardian: GuardianPort = {
   // Links are read from the persona's PRE-ESTABLISHED linkedLearnerIds only.
@@ -21,12 +37,11 @@ export const mockGuardian: GuardianPort = {
     const linkedIds = p.linkedLearnerIds ?? [];
 
     const links: GuardianLinkView[] = linkedIds.map((learnerId) => {
-      const enr = learnerEnrollments[0]; // synthetic: linked learner's primary course
       const nextLesson = lessons.find((l) => l.scheduledAt !== null);
       return {
         learnerId,
         displayName: displayNames[learnerId] ?? "Linked learner",
-        progressPct: enr?.progressPct ?? 0,
+        progressPct: overallProgress(learnerId),
         consentStatus: "active",
         nextSessionAt: nextLesson?.scheduledAt ?? null,
       };

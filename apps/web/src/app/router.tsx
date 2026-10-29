@@ -15,6 +15,7 @@ import { CourseDetail } from "../features/catalog/CourseDetail";
 import { TutorView } from "../features/tutor/TutorView";
 import { LessonPlanEditor } from "../features/lessonplan/LessonPlanEditor";
 import { GuardianHome } from "../features/guardian/GuardianHome";
+import { CourseLearning } from "../features/learning/CourseLearning";
 
 export const routes = [
   { path: "/", element: <Landing /> },
@@ -28,6 +29,7 @@ export const routes = [
       { path: "orgs/:orgId", element: <RequireSection section="directory"><OrgDetail /></RequireSection> },
       { path: "centers/:centerId", element: <RequireSection section="directory"><CenterDetail /></RequireSection> },
       { path: "learning", element: <RequireSection section="learning"><LearnerHome /></RequireSection> },
+      { path: "learning/courses/:courseId", element: <RequireSection section="learning"><CourseLearning /></RequireSection> },
       { path: "teaching", element: <RequireSection section="teaching"><TeacherHome /></RequireSection> },
       { path: "teaching/classes/:classId", element: <RequireSection section="teaching"><ClassDetail /></RequireSection> },
       { path: "teaching/classes/:classId/plan", element: <RequireSection section="teaching"><LessonPlanEditor /></RequireSection> },

@@ -2,6 +2,7 @@
 import { organizations } from "./directory";
 
 const ORG = organizations[0].id; // Nova Learning Group
+const ORG2 = organizations[1].id; // Lumen Education Holdings (used for cross-org negative tests)
 
 export interface PersonaMapping {
   orgId: string;
@@ -22,4 +23,6 @@ export const personaMap: Record<string, PersonaMapping> = {
   "demo-learner": { orgId: ORG, learnerId: LEARNER_LINH },
   "demo-learner-2": { orgId: ORG, learnerId: LEARNER_MINH },
   "demo-guardian": { orgId: ORG, guardianId: GUARDIAN_MAI, linkedLearnerIds: [LEARNER_LINH] },
+  // A different tenant root — exists only to exercise cross-org isolation in tests.
+  "demo-staff-org2": { orgId: ORG2 },
 };
