@@ -16,6 +16,7 @@ import { activities } from "../../fixtures/activities";
 import { organizations } from "../../fixtures/directory";
 import { seedConversations } from "../../fixtures/tutor";
 import { LEARNER_LINH, personaMap } from "../../fixtures/personas";
+import { LEARNER_SEED, learnerById } from "../../fixtures/learners";
 
 const ORG = organizations[0].id;
 
@@ -65,51 +66,82 @@ export const lessonPlanStore = {
   nextId: () => `PLAN-${++planSeq}`,
 };
 
-// ── Learning attempts + evidence (per persona, per activity) ─────────────────
-// attempts: Map<personaId, Map<activityId, LearningAttempt>>
+// ── Learning attempts + evidence (keyed by learnerId, the domain subject) ─────
+// Identity is separated from the acting persona: attempts belong to a learnerId, so
+// roster learners WITHOUT a login persona still own progress (S5-B).
+// attempts: Map<learnerId, Map<activityId, LearningAttempt>>
 const attempts = new Map<string, Map<string, LearningAttempt>>();
-// evidence: Map<personaId, Map<activityId, LearningEvidence[]>>
+// evidence: Map<learnerId, Map<activityId, LearningEvidence[]>>
 const evidence = new Map<string, Map<string, LearningEvidence[]>>();
 let attemptSeq = 0;
 let evidenceSeq = 0;
 
-function attemptsFor(personaId: string): Map<string, LearningAttempt> {
-  let m = attempts.get(personaId);
+// Deterministic assessment score (0..100): pure hash of learnerId + activityId.
+// NOT random, NOT an external model, repeatable across runs.
+function deterministicScore(learnerId: string, activityId: string): number {
+  let h = 0;
+  const s = `${learnerId}:${activityId}`;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return 60 + (h % 41); // 60..100
+}
+
+function activityById(activityId: string): LearningActivity | undefined {
+  return activities.find((a) => a.id === activityId);
+}
+
+function attemptsFor(learnerId: string): Map<string, LearningAttempt> {
+  let m = attempts.get(learnerId);
   if (!m) {
     m = new Map();
-    attempts.set(personaId, m);
-    // Seed a deterministic baseline for the primary demo learner so the unified journey
-    // shows consistent, non-zero progress across learner/teacher/guardian from the start.
-    if (personaMap[personaId]?.learnerId === LEARNER_LINH) {
-      for (const seedId of ["ACT-A2-1", "ACT-A2-2"]) {
-        const a = activities.find((x) => x.id === seedId);
-        if (!a) continue;
-        const idx = ++attemptSeq;
-        m.set(seedId, {
-          id: `ATT-${idx}`,
-          personaId,
-          activityId: seedId,
-          state: "completed",
-          completedAt: new Date(LEARNING_EPOCH + idx * 3600000).toISOString(),
-          score: a.assessed ? deterministicScore(personaId, seedId) : null,
-        });
-      }
+    attempts.set(learnerId, m);
+    // Seed this learner's deterministic completions (covers every roster learner).
+    for (const seedId of LEARNER_SEED[learnerId] ?? []) {
+      const a = activityById(seedId);
+      if (!a) continue;
+      const idx = ++attemptSeq;
+      m.set(seedId, {
+        id: `ATT-${idx}`,
+        learnerId,
+        activityId: seedId,
+        state: "completed",
+        completedAt: new Date(LEARNING_EPOCH + idx * 3600000).toISOString(),
+        score: a.assessed ? deterministicScore(learnerId, seedId) : null,
+      });
     }
   }
   return m;
 }
 
-// Deterministic weighted progress for a persona in one course. Single source of truth
-// used by both the learner dashboard and the learning views (no divergent numbers).
-function courseProgressFor(personaId: string, courseId: string) {
-  const org = personaMap[personaId]?.orgId;
+function evidenceFor(learnerId: string): Map<string, LearningEvidence[]> {
+  let m = evidence.get(learnerId);
+  if (!m) {
+    m = new Map();
+    evidence.set(learnerId, m);
+  }
+  return m;
+}
+
+export interface CourseProgress {
+  totalActivities: number;
+  completedActivities: number;
+  assessedCount: number;
+  progressPct: number;
+  state: "not_started" | "in_progress" | "completed";
+  lastActivityAt: string | null;
+}
+
+// Deterministic weighted progress for a LEARNER in one course. Single source of truth
+// consumed by learner/teacher/guardian views (no divergent numbers). Org-scoped: a
+// learner only matches activities in their own organization.
+function courseProgressFor(learnerId: string, courseId: string): CourseProgress {
+  const org = learnerById[learnerId]?.orgId;
   const list = activities.filter((a) => a.courseId === courseId && a.orgId === org);
   const totalWeight = list.reduce((s, a) => s + a.weight, 0);
   let completedWeight = 0;
   let completedActivities = 0;
   let assessedCount = 0;
   let lastActivityAt: string | null = null;
-  const m = attemptsFor(personaId);
+  const m = attemptsFor(learnerId);
   for (const a of list) {
     const att = m.get(a.id);
     if (att?.state === "completed") {
@@ -120,47 +152,38 @@ function courseProgressFor(personaId: string, courseId: string) {
         lastActivityAt = att.completedAt;
     }
   }
+  const total = list.length;
+  const state =
+    completedActivities === 0
+      ? "not_started"
+      : total > 0 && completedActivities === total
+        ? "completed"
+        : "in_progress";
   return {
-    totalActivities: list.length,
+    totalActivities: total,
     completedActivities,
     assessedCount,
     progressPct: totalWeight === 0 ? 0 : Math.round((completedWeight / totalWeight) * 100),
+    state,
     lastActivityAt,
   };
-}
-function evidenceFor(personaId: string): Map<string, LearningEvidence[]> {
-  let m = evidence.get(personaId);
-  if (!m) {
-    m = new Map();
-    evidence.set(personaId, m);
-  }
-  return m;
-}
-
-// Deterministic assessment score (0..100) for an assessed activity: pure hash of
-// personaId + activityId. NOT random, NOT an external model, repeatable across runs.
-function deterministicScore(personaId: string, activityId: string): number {
-  let h = 0;
-  const s = `${personaId}:${activityId}`;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return 60 + (h % 41); // 60..100
-}
-
-function activityById(activityId: string): LearningActivity | undefined {
-  return activities.find((a) => a.id === activityId);
 }
 
 export const learningStore = {
   courseProgress: courseProgressFor,
 
-  getAttempt: (personaId: string, activityId: string): LearningAttempt | null =>
-    attemptsFor(personaId).get(activityId) ?? null,
+  getAttempt: (learnerId: string, activityId: string): LearningAttempt | null =>
+    attemptsFor(learnerId).get(activityId) ?? null,
 
-  getEvidence: (personaId: string, activityId: string): LearningEvidence[] =>
-    (evidenceFor(personaId).get(activityId) ?? []).map((e) => ({ ...e })),
+  getEvidence: (learnerId: string, activityId: string): LearningEvidence[] =>
+    (evidenceFor(learnerId).get(activityId) ?? []).map((e) => ({ ...e })),
 
-  // Fail-closed + idempotent completion.
+  // Fail-closed + idempotent completion. The ACTOR is a persona; the SUBJECT is that
+  // persona's own learnerId. A persona can only complete activities for itself.
   complete: (personaId: string, activityId: string): { completed: boolean; reason?: string } => {
+    const learnerId = personaMap[personaId]?.learnerId;
+    if (!learnerId) return { completed: false, reason: "not_a_learner" };
+
     const activity = activityById(activityId);
     if (!activity) return { completed: false, reason: "unknown_activity" };
 
@@ -168,20 +191,20 @@ export const learningStore = {
     if (activity.orgId !== personaMap[personaId]?.orgId)
       return { completed: false, reason: "cross_org_denied" };
 
-    // Must be enrolled in the activity's course (reuses the enrollment store).
-    const enrolled = enrollMapFor(personaId).has(activity.courseId);
-    if (!enrolled) return { completed: false, reason: "not_enrolled" };
+    // Must be enrolled in the activity's course (reuses the persona-keyed enrollment store).
+    if (!enrollMapFor(personaId).has(activity.courseId))
+      return { completed: false, reason: "not_enrolled" };
 
-    const m = attemptsFor(personaId);
+    const m = attemptsFor(learnerId);
     const existing = m.get(activityId);
     if (existing?.state === "completed") return { completed: false, reason: "already_completed" };
 
     const idx = ++attemptSeq;
-    const score = activity.assessed ? deterministicScore(personaId, activityId) : null;
+    const score = activity.assessed ? deterministicScore(learnerId, activityId) : null;
     const completedAt = new Date(LEARNING_EPOCH + idx * 3600000).toISOString();
     m.set(activityId, {
       id: existing?.id ?? `ATT-${idx}`,
-      personaId,
+      learnerId,
       activityId,
       state: "completed",
       completedAt,
@@ -189,11 +212,11 @@ export const learningStore = {
     });
 
     // AI-generated feedback is recorded as EVIDENCE, separate from the score.
-    const ev = evidenceFor(personaId);
+    const ev = evidenceFor(learnerId);
     const list = ev.get(activityId) ?? [];
     list.push({
       id: `EVID-${++evidenceSeq}`,
-      personaId,
+      learnerId,
       activityId,
       kind: "ai_feedback",
       text:

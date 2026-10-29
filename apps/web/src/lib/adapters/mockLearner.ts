@@ -3,14 +3,17 @@ import { personaMap } from "../../fixtures/personas";
 import { lessons } from "../../fixtures/learning";
 import { courses } from "../../fixtures/catalog";
 import { enrollmentStore, learningStore } from "./store";
+import { withFault } from "./faults";
 
 const latency = <T>(v: T, ms = 100): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
 
 export const mockLearner: LearnerPort = {
-  getDashboard: (personaId) => {
+  getDashboard: (personaId) =>
+    withFault("learner.getDashboard", () => {
     const p = personaMap[personaId];
     if (!p || !p.learnerId) return latency(null); // fail-closed: no learner scope for this persona
+    const learnerId = p.learnerId;
     // Enrolled courses are derived from the shared enrollment store (reflects new enrollments).
     const enrolled: EnrolledCourse[] = enrollmentStore
       .list(personaId)
@@ -19,7 +22,7 @@ export const mockLearner: LearnerPort = {
         if (!course) return null;
         const nextLesson = lessons.find((l) => l.courseId === course.id && l.scheduledAt !== null);
         // Progress is the activity-derived value (single source of truth), not the seed.
-        const progressPct = learningStore.courseProgress(personaId, course.id).progressPct;
+        const progressPct = learningStore.courseProgress(learnerId, course.id).progressPct;
         return {
           course,
           state: rec.state,
@@ -39,5 +42,5 @@ export const mockLearner: LearnerPort = {
       ),
     };
     return latency(dashboard);
-  },
+    }),
 };

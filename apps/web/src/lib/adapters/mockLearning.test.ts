@@ -4,7 +4,8 @@ import { courses } from "../../fixtures/catalog";
 
 const LINH = "demo-learner"; // enrolled in courses[0] & [1]; ACT-A2-1/2 pre-completed
 const MINH = "demo-learner-2"; // enrolled in nothing initially
-const STAFF_ORG2 = "demo-staff-org2";
+const LEARNER_ORG2 = "demo-learner-org2"; // a learner in a different tenant root
+const STAFF_ORG2 = "demo-staff-org2"; // staff with no learnerId
 const A2 = courses[0].id;
 
 describe("mock learning — activities, completion, progress", () => {
@@ -66,11 +67,18 @@ describe("mock learning — activities, completion, progress", () => {
     expect(res.reason).toBe("not_enrolled");
   });
 
-  // NEGATIVE: cross-org completion is denied before enrollment is even considered.
+  // NEGATIVE: cross-org completion — a learner in another org cannot complete this org's activity.
   it("denies completing an activity in another organization", async () => {
-    const res = await mockLearning.completeActivity(STAFF_ORG2, "ACT-A2-1");
+    const res = await mockLearning.completeActivity(LEARNER_ORG2, "ACT-A2-1");
     expect(res.completed).toBe(false);
     expect(res.reason).toBe("cross_org_denied");
+  });
+
+  // NEGATIVE: a persona with no learner identity cannot complete activities.
+  it("denies completion for a non-learner persona", async () => {
+    const res = await mockLearning.completeActivity(STAFF_ORG2, "ACT-A2-1");
+    expect(res.completed).toBe(false);
+    expect(res.reason).toBe("not_a_learner");
   });
 
   it("denies completing an unknown activity", async () => {

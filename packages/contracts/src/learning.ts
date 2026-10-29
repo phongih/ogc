@@ -25,7 +25,9 @@ export type AttemptState = z.infer<typeof AttemptState>;
 
 export const LearningAttempt = z.object({
   id: z.string().min(1),
-  personaId: z.string().min(1), // owner; attempts are strictly per-persona
+  // Owner is the LEARNER (domain subject), not the acting persona. A persona acts on
+  // its own learnerId; roster learners without a persona still own attempts.
+  learnerId: Id,
   activityId: z.string().min(1),
   state: AttemptState,
   completedAt: z.string().nullable(), // deterministic ISO in the mock, or null
@@ -42,7 +44,7 @@ export type EvidenceKind = z.infer<typeof EvidenceKind>;
 
 export const LearningEvidence = z.object({
   id: z.string().min(1),
-  personaId: z.string().min(1),
+  learnerId: Id,
   activityId: z.string().min(1),
   kind: EvidenceKind,
   text: z.string(),
@@ -50,12 +52,20 @@ export const LearningEvidence = z.object({
 });
 export type LearningEvidence = z.infer<typeof LearningEvidence>;
 
-// ── Progress snapshot ─────────────────────────────────────────────────────────
+// ── Progress states + snapshot ───────────────────────────────────────────────
+// Explicit course-level progress state (S5-C). Derived deterministically:
+//   completed == 0            → not_started
+//   0 < completed < total     → in_progress
+//   completed == total (>0)   → completed
+export const ProgressState = z.enum(["not_started", "in_progress", "completed"]);
+export type ProgressState = z.infer<typeof ProgressState>;
+
 export const ProgressSnapshot = z.object({
-  personaId: z.string().min(1),
-  learnerId: Id,
+  learnerId: Id, // the domain subject (no personaId here — identity is separated)
+  orgId: Id, // tenant root the progress belongs to
   courseId: Id,
   courseTitle: z.string().min(1),
+  state: ProgressState,
   totalActivities: z.number().int().nonnegative(),
   completedActivities: z.number().int().nonnegative(),
   assessedCount: z.number().int().nonnegative(),
@@ -64,6 +74,17 @@ export const ProgressSnapshot = z.object({
   lastActivityAt: z.string().nullable(),
 });
 export type ProgressSnapshot = z.infer<typeof ProgressSnapshot>;
+
+// Learner-level aggregation across a learner's courses (S5-C).
+export const LearnerProgressSummary = z.object({
+  learnerId: Id,
+  orgId: Id,
+  courseCount: z.number().int().nonnegative(),
+  overallPct: z.number().min(0).max(100), // mean of per-course progressPct, rounded
+  state: ProgressState,
+  snapshots: z.array(ProgressSnapshot),
+});
+export type LearnerProgressSummary = z.infer<typeof LearnerProgressSummary>;
 
 // Self-scoped learning: a persona acts only on its own enrolled courses/activities.
 export interface LearningPort {
@@ -81,8 +102,8 @@ export interface LearningPort {
 }
 
 // Cross-role viewing: a viewer persona reads ANOTHER learner's progress only when
-// authorized (teacher of an assigned class, or guardian of a linked learner).
-// Returns null when the viewer is not authorized for that learner (fail-closed).
+// authorized (teacher of an assigned class, guardian of a linked learner, or same-org
+// staff). Returns null when the viewer is not authorized for that learner (fail-closed).
 export interface ProgressViewPort {
-  getLearnerProgress(viewerPersonaId: string, learnerId: string): Promise<ProgressSnapshot[] | null>;
+  getLearnerProgress(viewerPersonaId: string, learnerId: string): Promise<LearnerProgressSummary | null>;
 }

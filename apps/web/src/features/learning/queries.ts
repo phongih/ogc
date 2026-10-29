@@ -63,13 +63,8 @@ export const useClassProgress = (viewerPersonaId: string, learnerIds: string[]) 
     queryFn: async () => {
       const entries = await Promise.all(
         learnerIds.map(async (id) => {
-          const snaps = await progressView.getLearnerProgress(viewerPersonaId, id);
-          if (snaps === null) return [id, null] as const; // unauthorized
-          const overall =
-            snaps.length === 0
-              ? 0
-              : Math.round(snaps.reduce((s, x) => s + x.progressPct, 0) / snaps.length);
-          return [id, overall] as const;
+          const summary = await progressView.getLearnerProgress(viewerPersonaId, id);
+          return [id, summary === null ? null : summary.overallPct] as const; // null = unauthorized
         }),
       );
       return Object.fromEntries(entries) as Record<string, number | null>;

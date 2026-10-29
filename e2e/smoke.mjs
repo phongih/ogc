@@ -149,6 +149,21 @@ async function main() {
     await page.setViewportSize({ width: 375, height: 720 });
     await page.getByRole("heading", { name: "Guardian workspace" }).waitFor();
     check("[responsive] view renders its heading at 375px width", (await page.locator("h1").count()) > 0);
+
+    // ── Scenario E — MOBILE NAV: drawer at 375px (real media queries apply) ──
+    await signIn(page, /Linh \(Learner\)/); // reloads at the 375px viewport
+    // Desktop primary nav is hidden at phone width; the toggle is visible.
+    const toggle = page.getByRole("button", { name: "Open menu" });
+    await toggle.waitFor({ state: "visible" });
+    check("[mobile] hamburger toggle visible at 375px", await toggle.isVisible());
+    await toggle.click();
+    const drawer = page.getByRole("dialog", { name: "Menu" });
+    await drawer.waitFor();
+    await drawer.getByRole("link", { name: "AI Tutor" }).click();
+    await page.getByRole("heading", { name: "AI Tutor" }).waitFor();
+    // Drawer closes on selection (route change).
+    await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
+    check("[mobile] drawer navigates and closes on route selection", true);
   } finally {
     await browser.close();
     server.close();

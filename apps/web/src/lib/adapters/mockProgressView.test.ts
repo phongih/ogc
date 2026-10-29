@@ -10,9 +10,10 @@ const STAFF_ORG2 = "demo-staff-org2"; // different tenant root
 
 describe("cross-role progress view — authorization", () => {
   it("a learner sees their own progress", async () => {
-    const snaps = await mockProgressView.getLearnerProgress(LEARNER, LEARNER_LINH);
-    expect(snaps).not.toBeNull();
-    expect(snaps!.length).toBeGreaterThan(0);
+    const summary = await mockProgressView.getLearnerProgress(LEARNER, LEARNER_LINH);
+    expect(summary).not.toBeNull();
+    expect(summary!.snapshots.length).toBeGreaterThan(0);
+    expect(summary!.learnerId).toBe(LEARNER_LINH);
   });
 
   it("a teacher sees progress for an assigned-class learner", async () => {

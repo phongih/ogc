@@ -3,21 +3,19 @@ import type {
   ProgressViewPort,
   LearningActivity,
   ProgressSnapshot,
+  ProgressState,
+  LearnerProgressSummary,
 } from "@ogc/contracts";
 import { activities } from "../../fixtures/activities";
 import { courses } from "../../fixtures/catalog";
 import { classTeachers, rosters } from "../../fixtures/teaching";
 import { personaMap } from "../../fixtures/personas";
+import { learnerById } from "../../fixtures/learners";
 import { enrollmentStore, learningStore } from "./store";
+import { withFault } from "./faults";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
-
-// Reverse map: learnerId -> backing personaId (only personas carry attempt state).
-const personaByLearner: Record<string, string> = Object.entries(personaMap).reduce(
-  (acc, [pid, m]) => (m.learnerId ? ((acc[m.learnerId] = pid), acc) : acc),
-  {} as Record<string, string>,
-);
 
 // Activities for a course, scoped to the persona's organization (fail-closed).
 function courseActivitiesFor(personaId: string, courseId: string): LearningActivity[] {
@@ -26,18 +24,19 @@ function courseActivitiesFor(personaId: string, courseId: string): LearningActiv
   return activities.filter((a) => a.courseId === courseId && a.orgId === org);
 }
 
-function snapshotFor(personaId: string, courseId: string): ProgressSnapshot | null {
-  const learnerId = personaMap[personaId]?.learnerId;
-  if (!learnerId) return null;
+// Snapshot for a LEARNER (domain subject) in one course.
+function snapshotFor(learnerId: string, courseId: string): ProgressSnapshot | null {
+  const learner = learnerById[learnerId];
+  if (!learner) return null;
   const course = courses.find((c) => c.id === courseId);
   if (!course) return null;
-
-  const p = learningStore.courseProgress(personaId, courseId);
+  const p = learningStore.courseProgress(learnerId, courseId);
   return {
-    personaId,
     learnerId,
+    orgId: learner.orgId,
     courseId,
     courseTitle: course.title,
+    state: p.state,
     totalActivities: p.totalActivities,
     completedActivities: p.completedActivities,
     assessedCount: p.assessedCount,
@@ -46,21 +45,68 @@ function snapshotFor(personaId: string, courseId: string): ProgressSnapshot | nu
   };
 }
 
-function myProgress(personaId: string): ProgressSnapshot[] {
-  if (!personaMap[personaId]?.learnerId) return [];
-  return enrollmentStore
-    .list(personaId)
-    .map((e) => snapshotFor(personaId, e.courseId))
+function aggregateState(snaps: ProgressSnapshot[]): ProgressState {
+  if (snaps.length === 0 || snaps.every((s) => s.state === "not_started")) return "not_started";
+  if (snaps.every((s) => s.state === "completed")) return "completed";
+  return "in_progress";
+}
+
+function summaryFor(learnerId: string): LearnerProgressSummary {
+  const learner = learnerById[learnerId];
+  const snaps = (learner?.courseIds ?? [])
+    .map((cid) => snapshotFor(learnerId, cid))
     .filter((s): s is ProgressSnapshot => s !== null);
+  const overallPct =
+    snaps.length === 0 ? 0 : Math.round(snaps.reduce((s, x) => s + x.progressPct, 0) / snaps.length);
+  return {
+    learnerId,
+    orgId: learner?.orgId ?? "",
+    courseCount: snaps.length,
+    overallPct,
+    state: aggregateState(snaps),
+    snapshots: snaps,
+  };
 }
 
 export const mockLearning: LearningPort = {
-  listActivities: (personaId, courseId) => latency(courseActivitiesFor(personaId, courseId)),
-  getAttempt: (personaId, activityId) => latency(learningStore.getAttempt(personaId, activityId)),
-  completeActivity: (personaId, activityId) => latency(learningStore.complete(personaId, activityId)),
-  getEvidence: (personaId, activityId) => latency(learningStore.getEvidence(personaId, activityId)),
-  getProgress: (personaId, courseId) => latency(snapshotFor(personaId, courseId)),
-  listMyProgress: (personaId) => latency(myProgress(personaId)),
+  listActivities: (personaId, courseId) =>
+    withFault("learning.listActivities", () => latency(courseActivitiesFor(personaId, courseId))),
+
+  getAttempt: (personaId, activityId) => {
+    const learnerId = personaMap[personaId]?.learnerId;
+    return withFault("learning.getAttempt", () =>
+      latency(learnerId ? learningStore.getAttempt(learnerId, activityId) : null),
+    );
+  },
+
+  completeActivity: (personaId, activityId) =>
+    withFault("learning.completeActivity", () => latency(learningStore.complete(personaId, activityId))),
+
+  getEvidence: (personaId, activityId) => {
+    const learnerId = personaMap[personaId]?.learnerId;
+    return withFault("learning.getEvidence", () =>
+      latency(learnerId ? learningStore.getEvidence(learnerId, activityId) : []),
+    );
+  },
+
+  getProgress: (personaId, courseId) => {
+    const learnerId = personaMap[personaId]?.learnerId;
+    return withFault("learning.getProgress", () =>
+      latency(learnerId ? snapshotFor(learnerId, courseId) : null),
+    );
+  },
+
+  listMyProgress: (personaId) => {
+    const learnerId = personaMap[personaId]?.learnerId;
+    if (!learnerId) return withFault("learning.listMyProgress", () => latency<ProgressSnapshot[]>([]));
+    // Union of the learner's synthetic courses and any courses the persona has enrolled in.
+    const courseIds = new Set<string>(learnerById[learnerId]?.courseIds ?? []);
+    for (const e of enrollmentStore.list(personaId)) courseIds.add(e.courseId);
+    const snaps = [...courseIds]
+      .map((cid) => snapshotFor(learnerId, cid))
+      .filter((s): s is ProgressSnapshot => s !== null);
+    return withFault("learning.listMyProgress", () => latency(snaps));
+  },
 };
 
 // ── Cross-role authorization for viewing another learner's progress ───────────
@@ -80,22 +126,20 @@ function guardianAuthorized(viewerPersonaId: string, learnerId: string): boolean
 export const mockProgressView: ProgressViewPort = {
   getLearnerProgress: (viewerPersonaId, learnerId) => {
     const viewer = personaMap[viewerPersonaId];
-    if (!viewer) return latency<ProgressSnapshot[] | null>(null);
+    const run = (v: LearnerProgressSummary | null) =>
+      withFault("progress.getLearnerProgress", () => latency<LearnerProgressSummary | null>(v));
+    if (!viewer) return run(null);
 
-    // Determine authorization by the viewer's role, fail-closed.
+    const target = learnerById[learnerId];
     const isSelf = viewer.learnerId === learnerId;
     const isStaff = !viewer.learnerId && !viewer.teacherId && !viewer.guardianId; // org staff/admin
     const authorized =
       isSelf ||
-      (isStaff && Object.values(personaMap).some((m) => m.learnerId === learnerId && m.orgId === viewer.orgId)) ||
+      (isStaff && target?.orgId === viewer.orgId) ||
       teacherAuthorized(viewerPersonaId, learnerId) ||
       guardianAuthorized(viewerPersonaId, learnerId);
 
-    if (!authorized) return latency<ProgressSnapshot[] | null>(null);
-
-    // Progress exists only for a learner that has a backing persona with attempts.
-    const targetPersona = personaByLearner[learnerId];
-    if (!targetPersona) return latency<ProgressSnapshot[] | null>([]);
-    return latency<ProgressSnapshot[] | null>(myProgress(targetPersona));
+    if (!authorized || !target) return run(null);
+    return run(summaryFor(learnerId));
   },
 };
