@@ -147,6 +147,42 @@ describe("public catalog — leakage / allowlist", () => {
   });
 });
 
+describe("public catalog — multi-tenant + cursor hardening (S8)", () => {
+  it("stable composite cursor across DUPLICATE course codes (Lumen BUS-B2 ×2)", async () => {
+    const p1 = await get(`/public/orgs/${LUMEN}/courses?limit=1`);
+    expect(p1.body.data.length).toBe(1);
+    expect(p1.body.data[0].code).toBe("BUS-B2");
+    const cur = p1.body.meta.page.nextCursor;
+    expect(cur).toBeTruthy();
+    const p2 = await get(`/public/orgs/${LUMEN}/courses?limit=1&cursor=${encodeURIComponent(cur)}`);
+    expect(p2.body.data[0].code).toBe("BUS-B2"); // same code…
+    expect(p2.body.data[0].id).not.toBe(p1.body.data[0].id); // …different course, no skip/dup
+  });
+
+  it("a cursor past the end yields an empty page with nextCursor null", async () => {
+    const beyond = Buffer.from(`ZZZZ\u0000zzzz`, "utf8").toString("base64url");
+    const { status, body } = await get(`/public/orgs/${NOVA}/courses?cursor=${beyond}`);
+    expect(status).toBe(200);
+    expect(body.data.length).toBe(0);
+    expect(body.meta.page.nextCursor).toBeNull();
+  });
+
+  it("ETag differs by organization, filter and page (org-specific caching)", async () => {
+    const etag = async (p: string) => (await fetch(`${base}${p}`)).headers.get("etag");
+    const nova = await etag(`/public/orgs/${NOVA}/courses`);
+    const lumen = await etag(`/public/orgs/${LUMEN}/courses`);
+    const novaB1 = await etag(`/public/orgs/${NOVA}/courses?level=B1`);
+    const novaP1 = await etag(`/public/orgs/${NOVA}/courses?limit=1`);
+    expect(nova).not.toBe(lumen);
+    expect(nova).not.toBe(novaB1);
+    expect(nova).not.toBe(novaP1);
+  });
+
+  it("cross-org: a Nova course id is not resolvable under Lumen", async () => {
+    expect((await get(`/public/orgs/${LUMEN}/courses/${E01}`)).status).toBe(404);
+  });
+});
+
 describe("public catalog — throttling", () => {
   it("returns 429 once the per-client window is exceeded", async () => {
     const limited = createCatalogServer({ rateLimit: { windowMs: 10_000, max: 2 } });

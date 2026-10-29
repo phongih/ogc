@@ -23,7 +23,7 @@ export function CourseLearning() {
   const { session } = useSession();
   const personaId = session?.personaId ?? "";
   const { courseId = "" } = useParams();
-  const course = useCourse(courseId);
+  const course = useCourse(session?.orgId ?? "", courseId);
   const acts = useActivities(personaId, courseId);
   const progress = useCourseProgress(personaId, courseId);
   const attempts = useActivityAttempts(personaId, (acts.data ?? []).map((a) => a.id));

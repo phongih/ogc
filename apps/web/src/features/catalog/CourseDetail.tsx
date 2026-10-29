@@ -9,7 +9,7 @@ export function CourseDetail() {
   const { session } = useSession();
   const navigate = useNavigate();
   const personaId = session?.personaId ?? "";
-  const q = useCourse(courseId);
+  const q = useCourse(session?.orgId ?? "", courseId);
   const stateQ = useEnrollmentState(personaId, courseId);
   const enroll = useEnroll(personaId);
 

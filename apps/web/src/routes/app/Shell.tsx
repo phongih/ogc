@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { sectionsFor } from "@ogc/mock-authz";
 import { useSession } from "../../app/session";
@@ -10,7 +10,28 @@ export function Shell() {
   const [menuOpen, setMenuOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const firstLinkRef = useRef<HTMLAnchorElement>(null);
+  const drawerRef = useRef<HTMLElement>(null);
   const location = useLocation();
+
+  // Focus trap: keep Tab / Shift+Tab inside the open drawer (containment), so focus
+  // never reaches the background while the drawer is open.
+  const trapTab = (e: ReactKeyboardEvent) => {
+    if (e.key !== "Tab" || !drawerRef.current) return;
+    const nodes = drawerRef.current.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    );
+    if (nodes.length === 0) return;
+    const first = nodes[0];
+    const last = nodes[nodes.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && active === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
 
   // Close the drawer whenever the route changes (route selection closes the menu).
   useEffect(() => setMenuOpen(false), [location.pathname]);
@@ -87,9 +108,11 @@ export function Shell() {
           />
           <nav
             id="mobile-nav"
+            ref={drawerRef}
             role="dialog"
             aria-modal="true"
             aria-label="Menu"
+            onKeyDown={trapTab}
             className="fixed inset-y-0 left-0 z-30 w-72 max-w-[85%] space-y-1 border-r border-border bg-surface p-4 shadow-lg"
           >
             <p className="px-3 pb-2 text-xs uppercase tracking-wide text-muted">Navigate</p>

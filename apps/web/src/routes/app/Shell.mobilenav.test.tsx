@@ -36,6 +36,29 @@ describe("mobile navigation drawer (a11y behavior)", () => {
     expect(screen.getByRole("button", { name: "Open menu" })).toHaveFocus();
   });
 
+  it("traps Tab within the drawer (containment) — forward wraps last → first", async () => {
+    renderApp("/app/catalog", "learner");
+    await userEvent.click(await waitFor(() => screen.getByRole("button", { name: "Open menu" })));
+    const dialog = screen.getByRole("dialog", { name: "Menu" });
+    const links = within(dialog).getAllByRole("link");
+    const first = links[0];
+    const last = links[links.length - 1];
+    last.focus();
+    expect(last).toHaveFocus();
+    await userEvent.tab(); // from last → wraps to first (trapped inside the drawer)
+    expect(first).toHaveFocus();
+  });
+
+  it("traps Shift+Tab within the drawer — backward wraps first → last", async () => {
+    renderApp("/app/catalog", "learner");
+    await userEvent.click(await waitFor(() => screen.getByRole("button", { name: "Open menu" })));
+    const dialog = screen.getByRole("dialog", { name: "Menu" });
+    const links = within(dialog).getAllByRole("link");
+    links[0].focus();
+    await userEvent.tab({ shift: true });
+    expect(links[links.length - 1]).toHaveFocus();
+  });
+
   it("closes when a navigation link is selected", async () => {
     renderApp("/app/catalog", "learner");
     await userEvent.click(await waitFor(() => screen.getByRole("button", { name: "Open menu" })));

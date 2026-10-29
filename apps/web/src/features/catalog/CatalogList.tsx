@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { CourseFormat, CourseLevel } from "@ogc/contracts";
-import { Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { useCourses } from "./queries";
 
@@ -67,25 +67,41 @@ export function CatalogList() {
         <Spinner label="Loading courses" />
       ) : query.isError ? (
         <ErrorState message="Could not load courses." onRetry={() => query.refetch()} />
-      ) : !query.data || query.data.length === 0 ? (
-        <EmptyState title="No courses match" hint="Try clearing the filters." />
-      ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {query.data.map((c) => (
-            <li key={c.id}>
-              <Link to={`/app/catalog/${c.id}`} className="block">
-                <Card className="h-full transition hover:border-brand">
-                  <p className="text-xs text-muted">{c.code}</p>
-                  <h3 className="mt-1 font-medium">{c.title}</h3>
-                  <p className="mt-1 text-sm text-muted">
-                    {c.level} · {c.format.replace("_", " ")} · {c.durationWeeks} weeks
-                  </p>
-                </Card>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      ) : (() => {
+        const items = (query.data?.pages ?? []).flatMap((p) => p.items);
+        if (items.length === 0)
+          return <EmptyState title="No courses match" hint="Try clearing the filters." />;
+        return (
+          <>
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {items.map((c) => (
+                <li key={c.id}>
+                  <Link to={`/app/catalog/${c.id}`} className="block">
+                    <Card className="h-full transition hover:border-brand">
+                      <p className="text-xs text-muted">{c.code}</p>
+                      <h3 className="mt-1 font-medium">{c.title}</h3>
+                      <p className="mt-1 text-sm text-muted">
+                        {c.level} · {c.format.replace("_", " ")} · {c.durationWeeks} weeks
+                      </p>
+                    </Card>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {query.hasNextPage ? (
+              <div className="mt-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => query.fetchNextPage()}
+                  disabled={query.isFetchingNextPage}
+                >
+                  {query.isFetchingNextPage ? "Loading…" : "Load more"}
+                </Button>
+              </div>
+            ) : null}
+          </>
+        );
+      })()}
     </section>
   );
 }

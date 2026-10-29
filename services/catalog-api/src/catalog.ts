@@ -53,15 +53,18 @@ export function resolveOrg(slug: string) {
   return organizations.find((o) => o.slug === slug) ?? null;
 }
 
-// Opaque, deterministic cursor = base64url of the last item's sort key (its `code`).
-function encodeCursor(code: string): string {
-  return Buffer.from(code, "utf8").toString("base64url");
+// Opaque, deterministic COMPOSITE cursor = base64url of "code\0id". The id tiebreaker
+// keeps pagination stable even when two courses share the same `code`.
+const SEP = "\u0000";
+function encodeCursor(code: string, id: string): string {
+  return Buffer.from(`${code}${SEP}${id}`, "utf8").toString("base64url");
 }
-function decodeCursor(cursor: string): string {
+function decodeCursor(cursor: string): { code: string; id: string } {
   const s = Buffer.from(cursor, "base64url").toString("utf8");
-  // A valid cursor round-trips to a non-empty ascii course code.
-  if (!s || !/^[\x20-\x7e]+$/.test(s)) throw new ValidationError("invalid cursor");
-  return s;
+  const i = s.indexOf(SEP);
+  // A valid cursor round-trips to "code\0id" with printable-ascii parts.
+  if (i <= 0 || !/^[\x20-\x7e]+$/.test(s.replace(SEP, ""))) throw new ValidationError("invalid cursor");
+  return { code: s.slice(0, i), id: s.slice(i + 1) };
 }
 
 function parseLimit(raw: string | undefined): number {
@@ -101,12 +104,14 @@ export function listPublicCourses(orgId: string, query: ListQuery): ListResult {
     .filter((c) => (query.level ? c.level === query.level : true))
     .filter((c) => (query.format ? c.format === query.format : true))
     .filter((c) => (q ? c.title.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) : true))
-    .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+    .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-  if (after !== null) rows = rows.filter((c) => c.code > after);
+  if (after !== null)
+    rows = rows.filter((c) => c.code > after.code || (c.code === after.code && c.id > after.id));
 
   const page = rows.slice(0, limit);
-  const nextCursor = rows.length > limit ? encodeCursor(page[page.length - 1].code) : null;
+  const last = page[page.length - 1];
+  const nextCursor = rows.length > limit ? encodeCursor(last.code, last.id) : null;
   return { items: page.map(toPublicCourse), nextCursor, pageSize: page.length };
 }
 

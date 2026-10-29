@@ -99,4 +99,18 @@ export const courses: InternalCourse[] = [
     objectives: ["Write professional emails", "Lead meetings", "Negotiate"],
     published: true,
   },
+  {
+    // DUPLICATE code "BUS-B2" (shared with f01) — exercises stable composite-cursor
+    // pagination (code tie broken by id).
+    id: "00000000-0000-4000-8000-000000000f02",
+    orgId: LUMEN,
+    brandId: LUMEN_BRAND,
+    code: "BUS-B2",
+    title: "Business English B2 (evening)",
+    level: "B2",
+    format: "hybrid",
+    durationWeeks: 9,
+    objectives: ["Write professional emails", "Lead meetings", "Negotiate"],
+    published: true,
+  },
 ];

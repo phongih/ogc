@@ -108,14 +108,18 @@ async function main() {
     await page.getByRole("button", { name: /Linh \(Learner\)/ }).click();
     await page.getByRole("link", { name: "OGC Learning" }).waitFor();
 
-    // Catalog list now served by the HTTP backend.
+    // Catalog list now served by the HTTP backend (first page = 2 courses by code order).
     await page.getByRole("link", { name: "Catalog" }).click();
     await page.getByRole("heading", { name: "Course catalog" }).waitFor();
     await page.getByText("Everyday English A2").waitFor();
-    await page.getByText("IELTS Foundation B2").waitFor();
     check("catalog list rendered from HTTP backend", true);
 
-    // Unpublished course must NOT appear.
+    // Explicit pagination: IELTS is on page 2 → "Load more" fetches the next page.
+    await page.getByRole("button", { name: "Load more" }).click();
+    await page.getByText("IELTS Foundation B2").waitFor();
+    check("explicit pagination (Load more) fetches next page from backend", true);
+
+    // Unpublished course must NOT appear anywhere.
     const hasDraft = (await page.getByText(/Advanced English C1/).count()) > 0;
     check("unpublished course absent from HTTP-backed list", !hasDraft);
 

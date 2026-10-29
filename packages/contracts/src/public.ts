@@ -60,6 +60,14 @@ export const PublicListResponse = z.object({
 });
 export type PublicListResponse = z.infer<typeof PublicListResponse>;
 
+// CatalogPage — the explicit pagination unit at the CatalogPort boundary (one page of
+// the public catalog view model). The UI drives pagination with the opaque nextCursor.
+export const CatalogPage = z.object({
+  items: z.array(PublicCourse),
+  nextCursor: z.string().nullable(),
+});
+export type CatalogPage = z.infer<typeof CatalogPage>;
+
 export const PublicItemResponse = z.object({
   data: PublicCourse,
   meta: PublicMeta,
