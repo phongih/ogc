@@ -13,14 +13,16 @@ pnpm -r --if-present typecheck
 echo "== lint =="
 pnpm lint
 
-echo "== test: web (unit + component + accessibility/axe) =="
+# Build the backend FIRST: the web conformance suite spawns the built server to run
+# the shared CatalogPort cases against the real localhost HTTP backend.
+echo "== build: catalog-api backend =="
+pnpm --filter @ogc/catalog-api build
+
+echo "== test: web (unit + component + a11y + CatalogPort conformance mock+http) =="
 pnpm --filter @ogc/web test
 
 echo "== test: catalog-api backend (contract + negative + leakage + throttle) =="
 pnpm --filter @ogc/catalog-api test
-
-echo "== build: catalog-api backend =="
-pnpm --filter @ogc/catalog-api build
 
 echo "== build: web =="
 pnpm --filter @ogc/web build
