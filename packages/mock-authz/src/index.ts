@@ -15,7 +15,7 @@ export const NON_PRODUCTION = true as const;
 export type MockRole = "staff" | "teacher" | "guardian" | "learner";
 
 /** UI navigation sections (not permissions). */
-export type Section = "directory" | "learning" | "teaching" | "catalog" | "tutor";
+export type Section = "directory" | "learning" | "teaching" | "catalog" | "tutor" | "guardian";
 
 export interface MockSession {
   readonly nonProduction: true;
@@ -37,9 +37,9 @@ export function createMockSession(persona: MockPersona): MockSession {
 }
 
 const SECTIONS_BY_ROLE: Record<MockRole, Section[]> = {
-  staff: ["directory", "catalog", "tutor", "teaching", "learning"],
+  staff: ["directory", "catalog", "tutor", "teaching", "learning", "guardian"],
   teacher: ["teaching", "catalog", "tutor"],
-  guardian: ["catalog", "tutor"],
+  guardian: ["guardian", "catalog", "tutor"],
   learner: ["learning", "catalog", "tutor"],
 };
 
@@ -55,4 +55,15 @@ export function mockCanView(session: MockSession | null, section: Section): bool
 export function sectionsFor(session: MockSession | null): Section[] {
   if (!session) return [];
   return SECTIONS_BY_ROLE[session.role];
+}
+
+/*
+ * D-14 (Guardian Self-Verification Prohibition). A guardian MUST NOT be able to
+ * self-assert or self-verify a relationship to a learner through this UI. The
+ * governed backend establishes natural-person identity and guardian links; this
+ * mock deliberately provides NO path to do so and always denies. This is a
+ * placeholder marking an UNRESOLVED security requirement — not an implementation.
+ */
+export function mockGuardianCanSelfVerify(): false {
+  return false;
 }

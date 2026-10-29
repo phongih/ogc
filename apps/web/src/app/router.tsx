@@ -13,6 +13,8 @@ import { ClassDetail } from "../features/teacher/ClassDetail";
 import { CatalogList } from "../features/catalog/CatalogList";
 import { CourseDetail } from "../features/catalog/CourseDetail";
 import { TutorView } from "../features/tutor/TutorView";
+import { LessonPlanEditor } from "../features/lessonplan/LessonPlanEditor";
+import { GuardianHome } from "../features/guardian/GuardianHome";
 
 export const routes = [
   { path: "/", element: <Landing /> },
@@ -28,10 +30,12 @@ export const routes = [
       { path: "learning", element: <RequireSection section="learning"><LearnerHome /></RequireSection> },
       { path: "teaching", element: <RequireSection section="teaching"><TeacherHome /></RequireSection> },
       { path: "teaching/classes/:classId", element: <RequireSection section="teaching"><ClassDetail /></RequireSection> },
+      { path: "teaching/classes/:classId/plan", element: <RequireSection section="teaching"><LessonPlanEditor /></RequireSection> },
       { path: "catalog", element: <RequireSection section="catalog"><CatalogList /></RequireSection> },
       { path: "catalog/:courseId", element: <RequireSection section="catalog"><CourseDetail /></RequireSection> },
       { path: "tutor", element: <RequireSection section="tutor"><TutorView /></RequireSection> },
       { path: "tutor/:convId", element: <RequireSection section="tutor"><TutorView /></RequireSection> },
+      { path: "guardian", element: <RequireSection section="guardian"><GuardianHome /></RequireSection> },
     ],
   },
 ];

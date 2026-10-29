@@ -1,22 +1,27 @@
-import { Link, useParams } from "react-router-dom";
-import { Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { useCourse } from "./queries";
-import { useLearnerDashboard } from "../learner/queries";
+import { useEnroll, useEnrollmentState } from "../enrollment/queries";
 
 export function CourseDetail() {
   const { courseId = "" } = useParams();
   const { session } = useSession();
+  const navigate = useNavigate();
+  const personaId = session?.personaId ?? "";
   const q = useCourse(courseId);
-  const learner = useLearnerDashboard(session?.personaId ?? "");
+  const stateQ = useEnrollmentState(personaId, courseId);
+  const enroll = useEnroll(personaId);
 
   if (q.isLoading) return <Spinner label="Loading course" />;
   if (q.isError) return <ErrorState message="Could not load course." onRetry={() => q.refetch()} />;
   if (!q.data) return <EmptyState title="Course not found" />;
 
   const c = q.data;
-  const enrollment = learner.data?.enrolled.find((e) => e.course.id === c.id);
-  const state = enrollment?.state ?? "not_enrolled";
+  const state = stateQ.data ?? "not_enrolled";
+  const isEnrolled = state !== "not_enrolled";
+  // Only learner personas can enroll themselves in this synthetic flow.
+  const canEnroll = session?.role === "learner";
 
   return (
     <section className="space-y-6">
@@ -33,13 +38,40 @@ export function CourseDetail() {
           </div>
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted">Enrollment</dt>
-            <dd className="mt-1">
-              {state.replace("_", " ")}
-              {enrollment ? ` · ${enrollment.progressPct}%` : ""}
-            </dd>
+            <dd className="mt-1">{state.replace("_", " ")}</dd>
           </div>
         </dl>
       </Card>
+
+      {canEnroll ? (
+        <Card className="space-y-3">
+          {isEnrolled ? (
+            <>
+              <p className="text-sm text-muted">You are enrolled in this course.</p>
+              <Button onClick={() => navigate("/app/learning")}>Resume learning</Button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted">Enroll to add this course to My Learning.</p>
+              <Button
+                onClick={() => enroll.mutate(c.id)}
+                disabled={enroll.isPending}
+                aria-label={`Enroll in ${c.title}`}
+              >
+                {enroll.isPending ? "Enrolling…" : "Enroll"}
+              </Button>
+              {enroll.data && !enroll.data.enrolled ? (
+                <p role="alert" className="text-sm text-danger">
+                  {enroll.data.reason === "already_enrolled"
+                    ? "You are already enrolled in this course."
+                    : "Could not enroll in this course."}
+                </p>
+              ) : null}
+            </>
+          )}
+        </Card>
+      ) : null}
+
       <div>
         <h2 className="mb-2 text-lg font-medium">Learning objectives</h2>
         <ul className="list-inside list-disc space-y-1 text-sm">

@@ -37,7 +37,12 @@ export function ClassDetail() {
       )}
       <section id="plan" aria-label="Lesson planning">
         <h2 className="mb-2 text-lg font-medium">Lesson planning</h2>
-        <EmptyState title="Lesson planning arrives in a later slice" hint="Entry point only in Slice-2." />
+        <Link
+          to={`/app/teaching/classes/${classId}/plan`}
+          className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+        >
+          Open lesson plan editor
+        </Link>
       </section>
       <Link to="/app/teaching" className="inline-block text-sm text-brand">
         ← Back to teaching

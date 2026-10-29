@@ -4,3 +4,6 @@ export * from "./catalog.js";
 export * from "./learner.js";
 export * from "./teacher.js";
 export * from "./tutor.js";
+export * from "./lessonplan.js";
+export * from "./guardian.js";
+export * from "./enrollment.js";

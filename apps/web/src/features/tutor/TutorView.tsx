@@ -2,24 +2,41 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
-import { useConversation, useConversations, useSendMessage, useSuggestedPrompts } from "./queries";
+import {
+  useConversation,
+  useConversations,
+  useCreateConversation,
+  useSendMessage,
+  useSuggestedPrompts,
+} from "./queries";
 
 export function TutorView() {
   const { session } = useSession();
+  const personaId = session?.personaId ?? "";
   const { convId } = useParams();
   const navigate = useNavigate();
-  const list = useConversations(session?.personaId ?? "");
+  const list = useConversations(personaId);
   const activeId = convId ?? list.data?.[0]?.id ?? "";
-  const conv = useConversation(activeId);
-  const prompts = useSuggestedPrompts(activeId);
-  const send = useSendMessage(activeId);
+  const conv = useConversation(personaId, activeId);
+  const prompts = useSuggestedPrompts(personaId);
+  const send = useSendMessage(personaId, activeId);
+  const create = useCreateConversation(personaId);
   const [text, setText] = useState("");
 
   const submit = (value: string) => {
     const v = value.trim();
-    if (!v || send.isPending) return;
+    if (!v || send.isPending || !activeId) return;
     send.mutate(v);
     setText("");
+  };
+
+  const startNew = () => {
+    if (create.isPending) return;
+    const n = (list.data?.length ?? 0) + 1;
+    create.mutate(
+      { title: `New conversation ${n}`, lessonContext: null },
+      { onSuccess: (c) => navigate(`/app/tutor/${c.id}`) },
+    );
   };
 
   return (
@@ -27,8 +44,13 @@ export function TutorView() {
       <PageHeader title="AI Tutor" subtitle="Deterministic mock provider · no external LLM · synthetic history" />
       <div className="grid gap-4 md:grid-cols-[220px_1fr]">
         <nav aria-label="Conversations" className="space-y-2">
+          <Button variant="ghost" className="w-full" onClick={startNew} disabled={create.isPending}>
+            + New conversation
+          </Button>
           {list.isLoading ? (
             <Spinner label="Loading conversations" />
+          ) : (list.data ?? []).length === 0 ? (
+            <p className="px-1 text-xs text-muted">No conversations yet.</p>
           ) : (
             (list.data ?? []).map((c) => (
               <button
@@ -50,7 +72,7 @@ export function TutorView() {
           ) : conv.isError ? (
             <ErrorState message="Could not load the conversation." onRetry={() => conv.refetch()} />
           ) : !conv.data ? (
-            <EmptyState title="Select a conversation" />
+            <EmptyState title="Select or start a conversation" />
           ) : (
             <>
               {conv.data.lessonContext ? (
@@ -71,6 +93,9 @@ export function TutorView() {
                     </Card>
                   </li>
                 ))}
+                {conv.data.messages.length === 0 ? (
+                  <li className="text-sm text-muted">Start by asking a question below.</li>
+                ) : null}
               </ul>
 
               <div className="flex flex-wrap gap-2">

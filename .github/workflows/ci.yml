@@ -19,5 +19,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r --if-present typecheck
       - run: pnpm lint
-      - run: pnpm --filter @ogc/web test
+      - run: pnpm --filter @ogc/web test # unit + component + accessibility (axe)
       - run: pnpm --filter @ogc/web build
+      # Optional E2E: provisions a browser only on a hosted runner. Non-blocking so the
+      # core gates above remain authoritative; the local script resolves a pre-installed
+      # Playwright instead of downloading one.
+      - name: E2E smoke (Playwright)
+        continue-on-error: true
+        run: |
+          pnpm --filter @ogc/web exec playwright install --with-deps chromium || true
+          node e2e/smoke.mjs || echo "E2E skipped/soft-failed (non-blocking)"

@@ -7,7 +7,10 @@ const ORG = organizations[0].id;
 // Fixed base time so the mock is deterministic (no wall-clock in content).
 export const TUTOR_EPOCH = Date.parse("2026-10-20T08:00:00.000Z");
 
-export const seedConversations: Conversation[] = [
+// personaId is assigned by the store when seeding a persona (conversations are per-persona).
+export type SeedConversation = Omit<Conversation, "personaId">;
+
+export const seedConversations: SeedConversation[] = [
   {
     id: "CONV-001",
     orgId: ORG,

@@ -18,6 +18,7 @@ export type LessonContext = z.infer<typeof LessonContext>;
 export const Conversation = z.object({
   id: z.string().min(1),
   orgId: Id,
+  personaId: z.string().min(1), // owner; conversations are strictly per-persona
   title: z.string().min(1),
   lessonContext: LessonContext.nullable(),
   messages: z.array(Message),
@@ -26,8 +27,10 @@ export type Conversation = z.infer<typeof Conversation>;
 
 export interface TutorPort {
   listConversations(personaId: string): Promise<Conversation[]>;
-  getConversation(conversationId: string): Promise<Conversation | null>;
-  // Deterministic: the same input always yields the same tutor reply. No external LLM.
-  send(conversationId: string, text: string): Promise<Message[]>;
-  suggestedPrompts(conversationId: string): Promise<string[]>;
+  // personaId scopes access: a persona can only read/write its own conversations (fail-closed).
+  getConversation(personaId: string, conversationId: string): Promise<Conversation | null>;
+  createConversation(personaId: string, title: string, lessonContext?: LessonContext | null): Promise<Conversation>;
+  // Deterministic: same input always yields the same tutor reply. No external LLM.
+  send(personaId: string, conversationId: string, text: string): Promise<Message[]>;
+  suggestedPrompts(): Promise<string[]>;
 }
