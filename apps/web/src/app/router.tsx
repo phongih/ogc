@@ -2,24 +2,38 @@ import { createBrowserRouter } from "react-router-dom";
 import { Landing } from "../routes/public/Landing";
 import { MockLogin } from "../routes/app/MockLogin";
 import { Shell } from "../routes/app/Shell";
-import { Placeholder } from "../routes/app/Placeholder";
+import { AppHome } from "../routes/app/AppHome";
+import { RequireSection } from "./RequireSection";
 import { OrgList } from "../features/org/OrgList";
 import { OrgDetail } from "../features/org/OrgDetail";
 import { CenterDetail } from "../features/org/CenterDetail";
+import { LearnerHome } from "../features/learner/LearnerHome";
+import { TeacherHome } from "../features/teacher/TeacherHome";
+import { ClassDetail } from "../features/teacher/ClassDetail";
+import { CatalogList } from "../features/catalog/CatalogList";
+import { CourseDetail } from "../features/catalog/CourseDetail";
+import { TutorView } from "../features/tutor/TutorView";
 
-export const router = createBrowserRouter([
+export const routes = [
   { path: "/", element: <Landing /> },
   { path: "/login", element: <MockLogin /> },
   {
     path: "/app",
     element: <Shell />,
     children: [
-      { index: true, element: <OrgList /> },
-      { path: "orgs", element: <OrgList /> },
-      { path: "orgs/:orgId", element: <OrgDetail /> },
-      { path: "centers/:centerId", element: <CenterDetail /> },
-      { path: "catalog", element: <Placeholder title="Course catalog" /> },
-      { path: "tutor", element: <Placeholder title="AI Tutor" /> },
+      { index: true, element: <AppHome /> },
+      { path: "orgs", element: <RequireSection section="directory"><OrgList /></RequireSection> },
+      { path: "orgs/:orgId", element: <RequireSection section="directory"><OrgDetail /></RequireSection> },
+      { path: "centers/:centerId", element: <RequireSection section="directory"><CenterDetail /></RequireSection> },
+      { path: "learning", element: <RequireSection section="learning"><LearnerHome /></RequireSection> },
+      { path: "teaching", element: <RequireSection section="teaching"><TeacherHome /></RequireSection> },
+      { path: "teaching/classes/:classId", element: <RequireSection section="teaching"><ClassDetail /></RequireSection> },
+      { path: "catalog", element: <RequireSection section="catalog"><CatalogList /></RequireSection> },
+      { path: "catalog/:courseId", element: <RequireSection section="catalog"><CourseDetail /></RequireSection> },
+      { path: "tutor", element: <RequireSection section="tutor"><TutorView /></RequireSection> },
+      { path: "tutor/:convId", element: <RequireSection section="tutor"><TutorView /></RequireSection> },
     ],
   },
-]);
+];
+
+export const router = createBrowserRouter(routes);

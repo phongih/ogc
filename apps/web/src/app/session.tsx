@@ -10,8 +10,14 @@ interface SessionCtx {
 
 const Ctx = createContext<SessionCtx | null>(null);
 
-export function SessionProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<MockSession | null>(null);
+export function SessionProvider({
+  children,
+  initialSession = null,
+}: {
+  children: ReactNode;
+  initialSession?: MockSession | null; // used by tests to seed a persona
+}) {
+  const [session, setSession] = useState<MockSession | null>(initialSession);
   const value = useMemo<SessionCtx>(
     () => ({
       session,

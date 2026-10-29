@@ -4,10 +4,12 @@ import { Button, Card, PageHeader } from "../../ui";
 import type { MockPersona } from "@ogc/mock-authz";
 
 // Synthetic demo personas. No passwords, no real identities (NON-PRODUCTION).
+const ORG = "00000000-0000-4000-8000-000000000001";
 const personas: MockPersona[] = [
-  { personaId: "demo-staff", displayName: "Sam (Org Staff)", role: "staff", orgId: "00000000-0000-4000-8000-000000000001" },
-  { personaId: "demo-teacher", displayName: "Tara (Teacher)", role: "teacher", orgId: "00000000-0000-4000-8000-000000000001" },
-  { personaId: "demo-learner", displayName: "Linh (Learner)", role: "learner", orgId: "00000000-0000-4000-8000-000000000001" },
+  { personaId: "demo-staff", displayName: "Sam (Org Staff)", role: "staff", orgId: ORG },
+  { personaId: "demo-teacher", displayName: "Tara (Teacher)", role: "teacher", orgId: ORG },
+  { personaId: "demo-learner", displayName: "Linh (Learner)", role: "learner", orgId: ORG },
+  { personaId: "demo-guardian", displayName: "Mai (Guardian)", role: "guardian", orgId: ORG },
 ];
 
 export function MockLogin() {
@@ -25,7 +27,7 @@ export function MockLogin() {
                 className="w-full justify-between"
                 onClick={() => {
                   signIn(p);
-                  navigate("/app/orgs");
+                  navigate("/app");
                 }}
               >
                 <span>{p.displayName}</span>
