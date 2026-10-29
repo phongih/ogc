@@ -8,3 +8,4 @@ export * from "./lessonplan.js";
 export * from "./guardian.js";
 export * from "./enrollment.js";
 export * from "./learning.js";
+export * from "./public.js";

@@ -11,6 +11,7 @@ import type {
   ProgressViewPort,
 } from "@ogc/contracts";
 import { mockCatalog } from "../adapters/mockCatalog";
+import { httpCatalog } from "../adapters/httpCatalog";
 import { mockLearner } from "../adapters/mockLearner";
 import { mockTeacher } from "../adapters/mockTeacher";
 import { mockTutor } from "../adapters/mockTutor";
@@ -19,7 +20,15 @@ import { mockLessonPlan } from "../adapters/mockLessonPlan";
 import { mockGuardian } from "../adapters/mockGuardian";
 import { mockLearning, mockProgressView } from "../adapters/mockLearning";
 
-export const catalog: CatalogPort = mockCatalog;
+// Catalog is the only port with a real backend adapter (Slice-7). Selection is
+// dev-config only: `http` uses the local Catalog backend, otherwise the mock. Default
+// is the mock, so existing tests/E2E and all authenticated workflows are unchanged.
+function selectCatalog(): CatalogPort {
+  const g = (globalThis as unknown as { __OGC_CATALOG__?: { adapter?: string } }).__OGC_CATALOG__;
+  const mode = g?.adapter ?? (import.meta.env.VITE_CATALOG_ADAPTER as string | undefined);
+  return mode === "http" ? httpCatalog : mockCatalog;
+}
+export const catalog: CatalogPort = selectCatalog();
 export const learner: LearnerPort = mockLearner;
 export const teacher: TeacherPort = mockTeacher;
 export const tutor: TutorPort = mockTutor;
