@@ -15,10 +15,20 @@ describe("CatalogList", () => {
     expect(screen.queryByText("Everyday English A2")).not.toBeInTheDocument();
   });
 
-  it("shows an empty state when filters match nothing", async () => {
+  it("shows a clearable empty state when filters match nothing", async () => {
     renderUI(<CatalogList />, { role: "learner" });
     await userEvent.type(screen.getByLabelText("Search courses"), "zzzznope");
-    await waitFor(() => expect(screen.getByText("No courses match")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("No courses match these filters")).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "Clear filters" })).toBeInTheDocument();
+  });
+
+  it("clears filters to restore the full catalog", async () => {
+    renderUI(<CatalogList />, { role: "learner" });
+    await userEvent.type(screen.getByLabelText("Search courses"), "zzzznope");
+    await waitFor(() => expect(screen.getByText("No courses match these filters")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await waitFor(() => expect(screen.getByText("Everyday English A2")).toBeInTheDocument());
   });
 
   it("exposes accessible filter controls", () => {
