@@ -236,6 +236,49 @@ check("smoke-routes: all major routes render on the built dist", () => {
   }
 });
 
+// ──────────────────────────── B-5: promote / rollback rehearsal ─────────────────────
+const A = "a".repeat(40);
+const B = "b".repeat(40);
+function fakeRelease(root, sha) {
+  const d = join(root, "releases", sha);
+  mkdirSync(d, { recursive: true });
+  writeFileSync(join(d, "index.html"), `rel ${sha}`);
+}
+function currentIndex(root) {
+  return readFileSync(join(root, "current", "index.html"), "utf8");
+}
+
+check("promote + rollback rehearsal: atomic swap, previous preserved, before/after evidence", () => {
+  const root = tmp();
+  fakeRelease(root, A);
+  fakeRelease(root, B);
+
+  expectOk(run("promote.sh", [root, A]), "promote A");
+  if (currentIndex(root) !== `rel ${A}`) throw new Error("current did not point at A");
+
+  expectOk(run("promote.sh", [root, B]), "promote B");
+  if (currentIndex(root) !== `rel ${B}`) throw new Error("current did not point at B");
+  if (readFileSync(join(root, ".previous"), "utf8").trim() !== A) throw new Error(".previous != A");
+
+  const r = run("rollback.sh", [root]);
+  expectOk(r, "rollback");
+  if (!/before=\S+ after=\S+/.test(r.stdout)) throw new Error(`no before/after evidence: ${r.stdout}`);
+  if (currentIndex(root) !== `rel ${A}`) throw new Error("rollback did not restore A");
+  if (!existsSync(join(root, "releases", B, "index.html"))) throw new Error("B release was not preserved");
+});
+
+check("promote: rejects a missing release dir and an unsafe root", () => {
+  const root = tmp();
+  mkdirSync(root, { recursive: true });
+  expectFail(run("promote.sh", [root, "c".repeat(40)]), "missing release dir");
+  expectFail(run("promote.sh", ["relative/root", A]), "unsafe root");
+});
+
+check("promote/rollback: refuse the live VM root without OGC_LIVE", () => {
+  expectFail(run("promote.sh", ["/var/www/ogc", A]), "live promote refused");
+  expectFail(run("rollback.sh", ["/var/www/ogc"]), "live rollback refused");
+});
+
 // ───────────────────────────────────── summary ──────────────────────────────────────
 for (const d of tmps) rmSync(d, { recursive: true, force: true });
 console.log(`\n${pass}/${pass + fail} release-toolkit checks passed`);
