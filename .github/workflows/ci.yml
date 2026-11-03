@@ -19,9 +19,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r --if-present typecheck
       - run: pnpm lint
-      - run: pnpm --filter @ogc/web test # unit + component + accessibility (axe)
-      - run: pnpm --filter @ogc/catalog-api test # backend contract/negative/leakage
+      # Build the backend FIRST: the web conformance suite (conformance.http.test.ts)
+      # spawns the built catalog-api server to run the shared CatalogPort cases against
+      # the real localhost HTTP backend. Must precede the web test step on a clean runner.
       - run: pnpm --filter @ogc/catalog-api build
+      - run: pnpm --filter @ogc/web test # unit + component + accessibility (axe) + conformance (mock+http)
+      - run: pnpm --filter @ogc/catalog-api test # backend contract/negative/leakage
       - run: pnpm --filter @ogc/web build
       # Optional E2E: provisions a browser only on a hosted runner. Non-blocking so the
       # core gates above remain authoritative; the local script resolves a pre-installed
