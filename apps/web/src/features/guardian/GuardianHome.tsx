@@ -1,11 +1,65 @@
-import { Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import type { GuardianLinkView } from "@ogc/contracts";
+import { Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { useGuardianDashboard } from "./queries";
+import { useLearnerProgress } from "../learning/queries";
 
 function consentLabel(status: string): string {
   if (status === "active") return "Consent on file";
   if (status === "revoked") return "Consent revoked";
   return "No consent on file";
+}
+
+// Read-only progress view for ONE linked learner. The per-course breakdown is fetched
+// through the authorization-checked ProgressViewPort (fail-closed: a learner the guardian
+// is not linked to resolves to null). D-14: there is no add/verify control anywhere here.
+function LinkedLearnerCard({ link, viewerPersonaId }: { link: GuardianLinkView; viewerPersonaId: string }) {
+  const prog = useLearnerProgress(viewerPersonaId, link.learnerId);
+  const summary = prog.data ?? null;
+  const overall = summary?.overallPct ?? link.progressPct;
+
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-center gap-4">
+        <ProgressRing pct={overall} label={`${link.displayName} progress`} size={64} />
+        <div>
+          <h2 className="font-medium">{link.displayName}</h2>
+          <p className="text-xs text-muted">{overall}% overall · equal-weight average</p>
+        </div>
+      </div>
+
+      <p className="text-sm">{consentLabel(link.consentStatus)}</p>
+      <p className="text-sm text-muted">
+        Next session:{" "}
+        {link.nextSessionAt
+          ? new Date(link.nextSessionAt).toLocaleString("en-GB", { timeZone: "UTC" })
+          : "None scheduled"}
+      </p>
+
+      <div>
+        <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">By course</h3>
+        {prog.isLoading ? (
+          <p className="text-xs text-muted">Loading course progress…</p>
+        ) : !summary || summary.snapshots.length === 0 ? (
+          <p className="text-xs text-muted">No course progress to show.</p>
+        ) : (
+          <ul className="space-y-2">
+            {summary.snapshots.map((s) => (
+              <li key={s.courseId} className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span>{s.courseTitle}</span>
+                  <span className="text-muted">
+                    {s.completedActivities}/{s.totalActivities} · {s.progressPct}%
+                  </span>
+                </div>
+                <ProgressBar pct={s.progressPct} label={`${s.courseTitle} progress`} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Card>
+  );
 }
 
 export function GuardianHome() {
@@ -37,32 +91,7 @@ export function GuardianHome() {
         <ul className="grid gap-4 sm:grid-cols-2">
           {d.links.map((link) => (
             <li key={link.learnerId}>
-              <Card className="space-y-2">
-                <h2 className="font-medium">{link.displayName}</h2>
-                <div>
-                  <div
-                    role="progressbar"
-                    aria-valuenow={link.progressPct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label={`${link.displayName} progress`}
-                    className="h-2 w-full overflow-hidden rounded-full bg-border"
-                  >
-                    <span
-                      className="block h-full bg-brand"
-                      style={{ width: `${link.progressPct}%` }}
-                    />
-                  </div>
-                  <p className="mt-1 text-xs text-muted">{link.progressPct}% complete</p>
-                </div>
-                <p className="text-sm">{consentLabel(link.consentStatus)}</p>
-                <p className="text-sm text-muted">
-                  Next session:{" "}
-                  {link.nextSessionAt
-                    ? new Date(link.nextSessionAt).toLocaleString("en-GB", { timeZone: "UTC" })
-                    : "None scheduled"}
-                </p>
-              </Card>
+              <LinkedLearnerCard link={link} viewerPersonaId={session?.personaId ?? ""} />
             </li>
           ))}
         </ul>

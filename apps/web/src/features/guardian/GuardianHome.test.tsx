@@ -17,4 +17,18 @@ describe("GuardianHome", () => {
     // No control to add or verify a link exists.
     expect(screen.queryByRole("button", { name: /add learner|verify/i })).toBeNull();
   });
+
+  it("shows a read-only per-course progress breakdown for the linked learner", async () => {
+    renderApp("/app/guardian", "guardian");
+    await waitFor(() => expect(screen.getByText("Linh N.")).toBeInTheDocument());
+
+    expect(screen.getByRole("heading", { name: "By course" })).toBeInTheDocument();
+    // Overall ring ("Linh N. progress") plus per-course bars ("<course> progress"),
+    // which load asynchronously through the authorization-checked ProgressViewPort.
+    await waitFor(() =>
+      expect(screen.getAllByRole("progressbar", { name: /progress$/i }).length).toBeGreaterThanOrEqual(2),
+    );
+    // Still read-only: no control to mutate the link or verify it.
+    expect(screen.queryByRole("button", { name: /add learner|verify|edit link/i })).toBeNull();
+  });
 });
