@@ -1,22 +1,7 @@
 import { Link } from "react-router-dom";
-import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { useLearnerDashboard } from "./queries";
-
-function ProgressBar({ pct }: { pct: number }) {
-  return (
-    <div
-      className="mt-2 h-2 w-full overflow-hidden rounded-full bg-border"
-      role="progressbar"
-      aria-valuenow={pct}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-label={`Progress ${pct}%`}
-    >
-      <div className="h-full bg-brand" style={{ width: `${pct}%` }} />
-    </div>
-  );
-}
 
 export function LearnerHome() {
   const { session } = useSession();
@@ -27,9 +12,29 @@ export function LearnerHome() {
   if (!q.data) return <EmptyState title="No learner profile for this persona" hint="Sign in as the learner demo persona." />;
 
   const d = q.data;
+  // Overall progress uses equal course weighting (per Slice-5 decision: equal_course_weight).
+  const overallPct =
+    d.enrolled.length > 0
+      ? Math.round(d.enrolled.reduce((sum, e) => sum + e.progressPct, 0) / d.enrolled.length)
+      : 0;
+  const inProgress = d.enrolled.filter((e) => e.state === "in_progress").length;
+
   return (
     <section className="space-y-8">
       <PageHeader title="My Learning" subtitle={`${d.learnerName} · synthetic demo`} />
+
+      {d.enrolled.length > 0 ? (
+        <Card className="flex items-center gap-5">
+          <ProgressRing pct={overallPct} label="Overall learning progress" />
+          <div>
+            <p className="font-medium">Overall progress</p>
+            <p className="mt-1 text-sm text-muted">
+              {d.enrolled.length} course{d.enrolled.length === 1 ? "" : "s"} · {inProgress} in progress ·
+              equal-weight average
+            </p>
+          </div>
+        </Card>
+      ) : null}
 
       <div>
         <h2 className="mb-3 text-lg font-medium">Enrolled courses</h2>
@@ -49,7 +54,7 @@ export function LearnerHome() {
                     </div>
                     <span className="text-sm text-muted">{e.progressPct}%</span>
                   </div>
-                  <ProgressBar pct={e.progressPct} />
+                  <ProgressBar pct={e.progressPct} className="mt-2" />
                   <div className="mt-3 flex gap-2">
                     <Link to={`/app/learning/courses/${e.course.id}`}>
                       <Button variant="ghost">Resume learning</Button>

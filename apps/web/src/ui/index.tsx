@@ -66,6 +66,78 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
+/** Linear progress bar. Shared primitive (was duplicated in learner/learning features). */
+export function ProgressBar({
+  pct,
+  label,
+  className = "",
+}: {
+  pct: number;
+  label?: string;
+  className?: string;
+}) {
+  const v = Math.max(0, Math.min(100, Math.round(pct)));
+  return (
+    <div
+      className={`h-2 w-full overflow-hidden rounded-full bg-border ${className}`.trim()}
+      role="progressbar"
+      aria-valuenow={v}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label ?? `Progress ${v}%`}
+    >
+      <div className="h-full bg-brand" style={{ width: `${v}%` }} />
+    </div>
+  );
+}
+
+/** Circular progress ring (SVG donut) with the percentage centered. */
+export function ProgressRing({
+  pct,
+  label,
+  size = 72,
+  stroke = 8,
+}: {
+  pct: number;
+  label?: string;
+  size?: number;
+  stroke?: number;
+}) {
+  const v = Math.max(0, Math.min(100, Math.round(pct)));
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - v / 100);
+  return (
+    <div
+      className="relative inline-flex items-center justify-center text-brand"
+      role="progressbar"
+      aria-valuenow={v}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label ?? `Progress ${v}%`}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-border" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="transition-[stroke-dashoffset] duration-500"
+        />
+      </svg>
+      <span aria-hidden="true" className="absolute text-sm font-semibold text-fg">
+        {v}%
+      </span>
+    </div>
+  );
+}
+
 export function NonProductionBanner() {
   return (
     <div className="bg-danger/10 text-danger text-center text-xs py-1 px-3 border-b border-danger/30">
