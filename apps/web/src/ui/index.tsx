@@ -1,5 +1,36 @@
 // Reusable, responsive, accessible UI primitives (Architecture requirement #6).
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Link } from "react-router-dom";
+
+export interface Crumb {
+  label: string;
+  to?: string;
+}
+
+/** Breadcrumb trail rendered as a navigation landmark. The final (currentless) crumb
+ *  is marked aria-current="page". */
+export function Breadcrumbs({ items }: { items: Crumb[] }) {
+  return (
+    <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted">
+      <ol className="flex flex-wrap items-center gap-1.5">
+        {items.map((it, i) => (
+          <li key={`${it.label}-${i}`} className="flex items-center gap-1.5">
+            {it.to ? (
+              <Link to={it.to} className="text-brand hover:underline">
+                {it.label}
+              </Link>
+            ) : (
+              <span aria-current="page" className="text-fg">
+                {it.label}
+              </span>
+            )}
+            {i < items.length - 1 ? <span aria-hidden="true">/</span> : null}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
 
 export function Button({
   variant = "primary",

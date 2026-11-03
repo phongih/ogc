@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { Breadcrumbs, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { useBrands, useCenters, useOrganization } from "./queries";
 
 export function OrgDetail() {
@@ -14,6 +14,7 @@ export function OrgDetail() {
 
   return (
     <section className="space-y-8">
+      <Breadcrumbs items={[{ label: "Organizations", to: "/app/orgs" }, { label: org.data.name }]} />
       <PageHeader title={org.data.name} subtitle={`Organization · /${org.data.slug}`} />
 
       <div>
@@ -59,9 +60,6 @@ export function OrgDetail() {
         )}
       </div>
 
-      <Link to="/app/orgs" className="inline-block text-sm text-brand">
-        ← All organizations
-      </Link>
     </section>
   );
 }

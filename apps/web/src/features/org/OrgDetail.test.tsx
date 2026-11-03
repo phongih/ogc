@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { renderApp } from "../../test/harness";
 
 const ORG_NOVA = "00000000-0000-4000-8000-000000000001";
@@ -22,5 +22,13 @@ describe("OrgDetail", () => {
 
     const centerLink = screen.getByText("Nova English — District 1").closest("a");
     expect(centerLink).toHaveAttribute("href", "/app/centers/00000000-0000-4000-8000-000000000c01");
+  });
+
+  it("exposes a breadcrumb landmark back to the directory root", async () => {
+    renderApp(`/app/orgs/${ORG_NOVA}`, "staff");
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Nova Learning Group" })).toBeInTheDocument());
+
+    const crumb = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(within(crumb).getByRole("link", { name: "Organizations" })).toHaveAttribute("href", "/app/orgs");
   });
 });
