@@ -89,6 +89,63 @@ check("checkout: refuses to overwrite an existing dest", () => {
   expectFail(run("release-checkout.sh", [REPO, SHA, dest]), "existing dest");
 });
 
+// ────────────────────────── B-2: build-manifest / verify-artifact ───────────────────
+function fakeDist() {
+  const d = tmp();
+  mkdirSync(join(d, "assets"), { recursive: true });
+  writeFileSync(join(d, "index.html"), "<!doctype html><title>x</title><script src=/assets/app.js></script>");
+  writeFileSync(join(d, "assets", "app.js"), "console.log('ogc')");
+  return d;
+}
+function makeManifest(dist, sha = "a".repeat(40), mode = "mock") {
+  const out = join(tmp(), "manifest.json");
+  execFileSync("node", [join(SCRIPTS, "make-manifest.mjs"), dist, sha, mode, out], { stdio: "ignore" });
+  return out;
+}
+
+check("verify-artifact: accepts a dist that matches its manifest", () => {
+  const dist = fakeDist();
+  const man = makeManifest(dist);
+  expectOk(run("verify-artifact.sh", [dist, man]), "verify happy");
+});
+
+check("verify-artifact: rejects a tampered asset (sha mismatch)", () => {
+  const dist = fakeDist();
+  const man = makeManifest(dist);
+  writeFileSync(join(dist, "assets", "app.js"), "console.log('tampered')");
+  expectFail(run("verify-artifact.sh", [dist, man]), "tamper");
+});
+
+check("verify-artifact: rejects a missing asset", () => {
+  const dist = fakeDist();
+  const man = makeManifest(dist);
+  rmSync(join(dist, "assets", "app.js"));
+  expectFail(run("verify-artifact.sh", [dist, man]), "missing asset");
+});
+
+check("verify-artifact: rejects an invalid manifest and a non-mock build mode", () => {
+  const dist = fakeDist();
+  const bad = join(tmp(), "bad.json");
+  writeFileSync(bad, "{ not valid json");
+  expectFail(run("verify-artifact.sh", [dist, bad]), "invalid manifest");
+  const httpMan = makeManifest(dist, "a".repeat(40), "http");
+  expectFail(run("verify-artifact.sh", [dist, httpMan]), "non-mock build mode");
+});
+
+check("build-manifest: rejects an unexpected build mode (no build performed)", () => {
+  expectFail(run("build-manifest.sh", [REPO, join(tmp(), "m.json")], { OGC_BUILD_MODE: "http" }), "bad mode");
+});
+
+check("build-manifest: builds the synthetic SPA and the manifest verifies", () => {
+  const man = join(tmp(), "release-manifest.json");
+  expectOk(run("build-manifest.sh", [REPO, man]), "build-manifest happy");
+  const m = JSON.parse(readFileSync(man, "utf8"));
+  if (m.buildMode !== "mock") throw new Error(`buildMode ${m.buildMode}`);
+  if (m.sha !== SHA) throw new Error(`manifest sha ${m.sha} != ${SHA}`);
+  if (!m.assets.some((a) => a.path === "index.html")) throw new Error("no index.html in manifest");
+  expectOk(run("verify-artifact.sh", [join(REPO, "apps/web/dist"), man]), "verify built artifact");
+});
+
 // ───────────────────────────────────── summary ──────────────────────────────────────
 for (const d of tmps) rmSync(d, { recursive: true, force: true });
 console.log(`\n${pass}/${pass + fail} release-toolkit checks passed`);
