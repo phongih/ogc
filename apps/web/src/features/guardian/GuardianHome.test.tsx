@@ -18,6 +18,12 @@ describe("GuardianHome", () => {
     expect(screen.queryByRole("button", { name: /add learner|verify/i })).toBeNull();
   });
 
+  it("summarizes the guardian workspace with stat tiles", async () => {
+    renderApp("/app/guardian", "guardian");
+    await waitFor(() => expect(screen.getByText("Linked learners")).toBeInTheDocument());
+    expect(screen.getByText("Average progress")).toBeInTheDocument();
+  });
+
   it("shows a read-only per-course progress breakdown for the linked learner", async () => {
     renderApp("/app/guardian", "guardian");
     await waitFor(() => expect(screen.getByText("Linh N.")).toBeInTheDocument());

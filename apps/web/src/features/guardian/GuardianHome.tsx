@@ -1,5 +1,5 @@
 import type { GuardianLinkView } from "@ogc/contracts";
-import { Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner } from "../../ui";
+import { Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner, StatTile } from "../../ui";
 import { useSession } from "../../app/session";
 import { useGuardianDashboard } from "./queries";
 import { useLearnerProgress } from "../learning/queries";
@@ -71,6 +71,10 @@ export function GuardianHome() {
   if (!q.data) return <EmptyState title="No guardian workspace" hint="This persona is not a guardian." />;
 
   const d = q.data;
+  const avgProgress =
+    d.links.length > 0
+      ? Math.round(d.links.reduce((sum, l) => sum + l.progressPct, 0) / d.links.length)
+      : 0;
 
   return (
     <section className="space-y-6">
@@ -84,6 +88,13 @@ export function GuardianHome() {
         Linked learners are set up by your learning center. Guardians cannot add or verify a
         learner link here — this is handled by a governed process (unresolved requirement D-14).
       </p>
+
+      {d.links.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <StatTile label="Linked learners" value={d.links.length} />
+          <StatTile label="Average progress" value={`${avgProgress}%`} hint="equal-weight" />
+        </div>
+      ) : null}
 
       {d.links.length === 0 ? (
         <EmptyState title="No linked learners" hint="Contact your center to link a learner." />

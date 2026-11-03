@@ -30,6 +30,13 @@ describe("LearnerHome progress visualization", () => {
     expect(resumeLinks.length).toBe(bars.length);
   });
 
+  it("summarizes learning with stat tiles", async () => {
+    renderApp("/app/learning", "learner");
+    await waitFor(() => expect(screen.getByText("Courses")).toBeInTheDocument());
+    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.getByText("Upcoming")).toBeInTheDocument();
+  });
+
   it("deep-links each upcoming lesson to its course", async () => {
     renderApp("/app/learning", "learner");
     const list = await screen.findByRole("list", { name: "Upcoming lessons" });
