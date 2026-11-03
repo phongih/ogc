@@ -225,6 +225,17 @@ await (async () => {
   }
 })();
 
+// ─────────────────────────────────── B-4: smoke-routes ──────────────────────────────
+check("smoke-routes: all major routes render on the built dist", () => {
+  const dist = join(REPO, "apps/web/dist");
+  if (!existsSync(join(dist, "index.html"))) throw new Error("dist not built (build-manifest test should run first)");
+  try {
+    execFileSync("node", [join(SCRIPTS, "smoke-routes.mjs"), dist], { stdio: "ignore", timeout: 120000 });
+  } catch (e) {
+    throw new Error(`smoke-routes exited non-zero :: ${e.stderr?.toString() || e.message}`);
+  }
+});
+
 // ───────────────────────────────────── summary ──────────────────────────────────────
 for (const d of tmps) rmSync(d, { recursive: true, force: true });
 console.log(`\n${pass}/${pass + fail} release-toolkit checks passed`);
