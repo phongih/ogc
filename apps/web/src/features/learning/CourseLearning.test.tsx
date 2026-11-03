@@ -23,5 +23,7 @@ describe("CourseLearning", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: /Complete .*Quiz: At the market/i })).toBeNull(),
     );
+    // Completion is announced through a status region (a11y feedback).
+    await waitFor(() => expect(screen.getByText(/activity marked complete/i)).toBeInTheDocument());
   });
 });
