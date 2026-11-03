@@ -5,7 +5,7 @@
  * Scripts are invoked as real child processes against throwaway temp directories so the
  * fail-closed behavior (non-zero exit on bad input) is exercised exactly as in production.
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
@@ -145,6 +145,85 @@ check("build-manifest: builds the synthetic SPA and the manifest verifies", () =
   if (!m.assets.some((a) => a.path === "index.html")) throw new Error("no index.html in manifest");
   expectOk(run("verify-artifact.sh", [join(REPO, "apps/web/dist"), man]), "verify built artifact");
 });
+
+// ─────────────────────────────────── B-3: verify-https ──────────────────────────────
+function makeCert() {
+  const dir = tmp();
+  const key = join(dir, "key.pem");
+  const cert = join(dir, "cert.pem");
+  execFileSync(
+    "openssl",
+    ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-keyout", key, "-out", cert, "-days", "1",
+     "-subj", "/CN=localhost", "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1"],
+    { stdio: "ignore" },
+  );
+  return { key, cert };
+}
+
+// The TLS server runs in a SEPARATE process: the test uses synchronous execFileSync for
+// curl, which would otherwise block an in-process server's event loop.
+const SERVER_SRC = `
+const https = require("node:https"), fs = require("node:fs");
+const s = https.createServer(
+  { key: fs.readFileSync(process.argv[1]), cert: fs.readFileSync(process.argv[2]) },
+  (req, res) => {
+    if ((req.url || "/") === "/") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(req.method === "HEAD" ? undefined : "<html><body>assets/app.js</body></html>");
+    } else { res.writeHead(404); res.end(); }
+  },
+);
+s.listen(0, "127.0.0.1", () => process.stdout.write("PORT=" + s.address().port + "\\n"));
+`;
+
+await (async () => {
+  const cert = makeCert();
+  const child = spawn("node", ["-e", SERVER_SRC, cert.key, cert.cert], { stdio: ["ignore", "pipe", "ignore"] });
+  const port = await new Promise((resolve, reject) => {
+    let buf = "";
+    child.stdout.on("data", (d) => {
+      buf += d;
+      const m = buf.match(/PORT=(\d+)/);
+      if (m) resolve(Number(m[1]));
+    });
+    child.on("exit", () => reject(new Error("tls server exited early")));
+    setTimeout(() => reject(new Error("tls server start timeout")), 5000);
+  });
+  const base = `https://127.0.0.1:${port}`;
+  // The container routes outbound HTTPS through an agent proxy that cannot reach this
+  // in-process localhost server; clear proxy vars for these local curls (production VMs
+  // have no proxy, so verify-https.sh itself needs no proxy handling).
+  const noProxy = {
+    no_proxy: "localhost,127.0.0.1",
+    NO_PROXY: "localhost,127.0.0.1",
+    HTTPS_PROXY: "",
+    https_proxy: "",
+    HTTP_PROXY: "",
+    http_proxy: "",
+    ALL_PROXY: "",
+    all_proxy: "",
+  };
+  const trusted = { ...noProxy, OGC_CACERT: cert.cert };
+  try {
+    check("verify-https: accepts HTTP 200 over a validated cert with the expected asset", () => {
+      expectOk(run("verify-https.sh", [`${base}/`, "assets/app.js"], trusted), "https happy");
+    });
+    check("verify-https: fails when the cert is not trusted (never disables checks)", () => {
+      expectFail(run("verify-https.sh", [`${base}/`, "assets/app.js"], noProxy), "untrusted cert");
+    });
+    check("verify-https: fails on a non-200 response", () => {
+      expectFail(run("verify-https.sh", [`${base}/missing`, "assets/app.js"], trusted), "404");
+    });
+    check("verify-https: fails when the expected asset is absent", () => {
+      expectFail(run("verify-https.sh", [`${base}/`, "no-such-asset"], trusted), "missing asset");
+    });
+    check("verify-https: refuses a non-HTTPS url", () => {
+      expectFail(run("verify-https.sh", ["http://localhost:1/"], trusted), "http refused");
+    });
+  } finally {
+    child.kill();
+  }
+})();
 
 // ───────────────────────────────────── summary ──────────────────────────────────────
 for (const d of tmps) rmSync(d, { recursive: true, force: true });
