@@ -21,6 +21,9 @@ export function CourseLearning() {
   const list = acts.data ?? [];
   const attemptMap = attempts.data ?? {};
   const snap = progress.data;
+  // Per-activity pending feedback: only the activity currently being completed shows a
+  // "Completing…" state, instead of disabling/relabelling every row.
+  const pendingId = complete.isPending ? (complete.variables as string | undefined) : undefined;
 
   return (
     <section className="space-y-6">
@@ -61,13 +64,17 @@ export function CourseLearning() {
                   </div>
                   {done ? (
                     <span className="text-sm text-brand">Completed</span>
+                  ) : pendingId === a.id ? (
+                    <span className="text-sm text-muted" aria-live="polite">
+                      Completing…
+                    </span>
                   ) : (
                     <Button
                       onClick={() => complete.mutate(a.id)}
                       disabled={complete.isPending}
                       aria-label={`Complete ${a.title}`}
                     >
-                      {complete.isPending ? "Saving…" : "Mark complete"}
+                      Mark complete
                     </Button>
                   )}
                 </Card>
@@ -84,6 +91,11 @@ export function CourseLearning() {
             : complete.data.reason === "not_enrolled"
               ? "Enroll in this course before completing activities."
               : "Could not complete that activity."}
+        </p>
+      ) : null}
+      {complete.data?.completed ? (
+        <p role="status" className="text-sm text-brand">
+          Activity marked complete.
         </p>
       ) : null}
 

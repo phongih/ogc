@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner } from "../../ui";
+import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner, StatTile } from "../../ui";
 import { useSession } from "../../app/session";
 import { useLearnerDashboard } from "./queries";
 import { relativeDay } from "../../lib/time";
@@ -35,6 +35,14 @@ export function LearnerHome() {
             </p>
           </div>
         </Card>
+      ) : null}
+
+      {d.enrolled.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-3">
+          <StatTile label="Courses" value={d.enrolled.length} />
+          <StatTile label="In progress" value={inProgress} />
+          <StatTile label="Upcoming" value={d.upcoming.length} hint="lessons" />
+        </div>
       ) : null}
 
       <div>
