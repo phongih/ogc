@@ -1,7 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
-import { useCourse } from "./queries";
+import { useCourse, useCourses } from "./queries";
 import { useEnroll, useEnrollmentState } from "../enrollment/queries";
 
 export function CourseDetail() {
@@ -12,6 +12,7 @@ export function CourseDetail() {
   const q = useCourse(session?.orgId ?? "", courseId);
   const stateQ = useEnrollmentState(personaId, courseId);
   const enroll = useEnroll(personaId);
+  const catalog = useCourses(session?.orgId ?? "");
 
   if (q.isLoading) return <Spinner label="Loading course" />;
   if (q.isError) return <ErrorState message="Could not load course." onRetry={() => q.refetch()} />;
@@ -22,10 +23,19 @@ export function CourseDetail() {
   const isEnrolled = state !== "not_enrolled";
   // Only learner personas can enroll themselves in this synthetic flow.
   const canEnroll = session?.role === "learner";
+  const related = (catalog.data?.pages ?? [])
+    .flatMap((p) => p.items)
+    .filter((x) => x.id !== c.id)
+    .slice(0, 3);
 
   return (
     <section className="space-y-6">
-      <PageHeader title={c.title} subtitle={`${c.code} · ${c.level}`} />
+      <PageHeader title={c.title} subtitle={c.code} />
+      <div className="flex flex-wrap gap-2">
+        <Badge>{c.level}</Badge>
+        <Badge>{c.format.replace("_", " ")}</Badge>
+        <Badge>{c.durationWeeks} weeks</Badge>
+      </div>
       <Card>
         <dl className="grid gap-3 sm:grid-cols-3">
           <div>
@@ -80,6 +90,22 @@ export function CourseDetail() {
           ))}
         </ul>
       </div>
+      {related.length > 0 ? (
+        <div>
+          <h2 className="mb-2 text-lg font-medium">Related courses</h2>
+          <ul className="space-y-1 text-sm">
+            {related.map((rc) => (
+              <li key={rc.id}>
+                <Link to={`/app/catalog/${rc.id}`} className="text-brand hover:underline">
+                  {rc.title}
+                </Link>
+                <span className="text-muted"> · {rc.level}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <Link to="/app/catalog" className="inline-block text-sm text-brand">
         ← Back to catalog
       </Link>

@@ -169,6 +169,15 @@ export function ProgressRing({
   );
 }
 
+/** Small rounded pill for categorical labels (level, format, status). */
+export function Badge({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium">
+      {children}
+    </span>
+  );
+}
+
 /** Compact labelled metric for dashboard summaries. Shared across feature dashboards. */
 export function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (

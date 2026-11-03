@@ -19,4 +19,20 @@ describe("CourseDetail enrollment", () => {
       expect(screen.getByRole("button", { name: /resume learning/i })).toBeInTheDocument(),
     );
   });
+
+  it("shows level/format badges and related-course deep-links", async () => {
+    renderApp(`/app/catalog/${courses[0].id}`, "learner");
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Everyday English A2" })).toBeInTheDocument());
+
+    // Level + format rendered as badges (format also appears in the detail list).
+    expect(screen.getByText("A2")).toBeInTheDocument();
+    expect(screen.getAllByText("in center").length).toBeGreaterThanOrEqual(1);
+
+    // Related section deep-links to other catalog courses.
+    await screen.findByRole("heading", { name: "Related courses" });
+    const relatedLinks = screen
+      .getAllByRole("link")
+      .filter((a) => /^\/app\/catalog\/.+/.test(a.getAttribute("href") ?? ""));
+    expect(relatedLinks.length).toBeGreaterThanOrEqual(1);
+  });
 });
