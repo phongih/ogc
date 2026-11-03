@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } from "../../ui";
 import { useSession } from "../../app/session";
 import { useTeacherDashboard } from "./queries";
 
@@ -15,6 +15,16 @@ export function TeacherHome() {
   return (
     <section className="space-y-8">
       <PageHeader title="Teaching" subtitle={`${d.teacherName} · synthetic demo`} />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatTile label="Classes" value={d.classes.length} />
+        <StatTile label="Sessions" value={d.upcoming.length} hint="upcoming" />
+        <StatTile
+          label="Learners"
+          value={d.classes.reduce((sum, c) => sum + c.learnerCount, 0)}
+          hint="across your classes"
+        />
+      </div>
 
       <div>
         <h2 className="mb-3 text-lg font-medium">Assigned classes</h2>

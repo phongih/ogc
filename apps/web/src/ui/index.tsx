@@ -169,6 +169,17 @@ export function ProgressRing({
   );
 }
 
+/** Compact labelled metric for dashboard summaries. Shared across feature dashboards. */
+export function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
+  return (
+    <div className="rounded-ogc border border-border bg-surface p-4">
+      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      {hint ? <p className="mt-0.5 text-xs text-muted">{hint}</p> : null}
+    </div>
+  );
+}
+
 export function NonProductionBanner() {
   return (
     <div className="bg-danger/10 text-danger text-center text-xs py-1 px-3 border-b border-danger/30">

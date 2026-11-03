@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { renderApp } from "../../test/harness";
 
 describe("TeacherHome", () => {
@@ -19,5 +19,14 @@ describe("TeacherHome", () => {
 
     expect(screen.getAllByRole("link", { name: /learner overview/i }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: /lesson planning/i }).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("summarizes teaching with stat tiles (classes + total learners)", async () => {
+    renderApp("/app/teaching", "teacher");
+    await waitFor(() => expect(screen.getByText("Classes")).toBeInTheDocument());
+
+    // 2 synthetic classes with 12 + 9 = 21 learners.
+    expect(within(screen.getByText("Classes").closest("div") as HTMLElement).getByText("2")).toBeInTheDocument();
+    expect(within(screen.getByText("Learners").closest("div") as HTMLElement).getByText("21")).toBeInTheDocument();
   });
 });
