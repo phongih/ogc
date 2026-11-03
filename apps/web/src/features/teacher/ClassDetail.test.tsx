@@ -21,4 +21,13 @@ describe("ClassDetail", () => {
     const link = screen.getByRole("link", { name: /open lesson plan editor/i });
     expect(link).toHaveAttribute("href", `/app/teaching/classes/${CLASS_A2}/plan`);
   });
+
+  it("summarizes class progress as an equal-weight ring over authorized learners", async () => {
+    renderApp(`/app/teaching/classes/${CLASS_A2}`, "teacher");
+
+    // The ring's value loads once the authorization-checked class progress resolves.
+    const ring = await screen.findByRole("progressbar", { name: "Class progress" });
+    await waitFor(() => expect(Number(ring.getAttribute("aria-valuenow"))).toBeGreaterThan(0));
+    expect(screen.getByText(/equal-weight average/i)).toBeInTheDocument();
+  });
 });

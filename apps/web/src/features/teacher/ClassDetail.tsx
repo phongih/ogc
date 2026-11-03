@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { Card, EmptyState, ErrorState, PageHeader, ProgressRing, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { useClassRoster } from "./queries";
 import { useClassProgress } from "../learning/queries";
@@ -10,9 +10,27 @@ export function ClassDetail() {
   const q = useClassRoster(classId);
   const progress = useClassProgress(session?.personaId ?? "", (q.data ?? []).map((r) => r.learnerId));
 
+  // Class-level overall = equal-weight mean across the learners the viewer is authorized to
+  // see (fail-closed entries resolve to null and are excluded, not counted as zero).
+  const authorizedVals = Object.values(progress.data ?? {}).filter((v): v is number => typeof v === "number");
+  const classPct = authorizedVals.length
+    ? Math.round(authorizedVals.reduce((a, b) => a + b, 0) / authorizedVals.length)
+    : 0;
+
   return (
     <section className="space-y-6">
       <PageHeader title="Learner overview" subtitle="Class roster · synthetic demo" />
+      {q.data && q.data.length > 0 ? (
+        <Card className="flex items-center gap-4">
+          <ProgressRing pct={classPct} label="Class progress" size={64} />
+          <div>
+            <p className="font-medium">Class progress</p>
+            <p className="text-xs text-muted">
+              {authorizedVals.length} of {q.data.length} learners · equal-weight average
+            </p>
+          </div>
+        </Card>
+      ) : null}
       {q.isLoading ? (
         <Spinner label="Loading roster" />
       ) : q.isError ? (
