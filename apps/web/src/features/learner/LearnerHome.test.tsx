@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { renderApp } from "../../test/harness";
 
 // Per-course bars expose aria-label "Progress N%"; the overall ring is labelled distinctly.
@@ -28,5 +28,13 @@ describe("LearnerHome progress visualization", () => {
     const resumeLinks = screen.getAllByRole("link", { name: /resume learning/i });
     expect(bars.length).toBeGreaterThanOrEqual(1);
     expect(resumeLinks.length).toBe(bars.length);
+  });
+
+  it("deep-links each upcoming lesson to its course", async () => {
+    renderApp("/app/learning", "learner");
+    const list = await screen.findByRole("list", { name: "Upcoming lessons" });
+    const links = within(list).getAllByRole("link");
+    expect(links.length).toBeGreaterThanOrEqual(1);
+    links.forEach((a) => expect(a.getAttribute("href")).toMatch(/^\/app\/learning\/courses\//));
   });
 });

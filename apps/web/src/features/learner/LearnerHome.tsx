@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { useLearnerDashboard } from "./queries";
+import { relativeDay } from "../../lib/time";
 
 export function LearnerHome() {
   const { session } = useSession();
@@ -75,15 +76,21 @@ export function LearnerHome() {
         {d.upcoming.length === 0 ? (
           <EmptyState title="Nothing scheduled" />
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-2" aria-label="Upcoming lessons">
             {d.upcoming.map((l) => (
               <li key={l.id}>
-                <Card className="flex items-center justify-between">
-                  <span>{l.title}</span>
-                  <span className="text-sm text-muted">
-                    {l.scheduledAt ? new Date(l.scheduledAt).toLocaleString() : "Unscheduled"} · {l.durationMin}m
-                  </span>
-                </Card>
+                <Link to={`/app/learning/courses/${l.courseId}`} className="block">
+                  <Card className="flex items-center justify-between transition hover:border-brand">
+                    <span>{l.title}</span>
+                    <span className="text-sm text-muted">
+                      {relativeDay(l.scheduledAt)}
+                      {l.scheduledAt
+                        ? ` · ${new Date(l.scheduledAt).toLocaleDateString("en-GB", { timeZone: "UTC" })}`
+                        : ""}{" "}
+                      · {l.durationMin}m
+                    </span>
+                  </Card>
+                </Link>
               </li>
             ))}
           </ul>
