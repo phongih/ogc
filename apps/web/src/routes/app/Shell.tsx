@@ -50,6 +50,17 @@ export function Shell() {
     return () => document.removeEventListener("keydown", onKey);
   }, [menuOpen]);
 
+  // Lock background scroll while the mobile drawer is open (prevents the page behind
+  // the overlay from scrolling on touch devices). Restores the prior value on close.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [menuOpen]);
+
   if (!session) return <Navigate to="/login" replace />;
   const sections = sectionsFor(session);
 

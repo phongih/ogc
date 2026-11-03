@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { Activity, LessonPlanDraft, LessonPlanStatus } from "@ogc/contracts";
 import { Button, Card, EmptyState, PageHeader, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { usePlansForClass, useSavePlan } from "./queries";
+import { draftCache } from "./draftCache";
 
 // Parse a textarea (one item per line) into a trimmed, non-empty string list.
 const lines = (s: string): string[] =>
@@ -25,12 +26,25 @@ export function LessonPlanEditor() {
   const plans = usePlansForClass(personaId, classId);
   const save = useSavePlan(personaId, classId);
 
-  const [title, setTitle] = useState("");
-  const [objectivesText, setObjectivesText] = useState("");
-  const [activitiesText, setActivitiesText] = useState("");
-  const [resourcesText, setResourcesText] = useState("");
-  const [assessment, setAssessment] = useState("");
-  const [status, setStatus] = useState<LessonPlanStatus>("draft");
+  const cached = draftCache.get(classId)?.fields;
+  const [title, setTitle] = useState(cached?.title ?? "");
+  const [objectivesText, setObjectivesText] = useState(cached?.objectivesText ?? "");
+  const [activitiesText, setActivitiesText] = useState(cached?.activitiesText ?? "");
+  const [resourcesText, setResourcesText] = useState(cached?.resourcesText ?? "");
+  const [assessment, setAssessment] = useState(cached?.assessment ?? "");
+  const [status, setStatus] = useState<LessonPlanStatus>(cached?.status ?? "draft");
+  const [autosaved, setAutosaved] = useState<boolean>(() => Boolean(draftCache.get(classId)));
+
+  // Autosave the working draft into an in-session cache (no disk, no backend) so it
+  // survives navigation away and back. Skips an untouched empty form.
+  useEffect(() => {
+    const hasContent =
+      Boolean(title || objectivesText || activitiesText || resourcesText || assessment) ||
+      status !== "draft";
+    if (!hasContent) return;
+    draftCache.set(classId, { title, objectivesText, activitiesText, resourcesText, assessment, status });
+    setAutosaved(true);
+  }, [classId, title, objectivesText, activitiesText, resourcesText, assessment, status]);
 
   const draft: LessonPlanDraft = useMemo(
     () => ({
@@ -143,6 +157,11 @@ export function LessonPlanEditor() {
               </ul>
             ) : null}
             {saved ? <p className="text-sm text-brand">Lesson plan saved.</p> : null}
+            {autosaved ? (
+              <p className="text-xs text-muted" aria-live="polite">
+                Draft autosaved in this session.
+              </p>
+            ) : null}
 
             <Button onClick={() => save.mutate(draft)} disabled={save.isPending}>
               {save.isPending ? "Saving…" : "Save plan"}

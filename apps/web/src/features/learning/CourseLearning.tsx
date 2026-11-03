@@ -1,23 +1,8 @@
 import { Link, useParams } from "react-router-dom";
-import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { useCourse } from "../catalog/queries";
 import { useActivities, useActivityAttempts, useCompleteActivity, useCourseProgress } from "./queries";
-
-function ProgressBar({ pct, label }: { pct: number; label: string }) {
-  return (
-    <div
-      className="h-2 w-full overflow-hidden rounded-full bg-border"
-      role="progressbar"
-      aria-valuenow={pct}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-label={label}
-    >
-      <div className="h-full bg-brand" style={{ width: `${pct}%` }} />
-    </div>
-  );
-}
 
 export function CourseLearning() {
   const { session } = useSession();

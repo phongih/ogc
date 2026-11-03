@@ -1,5 +1,36 @@
 // Reusable, responsive, accessible UI primitives (Architecture requirement #6).
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { Link } from "react-router-dom";
+
+export interface Crumb {
+  label: string;
+  to?: string;
+}
+
+/** Breadcrumb trail rendered as a navigation landmark. The final (currentless) crumb
+ *  is marked aria-current="page". */
+export function Breadcrumbs({ items }: { items: Crumb[] }) {
+  return (
+    <nav aria-label="Breadcrumb" className="mb-4 text-sm text-muted">
+      <ol className="flex flex-wrap items-center gap-1.5">
+        {items.map((it, i) => (
+          <li key={`${it.label}-${i}`} className="flex items-center gap-1.5">
+            {it.to ? (
+              <Link to={it.to} className="text-brand hover:underline">
+                {it.label}
+              </Link>
+            ) : (
+              <span aria-current="page" className="text-fg">
+                {it.label}
+              </span>
+            )}
+            {i < items.length - 1 ? <span aria-hidden="true">/</span> : null}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
 
 export function Button({
   variant = "primary",
@@ -63,6 +94,89 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
         </Button>
       ) : null}
     </Card>
+  );
+}
+
+/** Linear progress bar. Shared primitive (was duplicated in learner/learning features). */
+export function ProgressBar({
+  pct,
+  label,
+  className = "",
+}: {
+  pct: number;
+  label?: string;
+  className?: string;
+}) {
+  const v = Math.max(0, Math.min(100, Math.round(pct)));
+  return (
+    <div
+      className={`h-2 w-full overflow-hidden rounded-full bg-border ${className}`.trim()}
+      role="progressbar"
+      aria-valuenow={v}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label ?? `Progress ${v}%`}
+    >
+      <div className="h-full bg-brand" style={{ width: `${v}%` }} />
+    </div>
+  );
+}
+
+/** Circular progress ring (SVG donut) with the percentage centered. */
+export function ProgressRing({
+  pct,
+  label,
+  size = 72,
+  stroke = 8,
+}: {
+  pct: number;
+  label?: string;
+  size?: number;
+  stroke?: number;
+}) {
+  const v = Math.max(0, Math.min(100, Math.round(pct)));
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const offset = circumference * (1 - v / 100);
+  return (
+    <div
+      className="relative inline-flex items-center justify-center text-brand"
+      role="progressbar"
+      aria-valuenow={v}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label ?? `Progress ${v}%`}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-border" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="transition-[stroke-dashoffset] duration-500"
+        />
+      </svg>
+      <span aria-hidden="true" className="absolute text-sm font-semibold text-fg">
+        {v}%
+      </span>
+    </div>
+  );
+}
+
+/** Compact labelled metric for dashboard summaries. Shared across feature dashboards. */
+export function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
+  return (
+    <div className="rounded-ogc border border-border bg-surface p-4">
+      <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      {hint ? <p className="mt-0.5 text-xs text-muted">{hint}</p> : null}
+    </div>
   );
 }
 

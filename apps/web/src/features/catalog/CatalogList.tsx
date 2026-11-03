@@ -20,6 +20,13 @@ export function CatalogList() {
     q: q || undefined,
   });
 
+  const filtersActive = Boolean(level || format || q);
+  const clearFilters = () => {
+    setLevel("");
+    setFormat("");
+    setQ("");
+  };
+
   return (
     <section className="space-y-6">
       <PageHeader title="Course catalog" subtitle="Synthetic demo courses" />
@@ -69,10 +76,34 @@ export function CatalogList() {
         <ErrorState message="Could not load courses." onRetry={() => query.refetch()} />
       ) : (() => {
         const items = (query.data?.pages ?? []).flatMap((p) => p.items);
-        if (items.length === 0)
-          return <EmptyState title="No courses match" hint="Try clearing the filters." />;
+        if (items.length === 0) {
+          if (filtersActive)
+            return (
+              <Card className="space-y-3 text-center">
+                <p className="font-medium">No courses match these filters</p>
+                <div>
+                  <Button variant="ghost" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                </div>
+              </Card>
+            );
+          return <EmptyState title="No courses available" hint="Synthetic catalog is empty." />;
+        }
         return (
           <>
+            <p className="text-sm text-muted" aria-live="polite">
+              Showing {items.length} course{items.length === 1 ? "" : "s"}
+              {query.hasNextPage ? " (more available)" : ""}
+              {filtersActive ? (
+                <>
+                  {" · "}
+                  <button type="button" onClick={clearFilters} className="text-brand underline">
+                    Clear filters
+                  </button>
+                </>
+              ) : null}
+            </p>
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {items.map((c) => (
                 <li key={c.id}>

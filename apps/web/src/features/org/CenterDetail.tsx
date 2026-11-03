@@ -1,10 +1,11 @@
-import { Link, useParams } from "react-router-dom";
-import { Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
-import { useCenter } from "./queries";
+import { useParams } from "react-router-dom";
+import { Breadcrumbs, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { useCenter, useOrganization } from "./queries";
 
 export function CenterDetail() {
   const { centerId = "" } = useParams();
   const q = useCenter(centerId);
+  const org = useOrganization(q.data?.orgId ?? "");
 
   if (q.isLoading) return <Spinner label="Loading center" />;
   if (q.isError) return <ErrorState message="Could not load center." onRetry={() => q.refetch()} />;
@@ -13,6 +14,13 @@ export function CenterDetail() {
   const c = q.data;
   return (
     <section className="space-y-6">
+      <Breadcrumbs
+        items={[
+          { label: "Organizations", to: "/app/orgs" },
+          { label: org.data?.name ?? "Organization", to: `/app/orgs/${c.orgId}` },
+          { label: c.name },
+        ]}
+      />
       <PageHeader title={c.name} subtitle={`Center · ${c.city}`} />
       <Card>
         <dl className="grid gap-3 sm:grid-cols-3">
@@ -30,9 +38,6 @@ export function CenterDetail() {
           </div>
         </dl>
       </Card>
-      <Link to={`/app/orgs/${c.orgId}`} className="inline-block text-sm text-brand">
-        ← Back to organization
-      </Link>
     </section>
   );
 }
