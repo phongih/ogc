@@ -21,3 +21,14 @@
     --ogc-danger: #ff6b5e;
   }
 }
+/* Explicit dark theme (forces dark regardless of the system preference). */
+:root[data-theme="dark"] {
+  --ogc-bg: #0d1117;
+  --ogc-surface: #161b22;
+  --ogc-border: #2b313a;
+  --ogc-fg: #e6edf3;
+  --ogc-muted: #9aa5b1;
+  --ogc-brand: #4f93ff;
+  --ogc-brand-fg: #0d1117;
+  --ogc-danger: #ff6b5e;
+}

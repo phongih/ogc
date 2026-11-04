@@ -30,6 +30,16 @@ describe("LearnerHome progress visualization", () => {
     expect(resumeLinks.length).toBe(bars.length);
   });
 
+  it("shows the learner streak and earned/locked achievements", async () => {
+    renderApp("/app/learning", "learner");
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: /Streak & achievements/i })).toBeInTheDocument(),
+    );
+    expect(screen.getByText(/5-day/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Quiz ace \(earned\)/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Course complete \(locked\)/)).toBeInTheDocument();
+  });
+
   it("summarizes learning with stat tiles", async () => {
     renderApp("/app/learning", "learner");
     await waitFor(() => expect(screen.getByText("Courses")).toBeInTheDocument());

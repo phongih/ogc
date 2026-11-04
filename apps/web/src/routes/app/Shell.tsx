@@ -4,6 +4,7 @@ import { sectionsFor } from "@ogc/mock-authz";
 import { useSession } from "../../app/session";
 import { sectionLabel, sectionRoute } from "../../app/nav";
 import { KeyboardHelp } from "../../app/KeyboardHelp";
+import { ThemeToggle } from "../../app/ThemeToggle";
 import { Button } from "../../ui";
 
 export function Shell() {
@@ -103,6 +104,7 @@ export function Shell() {
             <span className="hidden text-sm text-muted sm:inline">
               {session.displayName} · {session.role}
             </span>
+            <ThemeToggle />
             <Button variant="ghost" onClick={signOut}>
               Sign out
             </Button>
