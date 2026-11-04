@@ -137,8 +137,18 @@ check("build-manifest: rejects an unexpected build mode (no build performed)", (
   expectFail(run("build-manifest.sh", [REPO, join(tmp(), "m.json")], { OGC_BUILD_MODE: "http" }), "bad mode");
 });
 
-check("build-manifest: builds the synthetic SPA and the manifest verifies", () => {
-  const man = join(tmp(), "release-manifest.json");
+check("make-manifest: creates a missing output parent directory (regression, fast)", () => {
+  const dist = fakeDist();
+  const out = join(tmp(), "no", "such", "dir", "manifest.json");
+  execFileSync("node", [join(SCRIPTS, "make-manifest.mjs"), dist, "a".repeat(40), "mock", out], { stdio: "ignore" });
+  if (!existsSync(out)) throw new Error("manifest not written into a missing parent dir");
+  expectOk(run("verify-artifact.sh", [dist, out]), "verify after dir creation");
+});
+
+check("build-manifest: writes to a not-yet-existing manifest dir and verifies (regression)", () => {
+  // Regression (AUTH-019): the manifest's parent dir may not exist. build-manifest.sh now
+  // mkdir -p's it. Previously this failed with ENOENT.
+  const man = join(tmp(), "nested", "deep", "release-manifest.json");
   expectOk(run("build-manifest.sh", [REPO, man]), "build-manifest happy");
   const m = JSON.parse(readFileSync(man, "utf8"));
   if (m.buildMode !== "mock") throw new Error(`buildMode ${m.buildMode}`);
