@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { learner, profile, recommendation } from "../../lib/api";
+import { learner, profile, recommendation, masteryConfidence, justifiedRecommendation } from "../../lib/api";
 import { getAchievements } from "./achievements";
 
 export const useLearnerDashboard = (personaId: string) =>
@@ -24,5 +24,20 @@ export const useRecommendation = (personaId: string) =>
   useQuery({
     queryKey: ["li-recommendation", personaId],
     queryFn: () => recommendation.getRecommendation(personaId),
+    enabled: personaId.length > 0,
+  });
+
+// LI-2 — evidence quality: confidence per skill + evidence-justified next step.
+export const useMasteryConfidence = (personaId: string) =>
+  useQuery({
+    queryKey: ["li-confidence", personaId],
+    queryFn: () => masteryConfidence.getConfidence(personaId),
+    enabled: personaId.length > 0,
+  });
+
+export const useJustifiedRecommendation = (personaId: string) =>
+  useQuery({
+    queryKey: ["li-justified", personaId],
+    queryFn: () => justifiedRecommendation.getJustified(personaId),
     enabled: personaId.length > 0,
   });
