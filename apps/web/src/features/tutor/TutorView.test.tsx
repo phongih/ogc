@@ -36,4 +36,25 @@ describe("TutorView", () => {
       expect(screen.getByRole("button", { name: /^New conversation \d+$/ })).toBeInTheDocument(),
     );
   });
+
+  it("renames a conversation in place (in-memory)", async () => {
+    renderUI(<TutorView />, { role: "learner" });
+    await waitFor(() => expect(screen.getByText("Practising A2 plans")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Rename Practising A2 plans" }));
+    const input = screen.getByRole("textbox", { name: "Rename Practising A2 plans" });
+    await userEvent.clear(input);
+    await userEvent.type(input, "Weekend plans{Enter}");
+
+    await waitFor(() => expect(screen.getByText("Weekend plans")).toBeInTheDocument());
+    expect(screen.queryByText("Practising A2 plans")).not.toBeInTheDocument();
+  });
+
+  it("deletes a conversation from the list (in-memory)", async () => {
+    renderUI(<TutorView />, { role: "learner" });
+    await waitFor(() => expect(screen.getByText("B1 opinions warm-up")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Delete B1 opinions warm-up" }));
+    await waitFor(() => expect(screen.queryByText("B1 opinions warm-up")).not.toBeInTheDocument());
+  });
 });

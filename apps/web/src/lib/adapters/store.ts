@@ -268,4 +268,19 @@ export const tutorStore = {
     convFor(personaId).push(conv);
     return { ...conv, messages: [] };
   },
+  // In-memory rename/delete, fail-closed to the persona's own conversations (a foreign
+  // conversationId is never found in this persona's list, so it cannot be touched).
+  rename: (personaId: string, conversationId: string, title: string): boolean => {
+    const c = convFor(personaId).find((x) => x.id === conversationId);
+    if (!c) return false;
+    c.title = title;
+    return true;
+  },
+  remove: (personaId: string, conversationId: string): boolean => {
+    const list = convFor(personaId);
+    const i = list.findIndex((x) => x.id === conversationId);
+    if (i < 0) return false;
+    list.splice(i, 1);
+    return true;
+  },
 };
