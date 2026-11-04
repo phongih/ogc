@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Id } from "./common.js";
 import { Skill } from "./profile.js";
+import { ConfidenceBand } from "./confidence.js";
 
 /*
  * LEARNER INTELLIGENCE — Adaptive Recommendation (LI-1), the CLOSE of the loop.
@@ -37,4 +38,39 @@ export type PathStep = z.infer<typeof PathStep>;
 export interface RecommendationPort {
   getRecommendation(personaId: string): Promise<Recommendation | null>;
   getPath(personaId: string): Promise<PathStep[]>;
+}
+
+/*
+ * LI-2 — Justified recommendation. ADDITIVE: the LI-1 Recommendation above is unchanged.
+ * This wraps a Recommendation with an evidence-quality verdict so OGC can explain WHY a
+ * recommendation is or is not evidence-justified, distinct from the mastery estimate.
+ *
+ *  - evidence_based_weakest    — targets the weakest skill, backed by sufficient evidence
+ *                                (justified = true).
+ *  - exploratory_low_confidence — targets the weakest skill, but the mastery estimate
+ *                                rests on thin/placement-only evidence; practising is
+ *                                advised to BUILD evidence (justified = false).
+ *  - all_caught_up             — no available activity to recommend (justified = false).
+ */
+export const RecommendationReasonCode = z.enum([
+  "evidence_based_weakest",
+  "exploratory_low_confidence",
+  "all_caught_up",
+]);
+export type RecommendationReasonCode = z.infer<typeof RecommendationReasonCode>;
+
+export const JustifiedRecommendation = z.object({
+  recommendation: Recommendation.nullable(),
+  // true only when the recommendation is backed by sufficient evidence (not seed-only).
+  justified: z.boolean(),
+  reasonCode: RecommendationReasonCode,
+  confidence: z.number().min(0).max(100).nullable(), // governing skill's confidence level
+  confidenceBand: ConfidenceBand.nullable(),
+  reason: z.string().min(1), // human-readable; cites skill, mastery and confidence
+});
+export type JustifiedRecommendation = z.infer<typeof JustifiedRecommendation>;
+
+// Self-scoped. Never null — always returns a verdict (all_caught_up when nothing is due).
+export interface JustifiedRecommendationPort {
+  getJustified(personaId: string): Promise<JustifiedRecommendation>;
 }
