@@ -6,7 +6,7 @@ import {
   useLearnerDashboard,
   useLearnerProfile,
   useMasteryConfidence,
-  useJustifiedRecommendation,
+  useLearningPath,
 } from "./queries";
 import { relativeDay } from "../../lib/time";
 import { ALL_SKILLS, skillLabel } from "../learning/intelligence/skills";
@@ -16,7 +16,8 @@ export function LearnerHome() {
   const q = useLearnerDashboard(session?.personaId ?? "");
   const achievements = useAchievements(session?.personaId ?? "");
   const liProfile = useLearnerProfile(session?.personaId ?? "");
-  const nextStep = useJustifiedRecommendation(session?.personaId ?? "");
+  const path = useLearningPath(session?.personaId ?? "");
+  const nextStep = { data: path.data?.nextStep };
   const confidence = useMasteryConfidence(session?.personaId ?? "");
 
   if (q.isLoading) return <Spinner label="Loading your learning" />;
@@ -117,6 +118,40 @@ export function LearnerHome() {
                 })}
               </ul>
             </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {path.data && path.data.steps.length > 0 ? (
+        <div>
+          <h2 className="mb-3 text-lg font-medium">Learning path</h2>
+          <Card className="space-y-2" aria-label="Learning path">
+            {!path.data.graph.valid ? (
+              <p className="rounded-ogc border border-border/60 bg-surface p-2 text-xs text-muted" role="status">
+                Some activities are locked by an unresolved prerequisite and are held back.
+              </p>
+            ) : null}
+            <ol className="space-y-1" aria-label="Path steps">
+              {path.data.steps.map((s) => {
+                const icon = s.state === "completed" ? "✓" : s.state === "available" ? "→" : "🔒";
+                return (
+                  <li
+                    key={s.activityId}
+                    data-state={s.state}
+                    className="flex items-center justify-between gap-3 rounded-ogc px-2 py-1.5 text-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden="true">{icon}</span>
+                      <span className={s.state === "blocked" ? "text-muted" : ""}>{s.title}</span>
+                    </span>
+                    <span className="text-xs text-muted">
+                      {skillLabel(s.skill)} ·{" "}
+                      <span aria-label={`state ${s.state}`}>{s.state}</span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
           </Card>
         </div>
       ) : null}

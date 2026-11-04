@@ -209,14 +209,25 @@ async function main() {
     const reason = page.getByTestId("li-recommendation-reason");
     await reason.waitFor();
     const reasonText = (await reason.textContent()) ?? "";
-    check("[li] next step targets the weakest skill (Speaking)", /Speaking/.test(reasonText));
-    check("[li] recommendation reason cites the mastery value (55)", /55/.test(reasonText));
+    // Speaking (55) is the weakest skill, but its activity is prerequisite-BLOCKED, so the
+    // prerequisite-aware next step targets the weakest AVAILABLE skill: Use of English (65).
+    check(
+      "[li3] next step respects prerequisites (available Use of English 65, not blocked Speaking)",
+      /Use of English/.test(reasonText) && /65/.test(reasonText),
+    );
     const masteryList = page.getByRole("list", { name: "Skill mastery" });
     await masteryList.waitFor();
     check(
       "[li] mastery strip shows all three skills",
       (await masteryList.getByRole("progressbar").count()) === 3,
     );
+    // Learning path renders completed / available / blocked states.
+    await page.getByRole("heading", { name: "Learning path" }).waitFor();
+    const pathList = page.getByRole("list", { name: "Path steps" });
+    await pathList.waitFor();
+    check("[li3] path has a completed step", (await pathList.locator('[data-state="completed"]').count()) >= 1);
+    check("[li3] path has an available step", (await pathList.locator('[data-state="available"]').count()) >= 1);
+    check("[li3] path has a prerequisite-blocked step", (await pathList.locator('[data-state="blocked"]').count()) >= 1);
     await page.getByRole("link", { name: "Practise now" }).click();
     await page.waitForURL("**/app/learning/courses/**");
     check("[li] 'Practise now' deep-links to the recommended course", page.url().includes("/app/learning/courses/"));
