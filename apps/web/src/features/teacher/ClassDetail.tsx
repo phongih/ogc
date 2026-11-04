@@ -1,13 +1,16 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Card, EmptyState, ErrorState, PageHeader, ProgressRing, Spinner } from "../../ui";
+import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressRing, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { useClassAttendance, useClassRoster } from "./queries";
 import { useClassProgress } from "../learning/queries";
+import { LearnerIntelligencePanel } from "./LearnerIntelligencePanel";
 
 export function ClassDetail() {
   const { classId = "" } = useParams();
   const { session } = useSession();
   const q = useClassRoster(classId);
+  const [openLearner, setOpenLearner] = useState<{ id: string; name: string } | null>(null);
   const progress = useClassProgress(session?.personaId ?? "", (q.data ?? []).map((r) => r.learnerId));
   const attendance = useClassAttendance(session?.personaId ?? "", classId);
 
@@ -45,6 +48,7 @@ export function ClassDetail() {
               <tr className="text-left text-muted">
                 <th className="pb-2 font-medium">Learner</th>
                 <th className="pb-2 font-medium">Progress (activities)</th>
+                <th className="pb-2 font-medium">Intelligence</th>
               </tr>
             </thead>
             <tbody>
@@ -60,6 +64,19 @@ export function ClassDetail() {
                           ? "…"
                           : `${overall}%`}
                     </td>
+                    <td className="py-2">
+                      <Button
+                        variant="ghost"
+                        aria-label={`View intelligence for ${r.displayName}`}
+                        onClick={() =>
+                          setOpenLearner((cur) =>
+                            cur?.id === r.learnerId ? null : { id: r.learnerId, name: r.displayName },
+                          )
+                        }
+                      >
+                        {openLearner?.id === r.learnerId ? "Hide" : "View"}
+                      </Button>
+                    </td>
                   </tr>
                 );
               })}
@@ -67,6 +84,17 @@ export function ClassDetail() {
           </table>
         </Card>
       )}
+
+      {openLearner ? (
+        <section aria-label="Learner learning intelligence">
+          <h2 className="mb-2 text-lg font-medium">Learning intelligence · {openLearner.name}</h2>
+          <LearnerIntelligencePanel
+            viewerPersonaId={session?.personaId ?? ""}
+            learnerId={openLearner.id}
+            learnerName={openLearner.name}
+          />
+        </section>
+      ) : null}
       {attendance.data && attendance.data.length > 0 ? (
         <section aria-label="Attendance">
           <h2 className="mb-2 text-lg font-medium">Attendance</h2>
