@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InterventionInput } from "@ogc/contracts";
-import { teacher, teacherIntelligence } from "../../lib/api";
+import { teacher, teacherIntelligence, appliedRecommendation } from "../../lib/api";
 import { getClassAttendance } from "./attendance";
 
 export const useTeacherDashboard = (personaId: string) =>
@@ -37,5 +37,30 @@ export const useIntervene = (viewerPersonaId: string, learnerId: string) => {
     mutationFn: (input: InterventionInput) =>
       teacherIntelligence.intervene(viewerPersonaId, learnerId, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ti-interventions", viewerPersonaId, learnerId] }),
+  });
+};
+
+// AUTH-026 — applied teacher recommendation (reaches the learner).
+export const useActiveApplied = (viewerPersonaId: string, learnerId: string) =>
+  useQuery({
+    queryKey: ["applied-active", viewerPersonaId, learnerId],
+    queryFn: () => appliedRecommendation.getActiveApplied(viewerPersonaId, learnerId),
+    enabled: viewerPersonaId.length > 0 && learnerId.length > 0,
+  });
+
+export const useApplyRecommendation = (viewerPersonaId: string, learnerId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: InterventionInput) =>
+      appliedRecommendation.applyRecommendation(viewerPersonaId, learnerId, input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["applied-active", viewerPersonaId, learnerId] }),
+  });
+};
+
+export const useRevertApplied = (viewerPersonaId: string, learnerId: string) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => appliedRecommendation.revertApplied(viewerPersonaId, learnerId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["applied-active", viewerPersonaId, learnerId] }),
   });
 };

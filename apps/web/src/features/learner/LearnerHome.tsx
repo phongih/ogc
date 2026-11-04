@@ -7,9 +7,11 @@ import {
   useLearnerProfile,
   useMasteryConfidence,
   useLearningPath,
+  useNextAction,
 } from "./queries";
 import { relativeDay } from "../../lib/time";
 import { ALL_SKILLS, skillLabel } from "../learning/intelligence/skills";
+import { confidenceWord, masteryWord } from "../learning/intelligence/friendly";
 
 export function LearnerHome() {
   const { session } = useSession();
@@ -17,7 +19,7 @@ export function LearnerHome() {
   const achievements = useAchievements(session?.personaId ?? "");
   const liProfile = useLearnerProfile(session?.personaId ?? "");
   const path = useLearningPath(session?.personaId ?? "");
-  const nextStep = { data: path.data?.nextStep };
+  const next = useNextAction(session?.personaId ?? "");
   const confidence = useMasteryConfidence(session?.personaId ?? "");
 
   if (q.isLoading) return <Spinner label="Loading your learning" />;
@@ -61,35 +63,33 @@ export function LearnerHome() {
         <div>
           <h2 className="mb-3 text-lg font-medium">Learning intelligence</h2>
           <Card className="space-y-4" aria-label="Learning intelligence">
-            {nextStep.data ? (
-              <div className="rounded-ogc border border-brand/40 bg-brand/5 p-3">
+            {next.data ? (
+              <div
+                className="rounded-ogc border border-brand/40 bg-brand/5 p-3"
+                data-source={next.data.source}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs uppercase tracking-wide text-muted">Your next step</p>
-                  {nextStep.data.reasonCode !== "all_caught_up" ? (
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs ${
-                        nextStep.data.justified
-                          ? "border-border bg-surface"
-                          : "border-border/50 text-muted"
-                      }`}
-                    >
-                      {nextStep.data.justified ? "Evidence-based" : "Exploratory"}
-                    </span>
-                  ) : null}
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-xs ${
+                      next.data.source === "teacher"
+                        ? "border-brand bg-brand text-brand-fg"
+                        : "border-border bg-surface"
+                    }`}
+                  >
+                    {next.data.source === "teacher" ? "Teacher recommended" : "Suggested for you"}
+                  </span>
                 </div>
                 <p className="mt-1 text-sm" data-testid="li-recommendation-reason">
-                  {nextStep.data.reason}
+                  {next.data.friendlyReason}
                 </p>
-                {nextStep.data.recommendation ? (
-                  <Link
-                    to={`/app/learning/courses/${nextStep.data.recommendation.courseId}`}
-                    className="mt-2 inline-block"
-                  >
-                    <Button variant="ghost">Practise now</Button>
-                  </Link>
-                ) : null}
+                <Link to={`/app/learning/courses/${next.data.courseId}`} className="mt-2 inline-block">
+                  <Button variant="ghost">Start now</Button>
+                </Link>
               </div>
-            ) : null}
+            ) : (
+              <p className="text-sm text-muted">You&apos;re all caught up — nice work.</p>
+            )}
 
             <div>
               <p className="mb-2 text-sm font-medium">
@@ -104,8 +104,9 @@ export function LearnerHome() {
                       <div className="flex items-center justify-between text-sm">
                         <span>{skillLabel(s)}</span>
                         <span className="text-muted" aria-label={`${skillLabel(s)} mastery ${m.level}`}>
-                          {m.level}
-                          {band ? <span className="ml-1 text-xs">· {band} confidence</span> : null}
+                          {masteryWord(m.level)}
+                          {band ? <span className="ml-1 text-xs">· {confidenceWord(band)}</span> : null}
+                          <span className="ml-1 text-xs opacity-60">({m.level})</span>
                         </span>
                       </div>
                       <ProgressBar
