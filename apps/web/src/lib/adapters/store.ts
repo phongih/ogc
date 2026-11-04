@@ -9,14 +9,19 @@ import type {
   LearningActivity,
   LearningAttempt,
   LearningEvidence,
+  PracticeResult,
+  PracticeSubmission,
+  PracticeSubmitResult,
 } from "@ogc/contracts";
 import { courses } from "../../fixtures/catalog";
 import { learnerEnrollments } from "../../fixtures/learning";
 import { activities } from "../../fixtures/activities";
+import { practiceFor } from "../../fixtures/practice";
 import { organizations } from "../../fixtures/directory";
 import { seedConversations } from "../../fixtures/tutor";
 import { LEARNER_LINH, personaMap } from "../../fixtures/personas";
 import { LEARNER_SEED, learnerById } from "../../fixtures/learners";
+import { scorePractice } from "../../features/learning/practice/scoring";
 
 const ORG = organizations[0].id;
 
@@ -75,6 +80,11 @@ const attempts = new Map<string, Map<string, LearningAttempt>>();
 const evidence = new Map<string, Map<string, LearningEvidence[]>>();
 let attemptSeq = 0;
 let evidenceSeq = 0;
+
+// Last deterministic practice result per (learnerId, activityId) — for idempotent replay and
+// to surface the structured result to the learner UI. Synthetic, in-memory only.
+const practiceResults = new Map<string, PracticeResult>();
+const practiceKey = (learnerId: string, activityId: string) => `${learnerId}::${activityId}`;
 
 // Deterministic assessment score (0..100): pure hash of learnerId + activityId.
 // NOT random, NOT an external model, repeatable across runs.
@@ -228,6 +238,75 @@ export const learningStore = {
     ev.set(activityId, list);
 
     return { completed: true };
+  },
+
+  getPracticeResult: (learnerId: string, activityId: string): PracticeResult | null =>
+    practiceResults.get(practiceKey(learnerId, activityId)) ?? null,
+
+  // Fail-closed + idempotent practice submission. The SCORE is derived from the learner's
+  // responses (deterministic scorer), NOT a hash. A completed attempt is written so the
+  // existing LI-1 mastery pipeline picks it up unchanged. Idempotency key = submission.attemptId:
+  // replaying the same attemptId returns the prior result and never double-counts.
+  submitPractice: (
+    personaId: string,
+    activityId: string,
+    submission: PracticeSubmission,
+  ): PracticeSubmitResult => {
+    const learnerId = personaMap[personaId]?.learnerId;
+    if (!learnerId) return { ok: false, reason: "not_a_learner" };
+
+    const activity = activityById(activityId);
+    if (!activity) return { ok: false, reason: "unknown_activity" };
+    if (activity.orgId !== personaMap[personaId]?.orgId)
+      return { ok: false, reason: "cross_org_denied" };
+    if (!enrollMapFor(personaId).has(activity.courseId))
+      return { ok: false, reason: "not_enrolled" };
+
+    const practice = practiceFor(activityId);
+    if (!practice) return { ok: false, reason: "practice_not_available" };
+    if (!submission.attemptId || submission.attemptId.trim().length === 0)
+      return { ok: false, reason: "attempt_id_required" };
+
+    const m = attemptsFor(learnerId);
+    const existing = m.get(activityId);
+    if (existing?.state === "completed") {
+      // Idempotent replay of the SAME attempt → return the prior result, do not re-count.
+      if (existing.id === submission.attemptId) {
+        const prior = practiceResults.get(practiceKey(learnerId, activityId));
+        return prior ? { ok: true, result: prior, idempotentReplay: true } : { ok: false, reason: "already_completed" };
+      }
+      // A different attempt against an already-completed activity is rejected (no double-count).
+      return { ok: false, reason: "already_completed" };
+    }
+
+    // Deterministic score from the learner's own responses.
+    const result = scorePractice(practice, learnerId, submission);
+    const idx = ++attemptSeq;
+    const completedAt = new Date(LEARNING_EPOCH + idx * 3600000).toISOString();
+    m.set(activityId, {
+      id: submission.attemptId, // attemptId is the attempt identity → mastery idempotency key
+      learnerId,
+      activityId,
+      state: "completed",
+      completedAt,
+      score: result.score,
+    });
+
+    // Structured practice evidence (separate from the score; summary only, no answer leakage).
+    const ev = evidenceFor(learnerId);
+    const list = ev.get(activityId) ?? [];
+    list.push({
+      id: `EVID-${++evidenceSeq}`,
+      learnerId,
+      activityId,
+      kind: "practice_result",
+      text: `correct ${result.correct}/${result.total} · ${result.scoringVersion}`,
+      at: completedAt,
+    });
+    ev.set(activityId, list);
+
+    practiceResults.set(practiceKey(learnerId, activityId), result);
+    return { ok: true, result };
   },
 };
 
