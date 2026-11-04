@@ -164,6 +164,43 @@ async function main() {
     // Drawer closes on selection (route change).
     await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
     check("[mobile] drawer navigates and closes on route selection", true);
+
+    // ── Scenario F — Track A: catalog URL filters, tutor rename/delete, keyboard help ──
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await signIn(page, /Linh \(Learner\)/); // fresh reload resets the in-memory store
+
+    // Catalog filter is reflected in the shareable URL query string (no reload: the
+    // in-memory session would be lost, so filter via the live UI and read the URL).
+    await page.getByRole("link", { name: "Catalog" }).click();
+    await page.getByRole("heading", { name: /Course catalog/ }).waitFor();
+    await page.getByLabel("Search courses").fill("ielts");
+    await page.getByText("IELTS Foundation B2").waitFor();
+    check("[catalog] typing a filter narrows results", (await page.getByText("Everyday English A2").count()) === 0);
+    check("[catalog] filter is reflected in the shareable URL", page.url().includes("q=ielts"));
+    await page.getByRole("button", { name: "Clear filters" }).first().click();
+    await page.getByText("Everyday English A2").waitFor();
+    check("[catalog] clear filters restores the full catalog", true);
+
+    // Tutor conversation rename + delete (in-memory).
+    await page.getByRole("link", { name: "AI Tutor" }).click();
+    await page.getByText("Practising A2 plans").waitFor();
+    await page.getByRole("button", { name: "Rename Practising A2 plans" }).click();
+    const renameInput = page.getByRole("textbox", { name: "Rename Practising A2 plans" });
+    await renameInput.fill("Smoke renamed");
+    await renameInput.press("Enter");
+    await page.getByText("Smoke renamed").waitFor();
+    check("[tutor] rename a conversation in place", true);
+    await page.getByRole("button", { name: "Delete B1 opinions warm-up" }).click();
+    await page.waitForFunction(() => !document.body.textContent.includes("B1 opinions warm-up"));
+    check("[tutor] delete a conversation", true);
+
+    // Keyboard shortcut help: "?" opens the dialog, Esc closes it.
+    await page.keyboard.press("Shift+Slash");
+    await page.getByRole("dialog", { name: "Keyboard shortcuts" }).waitFor();
+    check("[a11y] '?' opens the keyboard shortcuts help", true);
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
+    check("[a11y] Esc closes the keyboard shortcuts help", true);
   } finally {
     await browser.close();
     server.close();
