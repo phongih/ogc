@@ -30,12 +30,22 @@ fi
 assert_full_sha "$sha"
 
 export COREPACK_ENABLE_DOWNLOAD_PROMPT=0 CI=true
+# Use the repo-pinned package manager (package.json "packageManager") via corepack, so the
+# build reproduces regardless of the host's default pnpm. Fail clearly when unavailable.
+if command -v corepack >/dev/null 2>&1; then
+  PNPM=(corepack pnpm)
+elif command -v pnpm >/dev/null 2>&1; then
+  log "WARNING: corepack not found — using host pnpm $(pnpm --version); build may not match the pinned toolchain"
+  PNPM=(pnpm)
+else
+  die "no pnpm toolchain available (install corepack, or pnpm matching package.json packageManager)"
+fi
 if [[ ! -d "$src/node_modules" ]]; then
-  log "installing dependencies (frozen lockfile)"
-  ( cd "$src" && pnpm install --frozen-lockfile >&2 )
+  log "installing dependencies (frozen lockfile) via ${PNPM[*]}"
+  ( cd "$src" && "${PNPM[@]}" install --frozen-lockfile >&2 )
 fi
 log "building synthetic SPA (mock adapter) at $sha"
-( cd "$src" && VITE_CATALOG_ADAPTER=mock pnpm --filter @ogc/web build >&2 )
+( cd "$src" && VITE_CATALOG_ADAPTER=mock "${PNPM[@]}" --filter @ogc/web build >&2 )
 
 dist="$src/apps/web/dist"
 [[ -f "$dist/index.html" ]] || die "build produced no $dist/index.html"
