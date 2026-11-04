@@ -1,13 +1,16 @@
 import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner, StatTile } from "../../ui";
 import { useSession } from "../../app/session";
-import { useAchievements, useLearnerDashboard } from "./queries";
+import { useAchievements, useLearnerDashboard, useLearnerProfile, useRecommendation } from "./queries";
 import { relativeDay } from "../../lib/time";
+import { ALL_SKILLS, skillLabel } from "../learning/intelligence/skills";
 
 export function LearnerHome() {
   const { session } = useSession();
   const q = useLearnerDashboard(session?.personaId ?? "");
   const achievements = useAchievements(session?.personaId ?? "");
+  const liProfile = useLearnerProfile(session?.personaId ?? "");
+  const nextStep = useRecommendation(session?.personaId ?? "");
 
   if (q.isLoading) return <Spinner label="Loading your learning" />;
   if (q.isError) return <ErrorState message="Could not load your learning." onRetry={() => q.refetch()} />;
@@ -43,6 +46,56 @@ export function LearnerHome() {
           <StatTile label="Courses" value={d.enrolled.length} />
           <StatTile label="In progress" value={inProgress} />
           <StatTile label="Upcoming" value={d.upcoming.length} hint="lessons" />
+        </div>
+      ) : null}
+
+      {liProfile.data ? (
+        <div>
+          <h2 className="mb-3 text-lg font-medium">Learning intelligence</h2>
+          <Card className="space-y-4" aria-label="Learning intelligence">
+            {nextStep.data ? (
+              <div className="rounded-ogc border border-brand/40 bg-brand/5 p-3">
+                <p className="text-xs uppercase tracking-wide text-muted">Your next step</p>
+                <p className="mt-1 text-sm" data-testid="li-recommendation-reason">
+                  {nextStep.data.reason}
+                </p>
+                <Link to={`/app/learning/courses/${nextStep.data.courseId}`} className="mt-2 inline-block">
+                  <Button variant="ghost">Practise now</Button>
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm text-muted">No next step — you&apos;re all caught up.</p>
+            )}
+
+            <div>
+              <p className="mb-2 text-sm font-medium">
+                Skill mastery <span className="text-muted">· CEFR {liProfile.data.cefrBand}</span>
+              </p>
+              <ul className="space-y-2" aria-label="Skill mastery">
+                {ALL_SKILLS.map((s) => {
+                  const m = liProfile.data!.skills[s];
+                  return (
+                    <li key={s}>
+                      <div className="flex items-center justify-between text-sm">
+                        <span>{skillLabel(s)}</span>
+                        <span className="text-muted" aria-label={`${skillLabel(s)} mastery ${m.level}`}>
+                          {m.level}
+                          <span className="ml-1 text-xs">
+                            ({m.evidenceCount} evidence)
+                          </span>
+                        </span>
+                      </div>
+                      <ProgressBar
+                        pct={m.level}
+                        label={`${skillLabel(s)} mastery ${m.level} percent`}
+                        className="mt-1"
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </Card>
         </div>
       ) : null}
 

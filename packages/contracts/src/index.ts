@@ -9,3 +9,6 @@ export * from "./guardian.js";
 export * from "./enrollment.js";
 export * from "./learning.js";
 export * from "./public.js";
+export * from "./profile.js";
+export * from "./placement.js";
+export * from "./recommendation.js";

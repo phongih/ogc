@@ -9,6 +9,9 @@ import type {
   GuardianPort,
   LearningPort,
   ProgressViewPort,
+  PlacementPort,
+  LearningProfilePort,
+  RecommendationPort,
 } from "@ogc/contracts";
 import { mockCatalog } from "../adapters/mockCatalog";
 import { httpCatalog } from "../adapters/httpCatalog";
@@ -19,6 +22,7 @@ import { mockEnrollment } from "../adapters/mockEnrollment";
 import { mockLessonPlan } from "../adapters/mockLessonPlan";
 import { mockGuardian } from "../adapters/mockGuardian";
 import { mockLearning, mockProgressView } from "../adapters/mockLearning";
+import { mockPlacement, mockProfile, mockRecommendation } from "../adapters/mockProfile";
 
 // Catalog is the only port with a real backend adapter (Slice-7). Selection is
 // dev-config only: `http` uses the local Catalog backend, otherwise the mock. Default
@@ -37,4 +41,7 @@ export const lessonPlan: LessonPlanPort = mockLessonPlan;
 export const guardian: GuardianPort = mockGuardian;
 export const learning: LearningPort = mockLearning;
 export const progressView: ProgressViewPort = mockProgressView;
+export const placement: PlacementPort = mockPlacement;
+export const profile: LearningProfilePort = mockProfile;
+export const recommendation: RecommendationPort = mockRecommendation;
 export { directory } from "./directory";
