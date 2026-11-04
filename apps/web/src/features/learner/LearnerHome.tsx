@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner, StatTile } from "../../ui";
 import { useSession } from "../../app/session";
-import { useLearnerDashboard } from "./queries";
+import { useAchievements, useLearnerDashboard } from "./queries";
 import { relativeDay } from "../../lib/time";
 
 export function LearnerHome() {
   const { session } = useSession();
   const q = useLearnerDashboard(session?.personaId ?? "");
+  const achievements = useAchievements(session?.personaId ?? "");
 
   if (q.isLoading) return <Spinner label="Loading your learning" />;
   if (q.isError) return <ErrorState message="Could not load your learning." onRetry={() => q.refetch()} />;
@@ -42,6 +43,31 @@ export function LearnerHome() {
           <StatTile label="Courses" value={d.enrolled.length} />
           <StatTile label="In progress" value={inProgress} />
           <StatTile label="Upcoming" value={d.upcoming.length} hint="lessons" />
+        </div>
+      ) : null}
+
+      {achievements.data ? (
+        <div>
+          <h2 className="mb-3 text-lg font-medium">Streak &amp; achievements</h2>
+          <Card className="space-y-3">
+            <p className="text-sm">
+              <span aria-hidden="true">🔥</span> <strong>{achievements.data.streakDays}-day</strong> learning streak
+            </p>
+            <ul className="flex flex-wrap gap-2">
+              {achievements.data.badges.map((b) => (
+                <li key={b.id}>
+                  <span
+                    aria-label={`${b.title} ${b.earned ? "(earned)" : "(locked)"}`}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${
+                      b.earned ? "border-border bg-surface" : "border-border/50 text-muted opacity-60"
+                    }`}
+                  >
+                    <span aria-hidden="true">{b.icon}</span> {b.title}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
         </div>
       ) : null}
 
