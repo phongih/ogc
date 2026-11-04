@@ -3,6 +3,7 @@ import { Link, NavLink, Navigate, Outlet, useLocation } from "react-router-dom";
 import { sectionsFor } from "@ogc/mock-authz";
 import { useSession } from "../../app/session";
 import { sectionLabel, sectionRoute } from "../../app/nav";
+import { KeyboardHelp } from "../../app/KeyboardHelp";
 import { Button } from "../../ui";
 
 export function Shell() {
@@ -147,6 +148,8 @@ export function Shell() {
       <main id="main" className="mx-auto max-w-6xl px-4 py-8">
         <Outlet />
       </main>
+
+      <KeyboardHelp />
     </div>
   );
 }
