@@ -39,5 +39,6 @@ log "building synthetic SPA (mock adapter) at $sha"
 
 dist="$src/apps/web/dist"
 [[ -f "$dist/index.html" ]] || die "build produced no $dist/index.html"
+mkdir -p "$(dirname "$out")"   # ensure the manifest's parent directory exists
 node "$HERE/make-manifest.mjs" "$dist" "$sha" "$mode" "$out"
 log "manifest written: $out (sha $sha)"
