@@ -295,6 +295,13 @@ check("promote/rollback: refuse the live VM root without OGC_LIVE", () => {
   expectFail(run("rollback.sh", ["/var/www/ogc"]), "live rollback refused");
 });
 
+// ─────────────────────────── B-6: make-release orchestrator (fail-closed) ────────────
+check("make-release: rejects bad sha, unsafe stage, and the live root (fail-closed)", () => {
+  expectFail(run("make-release.sh", [REPO, "deadbeef", tmp()]), "bad sha");
+  expectFail(run("make-release.sh", [REPO, "a".repeat(40), "relative/stage"]), "unsafe stage");
+  expectFail(run("make-release.sh", [REPO, "a".repeat(40), "/var/www/ogc"]), "live root refused");
+});
+
 // ───────────────────────────────────── summary ──────────────────────────────────────
 for (const d of tmps) rmSync(d, { recursive: true, force: true });
 console.log(`\n${pass}/${pass + fail} release-toolkit checks passed`);
