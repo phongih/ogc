@@ -39,7 +39,8 @@ export type LearningAttempt = z.infer<typeof LearningAttempt>;
 
 // ── Evidence (submissions + AI feedback) ──────────────────────────────────────
 // AI-generated feedback is evidence, NOT an assessment score. Kept separate on purpose.
-export const EvidenceKind = z.enum(["submission", "ai_feedback"]);
+// `practice_result` (OGC-AUTH-030) records a deterministic practice submission summary.
+export const EvidenceKind = z.enum(["submission", "ai_feedback", "practice_result"]);
 export type EvidenceKind = z.infer<typeof EvidenceKind>;
 
 export const LearningEvidence = z.object({

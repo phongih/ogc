@@ -12,6 +12,7 @@ import {
 import { relativeDay } from "../../lib/time";
 import { ALL_SKILLS, skillLabel } from "../learning/intelligence/skills";
 import { confidenceWord, masteryWord } from "../learning/intelligence/friendly";
+import { practiceFor } from "../../fixtures/practice";
 
 export function LearnerHome() {
   const { session } = useSession();
@@ -83,9 +84,16 @@ export function LearnerHome() {
                 <p className="mt-1 text-sm" data-testid="li-recommendation-reason">
                   {next.data.friendlyReason}
                 </p>
-                <Link to={`/app/learning/courses/${next.data.courseId}`} className="mt-2 inline-block">
-                  <Button variant="ghost">Start now</Button>
-                </Link>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {practiceFor(next.data.activityId) ? (
+                    <Link to={`/app/learning/practice/${next.data.activityId}`} className="inline-block">
+                      <Button variant="ghost">Practice now</Button>
+                    </Link>
+                  ) : null}
+                  <Link to={`/app/learning/courses/${next.data.courseId}`} className="inline-block">
+                    <Button variant="ghost">Start now</Button>
+                  </Link>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-muted">You&apos;re all caught up — nice work.</p>

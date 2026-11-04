@@ -19,6 +19,7 @@ import type {
   TeacherLearningIntelligencePort,
   AppliedRecommendationPort,
   LearnerNextActionPort,
+  PracticePort,
 } from "@ogc/contracts";
 import { mockCatalog } from "../adapters/mockCatalog";
 import { httpCatalog } from "../adapters/httpCatalog";
@@ -41,6 +42,7 @@ import {
   mockAppliedRecommendation,
   mockLearnerNextAction,
 } from "../adapters/mockProfile";
+import { mockPractice } from "../adapters/mockPractice";
 
 // Catalog is the only port with a real backend adapter (Slice-7). Selection is
 // dev-config only: `http` uses the local Catalog backend, otherwise the mock. Default
@@ -69,4 +71,5 @@ export const learningPath: LearningPathPort = mockLearningPath;
 export const teacherIntelligence: TeacherLearningIntelligencePort = mockTeacherIntelligence;
 export const appliedRecommendation: AppliedRecommendationPort = mockAppliedRecommendation;
 export const learnerNextAction: LearnerNextActionPort = mockLearnerNextAction;
+export const practice: PracticePort = mockPractice;
 export { directory } from "./directory";
