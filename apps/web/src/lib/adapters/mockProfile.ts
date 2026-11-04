@@ -1,11 +1,15 @@
 import type {
   LearnerProfile,
   LearningActivity,
+  ActivityPrerequisite,
+  LearningPathView,
+  LearningPathPort,
   MasteryConfidence,
   MasteryConfidencePort,
   JustifiedRecommendation,
   JustifiedRecommendationPort,
   PathStep,
+  PrerequisitePort,
   PlacementPort,
   PlacementResult,
   LearningProfilePort,
@@ -20,6 +24,7 @@ import { activities } from "../../fixtures/activities";
 import { personaMap } from "../../fixtures/personas";
 import { learnerById } from "../../fixtures/learners";
 import { placementByLearner } from "../../fixtures/placement";
+import { prerequisiteEdges } from "../../fixtures/prerequisites";
 import { learningStore } from "./store";
 import { withFault } from "./faults";
 import { ALL_SKILLS, assessmentTypeForKind, skillForKind } from "../../features/learning/intelligence/skills";
@@ -27,6 +32,7 @@ import { seedProfile, updateMastery } from "../../features/learning/intelligence
 import { buildPath, recommend } from "../../features/learning/intelligence/recommend";
 import { computeConfidence } from "../../features/learning/intelligence/confidence";
 import { justify } from "../../features/learning/intelligence/justify";
+import { buildLearningPath } from "../../features/learning/intelligence/pathplan";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -166,6 +172,54 @@ export const mockJustifiedRecommendation: JustifiedRecommendationPort = {
       const scoped = scopedActivities(s.learnerId, s.orgId);
       const rec = recommend(profile, scoped, completedIds(s.learnerId, scoped));
       return latency<JustifiedRecommendation>(justify(rec, confidenceFor(s.learnerId, s.orgId)));
+    }),
+};
+
+// ── LI-3: prerequisite graph + learning path ─────────────────────────────────
+
+// Prerequisite edges whose dependent activity is in the learner's scope.
+function scopedEdges(scoped: LearningActivity[]): ActivityPrerequisite[] {
+  const ids = new Set(scoped.map((a) => a.id));
+  return prerequisiteEdges.filter((e) => ids.has(e.activityId));
+}
+
+// Activity ids that exist but belong to ANOTHER tenant — so a prereq pointing at one is
+// classified as cross_org (rejected), never followed.
+function foreignActivityIds(orgId: string): Set<string> {
+  return new Set(activities.filter((a) => a.orgId !== orgId).map((a) => a.id));
+}
+
+export const mockPrerequisite: PrerequisitePort = {
+  getPrerequisites: (personaId) =>
+    withFault("prereq.getPrerequisites", () => {
+      const s = learnerFor(personaId);
+      return latency<ActivityPrerequisite[]>(s ? scopedEdges(scopedActivities(s.learnerId, s.orgId)) : []);
+    }),
+};
+
+export const mockLearningPath: LearningPathPort = {
+  getLearningPath: (personaId) =>
+    withFault("path.getLearningPath", () => {
+      const s = learnerFor(personaId);
+      if (!s) return latency<LearningPathView | null>(null);
+      const profile = profileFor(s.learnerId, s.orgId);
+      if (!profile) return latency<LearningPathView | null>(null);
+      const scoped = scopedActivities(s.learnerId, s.orgId);
+      const plan = buildLearningPath({
+        profile,
+        confidence: confidenceFor(s.learnerId, s.orgId),
+        activities: scoped,
+        edges: scopedEdges(scoped),
+        completedIds: completedIds(s.learnerId, scoped),
+        foreignActivityIds: foreignActivityIds(s.orgId),
+      });
+      return latency<LearningPathView>({
+        learnerId: s.learnerId,
+        orgId: s.orgId,
+        steps: plan.steps,
+        nextStep: plan.nextStep,
+        graph: plan.graph,
+      });
     }),
 };
 
