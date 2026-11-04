@@ -6,6 +6,8 @@ import {
   useConversation,
   useConversations,
   useCreateConversation,
+  useDeleteConversation,
+  useRenameConversation,
   useSendMessage,
   useSuggestedPrompts,
 } from "./queries";
@@ -21,7 +23,11 @@ export function TutorView() {
   const prompts = useSuggestedPrompts(personaId);
   const send = useSendMessage(personaId, activeId);
   const create = useCreateConversation(personaId);
+  const rename = useRenameConversation(personaId);
+  const del = useDeleteConversation(personaId);
   const [text, setText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
 
   const submit = (value: string) => {
     const v = value.trim();
@@ -53,15 +59,65 @@ export function TutorView() {
             <p className="px-1 text-xs text-muted">No conversations yet.</p>
           ) : (
             (list.data ?? []).map((c) => (
-              <button
+              <div
                 key={c.id}
-                onClick={() => navigate(`/app/tutor/${c.id}`)}
-                className={`block w-full rounded-ogc border px-3 py-2 text-left text-sm ${
-                  c.id === activeId ? "border-brand bg-surface" : "border-border hover:bg-surface"
+                className={`rounded-ogc border px-2 py-1.5 ${
+                  c.id === activeId ? "border-brand bg-surface" : "border-border"
                 }`}
               >
-                {c.title}
-              </button>
+                {editingId === c.id ? (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      rename.mutate(
+                        { id: c.id, title: draftTitle.trim() || c.title },
+                        { onSuccess: () => setEditingId(null) },
+                      );
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={draftTitle}
+                      onChange={(e) => setDraftTitle(e.target.value)}
+                      onBlur={() => setEditingId(null)}
+                      aria-label={`Rename ${c.title}`}
+                      className="w-full rounded-ogc border border-border bg-surface px-2 py-1 text-sm"
+                    />
+                  </form>
+                ) : (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => navigate(`/app/tutor/${c.id}`)}
+                      className="flex-1 truncate text-left text-sm"
+                    >
+                      {c.title}
+                    </button>
+                    <button
+                      aria-label={`Rename ${c.title}`}
+                      onClick={() => {
+                        setEditingId(c.id);
+                        setDraftTitle(c.title);
+                      }}
+                      className="text-xs text-muted hover:text-fg"
+                    >
+                      Rename
+                    </button>
+                    <button
+                      aria-label={`Delete ${c.title}`}
+                      onClick={() =>
+                        del.mutate(c.id, {
+                          onSuccess: () => {
+                            if (c.id === activeId) navigate("/app/tutor");
+                          },
+                        })
+                      }
+                      className="text-xs text-danger hover:opacity-80"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
             ))
           )}
         </nav>

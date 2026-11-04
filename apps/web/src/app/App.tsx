@@ -1,6 +1,7 @@
 import { RouterProvider } from "react-router-dom";
 import { AppProviders } from "./providers";
 import { router } from "./router";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { NonProductionBanner } from "../ui";
 
 export function App() {
@@ -10,7 +11,9 @@ export function App() {
         Skip to content
       </a>
       <NonProductionBanner />
-      <RouterProvider router={router} />
+      <ErrorBoundary>
+        <RouterProvider router={router} />
+      </ErrorBoundary>
     </AppProviders>
   );
 }

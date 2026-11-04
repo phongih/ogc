@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type { CourseFormat, CourseLevel } from "@ogc/contracts";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
@@ -10,9 +9,21 @@ const FORMATS: CourseFormat[] = ["in_center", "online", "hybrid"];
 
 export function CatalogList() {
   const { session } = useSession();
-  const [level, setLevel] = useState<CourseLevel | "">("");
-  const [format, setFormat] = useState<CourseFormat | "">("");
-  const [q, setQ] = useState("");
+  // Filters live in the URL query string → shareable links + working browser back/forward.
+  const [params, setParams] = useSearchParams();
+  const level = (params.get("level") ?? "") as CourseLevel | "";
+  const format = (params.get("format") ?? "") as CourseFormat | "";
+  const q = params.get("q") ?? "";
+  const setParam = (key: string, value: string) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: false },
+    );
 
   const query = useCourses(session?.orgId ?? "", {
     level: level || undefined,
@@ -21,11 +32,7 @@ export function CatalogList() {
   });
 
   const filtersActive = Boolean(level || format || q);
-  const clearFilters = () => {
-    setLevel("");
-    setFormat("");
-    setQ("");
-  };
+  const clearFilters = () => setParams(new URLSearchParams());
 
   return (
     <section className="space-y-6">
@@ -36,7 +43,7 @@ export function CatalogList() {
           <span className="sr-only">Search courses</span>
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => setParam("q", e.target.value)}
             placeholder="Search title or code"
             aria-label="Search courses"
             className="rounded-ogc border border-border bg-surface px-3 py-1.5 text-sm"
@@ -45,7 +52,7 @@ export function CatalogList() {
         <select
           aria-label="Filter by level"
           value={level}
-          onChange={(e) => setLevel(e.target.value as CourseLevel | "")}
+          onChange={(e) => setParam("level", e.target.value)}
           className="rounded-ogc border border-border bg-surface px-3 py-1.5 text-sm"
         >
           <option value="">All levels</option>
@@ -58,7 +65,7 @@ export function CatalogList() {
         <select
           aria-label="Filter by format"
           value={format}
-          onChange={(e) => setFormat(e.target.value as CourseFormat | "")}
+          onChange={(e) => setParam("format", e.target.value)}
           className="rounded-ogc border border-border bg-surface px-3 py-1.5 text-sm"
         >
           <option value="">All formats</option>

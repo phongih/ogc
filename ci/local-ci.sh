@@ -27,6 +27,9 @@ pnpm --filter @ogc/catalog-api test
 echo "== build: web =="
 pnpm --filter @ogc/web build
 
+echo "== test: release toolkit (ops/release) =="
+node ops/release/test/release.test.mjs
+
 # E2E needs the pre-installed Playwright + Chromium. If unavailable the E2E gates are
 # skipped (reported NOT RUN) so core gates stay portable; no browser download, no
 # external network. Full acceptance requires these to EXECUTE.

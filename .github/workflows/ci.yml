@@ -26,6 +26,7 @@ jobs:
       - run: pnpm --filter @ogc/web test # unit + component + accessibility (axe) + conformance (mock+http)
       - run: pnpm --filter @ogc/catalog-api test # backend contract/negative/leakage
       - run: pnpm --filter @ogc/web build
+      - run: node ops/release/test/release.test.mjs # release toolkit (browser smoke self-skips without Playwright)
       # Optional E2E: provisions a browser only on a hosted runner. Non-blocking so the
       # core gates above remain authoritative; the local script resolves a pre-installed
       # Playwright instead of downloading one.

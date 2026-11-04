@@ -2,9 +2,16 @@ import { describe, expect, it } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { CatalogList } from "./CatalogList";
-import { renderUI } from "../../test/harness";
+import { renderApp, renderUI } from "../../test/harness";
 
 describe("CatalogList", () => {
+  it("reads filters from the URL query string (shareable deep link)", async () => {
+    renderApp("/app/catalog?q=ielts", "learner");
+    await waitFor(() => expect(screen.getByText("IELTS Foundation B2")).toBeInTheDocument());
+    expect(screen.queryByText("Everyday English A2")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Search courses")).toHaveValue("ielts");
+  });
+
   it("renders synthetic courses then filters by query", async () => {
     renderUI(<CatalogList />, { role: "learner" });
     await waitFor(() => expect(screen.getByText("Everyday English A2")).toBeInTheDocument());
