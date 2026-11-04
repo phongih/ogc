@@ -1,5 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { learner, profile, recommendation, masteryConfidence, justifiedRecommendation } from "../../lib/api";
+import {
+  learner,
+  profile,
+  recommendation,
+  masteryConfidence,
+  justifiedRecommendation,
+  learningPath,
+} from "../../lib/api";
 import { getAchievements } from "./achievements";
 
 export const useLearnerDashboard = (personaId: string) =>
@@ -39,5 +46,13 @@ export const useJustifiedRecommendation = (personaId: string) =>
   useQuery({
     queryKey: ["li-justified", personaId],
     queryFn: () => justifiedRecommendation.getJustified(personaId),
+    enabled: personaId.length > 0,
+  });
+
+// LI-3 — prerequisite-governed learning path (steps + prerequisite-aware next step).
+export const useLearningPath = (personaId: string) =>
+  useQuery({
+    queryKey: ["li-path", personaId],
+    queryFn: () => learningPath.getLearningPath(personaId),
     enabled: personaId.length > 0,
   });
