@@ -2,6 +2,7 @@ import type {
   LearnerProfile,
   LearningActivity,
   ActivityPrerequisite,
+  InterventionResult,
   LearningPathView,
   LearningPathPort,
   MasteryConfidence,
@@ -10,6 +11,9 @@ import type {
   JustifiedRecommendationPort,
   PathStep,
   PrerequisitePort,
+  TeacherIntervention,
+  TeacherLearningIntelligencePort,
+  TeacherLearningView,
   PlacementPort,
   PlacementResult,
   LearningProfilePort,
@@ -25,6 +29,7 @@ import { personaMap } from "../../fixtures/personas";
 import { learnerById } from "../../fixtures/learners";
 import { placementByLearner } from "../../fixtures/placement";
 import { prerequisiteEdges } from "../../fixtures/prerequisites";
+import { classTeachers, rosters } from "../../fixtures/teaching";
 import { learningStore } from "./store";
 import { withFault } from "./faults";
 import { ALL_SKILLS, assessmentTypeForKind, skillForKind } from "../../features/learning/intelligence/skills";
@@ -220,6 +225,104 @@ export const mockLearningPath: LearningPathPort = {
         nextStep: plan.nextStep,
         graph: plan.graph,
       });
+    }),
+};
+
+// ── LI-4: teacher intervention & explainability ──────────────────────────────
+
+// Build the full learning-path view for a learner id (reused by the teacher view).
+function learnerPathView(learnerId: string, orgId: string): LearningPathView | null {
+  const profile = profileFor(learnerId, orgId);
+  if (!profile) return null;
+  const scoped = scopedActivities(learnerId, orgId);
+  const plan = buildLearningPath({
+    profile,
+    confidence: confidenceFor(learnerId, orgId),
+    activities: scoped,
+    edges: scopedEdges(scoped),
+    completedIds: completedIds(learnerId, scoped),
+    foreignActivityIds: foreignActivityIds(orgId),
+  });
+  return { learnerId, orgId, steps: plan.steps, nextStep: plan.nextStep, graph: plan.graph };
+}
+
+// Fail-closed teacher→learner authorization: the viewer must be a teacher who OWNS a class
+// whose roster contains the learner, AND share the learner's tenant. Returns null otherwise
+// (guardians, learners, staff and cross-org/unrelated teachers are all denied).
+function teacherOwnsLearner(viewerPersonaId: string, learnerId: string): { teacherId: string; orgId: string } | null {
+  const viewer = personaMap[viewerPersonaId];
+  const teacherId = viewer?.teacherId;
+  if (!teacherId) return null;
+  const owned = Object.entries(classTeachers)
+    .filter(([, t]) => t === teacherId)
+    .map(([classId]) => classId);
+  const onRoster = owned.some((classId) => (rosters[classId] ?? []).some((r) => r.learnerId === learnerId));
+  if (!onRoster) return null;
+  const learner = learnerById[learnerId];
+  if (!learner || learner.orgId !== viewer.orgId) return null; // cross-org guard
+  return { teacherId, orgId: viewer.orgId };
+}
+
+// Synthetic in-memory audit store for interventions (keyed by learnerId). Deterministic ts.
+const INTERVENTION_EPOCH = Date.parse("2026-02-01T00:00:00.000Z");
+let interventionSeq = 0;
+const interventions = new Map<string, TeacherIntervention[]>();
+
+export const mockTeacherIntelligence: TeacherLearningIntelligencePort = {
+  getLearnerView: (viewerPersonaId, learnerId) =>
+    withFault("teacher.getLearnerView", () => {
+      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+      if (!auth) return latency<TeacherLearningView | null>(null);
+      const profile = profileFor(learnerId, auth.orgId);
+      const path = learnerPathView(learnerId, auth.orgId);
+      if (!profile || !path) return latency<TeacherLearningView | null>(null);
+      const confidence: MasteryConfidence = {
+        learnerId,
+        orgId: auth.orgId,
+        skills: confidenceFor(learnerId, auth.orgId),
+      };
+      return latency<TeacherLearningView>({ learnerId, orgId: auth.orgId, profile, confidence, path });
+    }),
+
+  intervene: (viewerPersonaId, learnerId, input) =>
+    withFault("teacher.intervene", () => {
+      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+      if (!auth) return latency<InterventionResult>({ ok: false, reason: "not_authorized" });
+      if (!input.note || input.note.trim().length === 0)
+        return latency<InterventionResult>({ ok: false, reason: "reason_required" });
+      const path = learnerPathView(learnerId, auth.orgId);
+      if (!path) return latency<InterventionResult>({ ok: false, reason: "no_path" });
+      const step = path.steps.find((s) => s.activityId === input.selectedActivityId);
+      if (!step) return latency<InterventionResult>({ ok: false, reason: "activity_out_of_scope" });
+      // Prerequisites are never bypassed: only an AVAILABLE activity may be selected.
+      if (step.state !== "available")
+        return latency<InterventionResult>({ ok: false, reason: `activity_not_eligible:${step.state}` });
+
+      const idx = ++interventionSeq;
+      const rec: TeacherIntervention = {
+        id: `INT-${idx}`,
+        actorPersonaId: viewerPersonaId,
+        teacherId: auth.teacherId,
+        learnerId,
+        orgId: auth.orgId,
+        // The system recommendation is PRESERVED (recorded, not overwritten).
+        systemActivityId: path.nextStep.recommendation?.activityId ?? null,
+        selectedActivityId: input.selectedActivityId,
+        reasonCode: input.reasonCode,
+        note: input.note.trim(),
+        at: new Date(INTERVENTION_EPOCH + idx * 3600000).toISOString(),
+      };
+      const list = interventions.get(learnerId) ?? [];
+      list.push(rec);
+      interventions.set(learnerId, list);
+      return latency<InterventionResult>({ ok: true, intervention: { ...rec } });
+    }),
+
+  listInterventions: (viewerPersonaId, learnerId) =>
+    withFault("teacher.listInterventions", () => {
+      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+      if (!auth) return latency<TeacherIntervention[]>([]);
+      return latency<TeacherIntervention[]>((interventions.get(learnerId) ?? []).map((x) => ({ ...x })));
     }),
 };
 
