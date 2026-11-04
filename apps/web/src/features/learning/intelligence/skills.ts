@@ -1,4 +1,4 @@
-import type { ActivityKind, Skill } from "@ogc/contracts";
+import type { ActivityKind, AssessmentType, Skill } from "@ogc/contracts";
 
 // Deterministic ActivityKind → Skill mapping for LI-1.
 //   reading   → reading
@@ -17,6 +17,19 @@ export const ALL_SKILLS: readonly Skill[] = ["reading", "use_of_english", "speak
 
 export function skillForKind(kind: ActivityKind): Skill {
   return SKILL_BY_KIND[kind];
+}
+
+// LI-2 — assessment reliability by kind. Objective (auto-marked) is more reliable than
+// subjective (speaking) in this synthetic confidence model.
+export const ASSESSMENT_BY_KIND: Record<ActivityKind, AssessmentType> = {
+  reading: "objective",
+  exercise: "objective",
+  quiz: "objective",
+  speaking: "subjective",
+};
+
+export function assessmentTypeForKind(kind: ActivityKind): AssessmentType {
+  return ASSESSMENT_BY_KIND[kind];
 }
 
 export function skillLabel(skill: Skill): string {

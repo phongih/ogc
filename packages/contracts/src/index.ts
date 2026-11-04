@@ -11,4 +11,5 @@ export * from "./learning.js";
 export * from "./public.js";
 export * from "./profile.js";
 export * from "./placement.js";
+export * from "./confidence.js";
 export * from "./recommendation.js";
