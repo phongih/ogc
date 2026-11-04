@@ -1,12 +1,19 @@
 import type {
   LearnerProfile,
   LearningActivity,
+  MasteryConfidence,
+  MasteryConfidencePort,
+  JustifiedRecommendation,
+  JustifiedRecommendationPort,
   PathStep,
   PlacementPort,
   PlacementResult,
   LearningProfilePort,
+  QualityEvidence,
   Recommendation,
   RecommendationPort,
+  Skill,
+  SkillConfidence,
   SkillEvidence,
 } from "@ogc/contracts";
 import { activities } from "../../fixtures/activities";
@@ -15,9 +22,11 @@ import { learnerById } from "../../fixtures/learners";
 import { placementByLearner } from "../../fixtures/placement";
 import { learningStore } from "./store";
 import { withFault } from "./faults";
-import { skillForKind } from "../../features/learning/intelligence/skills";
+import { ALL_SKILLS, assessmentTypeForKind, skillForKind } from "../../features/learning/intelligence/skills";
 import { seedProfile, updateMastery } from "../../features/learning/intelligence/mastery";
 import { buildPath, recommend } from "../../features/learning/intelligence/recommend";
+import { computeConfidence } from "../../features/learning/intelligence/confidence";
+import { justify } from "../../features/learning/intelligence/justify";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -96,6 +105,67 @@ export const mockProfile: LearningProfilePort = {
     withFault("profile.getProfile", () => {
       const s = learnerFor(personaId);
       return latency<LearnerProfile | null>(s ? profileFor(s.learnerId, s.orgId) : null);
+    }),
+};
+
+// ── LI-2: evidence quality + confidence ──────────────────────────────────────
+
+// QualityEvidence for the confidence engine: one per assessed+completed+scored attempt,
+// carrying the assessment type. All store-produced evidence is valid by construction.
+function qualityEvidenceFor(learnerId: string, scoped: LearningActivity[]): QualityEvidence[] {
+  const out: QualityEvidence[] = [];
+  for (const a of scoped) {
+    if (!a.assessed) continue;
+    const att = learningStore.getAttempt(learnerId, a.id);
+    if (!att || att.state !== "completed" || att.score === null || att.completedAt === null) continue;
+    out.push({
+      attemptId: att.id,
+      skill: skillForKind(a.kind),
+      assessmentType: assessmentTypeForKind(a.kind),
+      valid: true,
+      at: att.completedAt,
+    });
+  }
+  return out;
+}
+
+// The assessable surface per skill in scope: count of assessed activities by skill.
+function assessableBySkill(scoped: LearningActivity[]): Record<Skill, number> {
+  const counts = {} as Record<Skill, number>;
+  for (const s of ALL_SKILLS) counts[s] = 0;
+  for (const a of scoped) if (a.assessed) counts[skillForKind(a.kind)] += 1;
+  return counts;
+}
+
+function confidenceFor(learnerId: string, orgId: string): Record<Skill, SkillConfidence> {
+  const scoped = scopedActivities(learnerId, orgId);
+  return computeConfidence(qualityEvidenceFor(learnerId, scoped), assessableBySkill(scoped));
+}
+
+export const mockMasteryConfidence: MasteryConfidencePort = {
+  getConfidence: (personaId) =>
+    withFault("confidence.getConfidence", () => {
+      const s = learnerFor(personaId);
+      if (!s) return latency<MasteryConfidence | null>(null);
+      return latency<MasteryConfidence>({
+        learnerId: s.learnerId,
+        orgId: s.orgId,
+        skills: confidenceFor(s.learnerId, s.orgId),
+      });
+    }),
+};
+
+export const mockJustifiedRecommendation: JustifiedRecommendationPort = {
+  getJustified: (personaId) =>
+    withFault("recommend.getJustified", () => {
+      const s = learnerFor(personaId);
+      // Fail-closed: a non-learner persona gets a well-formed "nothing to recommend" verdict.
+      if (!s) return latency<JustifiedRecommendation>(justify(null, {} as Record<Skill, SkillConfidence>));
+      const profile = profileFor(s.learnerId, s.orgId);
+      if (!profile) return latency<JustifiedRecommendation>(justify(null, {} as Record<Skill, SkillConfidence>));
+      const scoped = scopedActivities(s.learnerId, s.orgId);
+      const rec = recommend(profile, scoped, completedIds(s.learnerId, scoped));
+      return latency<JustifiedRecommendation>(justify(rec, confidenceFor(s.learnerId, s.orgId)));
     }),
 };
 
