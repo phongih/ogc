@@ -22,6 +22,13 @@ describe("ClassDetail", () => {
     expect(link).toHaveAttribute("href", `/app/teaching/classes/${CLASS_A2}/plan`);
   });
 
+  it("shows the class attendance overview for the owning teacher", async () => {
+    renderApp(`/app/teaching/classes/${CLASS_A2}`, "teacher");
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Attendance" })).toBeInTheDocument());
+    expect(screen.getByRole("columnheader", { name: "Present" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Rate" })).toBeInTheDocument();
+  });
+
   it("summarizes class progress as an equal-weight ring over authorized learners", async () => {
     renderApp(`/app/teaching/classes/${CLASS_A2}`, "teacher");
 
