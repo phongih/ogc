@@ -209,11 +209,15 @@ async function main() {
     const reason = page.getByTestId("li-recommendation-reason");
     await reason.waitFor();
     const reasonText = (await reason.textContent()) ?? "";
-    // Speaking (55) is the weakest skill, but its activity is prerequisite-BLOCKED, so the
-    // prerequisite-aware next step targets the weakest AVAILABLE skill: Use of English (65).
+    // Speaking (55) is weakest but prerequisite-blocked → next step targets available Use of
+    // English, in learner-friendly language with NO internal activity ids.
     check(
-      "[li3] next step respects prerequisites (available Use of English 65, not blocked Speaking)",
-      /Use of English/.test(reasonText) && /65/.test(reasonText),
+      "[li] next step is learner-friendly (Use of English, title, no ids)",
+      /Use of English/.test(reasonText) && /Quiz: At the market/.test(reasonText) && !/ACT-/.test(reasonText),
+    );
+    check(
+      "[li] default next-step source is 'Suggested for you' (system)",
+      (await page.locator('[data-source="system"]').count()) >= 1,
     );
     const masteryList = page.getByRole("list", { name: "Skill mastery" });
     await masteryList.waitFor();
@@ -228,12 +232,12 @@ async function main() {
     check("[li3] path has a completed step", (await pathList.locator('[data-state="completed"]').count()) >= 1);
     check("[li3] path has an available step", (await pathList.locator('[data-state="available"]').count()) >= 1);
     check("[li3] path has a prerequisite-blocked step", (await pathList.locator('[data-state="blocked"]').count()) >= 1);
-    await page.getByRole("link", { name: "Practise now" }).click();
+    await page.getByRole("link", { name: "Start now" }).first().click();
     await page.waitForURL("**/app/learning/courses/**");
-    check("[li] 'Practise now' deep-links to the recommended course", page.url().includes("/app/learning/courses/"));
+    check("[li] 'Start now' deep-links to the recommended course", page.url().includes("/app/learning/courses/"));
 
-    // ── Scenario H — LI-4: teacher learning intelligence + synthetic intervention ──
-    await signIn(page, /Tara \(Teacher\)/);
+    // ── Scenario H — Teacher oversight + APPLIED recommendation reaching the learner (LI-4 + AUTH-026) ──
+    await signIn(page, /Tara \(Teacher\)/); // fresh reload → seeded baseline, applied-state cleared
     await page.getByRole("heading", { name: "Teaching" }).waitFor();
     await page.getByRole("link", { name: "Learner overview" }).first().click();
     await page.getByRole("heading", { name: "Learner overview" }).waitFor();
@@ -242,7 +246,7 @@ async function main() {
 
     const sysRec = page.getByTestId("ti-system-rec");
     await sysRec.waitFor();
-    check("[li4] teacher sees the system recommendation", (await sysRec.textContent())?.includes("ACT-") ?? false);
+    check("[li4] teacher sees the system suggestion by title", (await sysRec.textContent())?.includes("Quiz: At the market") ?? false);
     const prereq = page.getByRole("list", { name: "Prerequisite status" });
     await prereq.waitFor();
     check("[li4] teacher sees a prerequisite-blocked step", (await prereq.locator('[data-state="blocked"]').count()) >= 1);
@@ -250,19 +254,30 @@ async function main() {
     // The blocked speaking activity must NOT be selectable; an available one must be.
     const altSelect = page.getByLabel("Alternative activity", { exact: true });
     const optionValues = await altSelect.locator("option").evaluateAll((os) => os.map((o) => o.value));
-    check("[li4] blocked activity is not an intervention option", !optionValues.includes("ACT-A2-4"));
-    check("[li4] an available activity is an intervention option", optionValues.includes("ACT-B1-2"));
+    check("[li4] blocked activity is not an apply option", !optionValues.includes("ACT-A2-4"));
+    check("[li4] an available activity is an apply option", optionValues.includes("ACT-B1-2"));
 
-    // Record an eligible alternative with a required reason.
+    // Apply an eligible alternative — this reaches the learner.
     await altSelect.selectOption("ACT-B1-2");
     await page.getByLabel("Reason code").selectOption("remediation");
     await page.getByLabel("Intervention note").fill("Focus on opinion phrases first");
-    await page.getByRole("button", { name: "Record recommendation" }).click();
-    const teacherRec = page.getByTestId("ti-teacher-rec");
-    await teacherRec.waitFor();
-    const trText = (await teacherRec.textContent()) ?? "";
-    check("[li4] teacher-selected recommendation is recorded and shown", /ACT-B1-2/.test(trText));
-    check("[li4] system recommendation is preserved alongside the teacher choice", /system:/.test(trText));
+    await page.getByRole("button", { name: "Apply for learner" }).click();
+    const teacherActive = page.getByTestId("ti-teacher-active");
+    await teacherActive.waitFor();
+    check("[li5] applied recommendation is active (shown by title)", /Quiz: Opinion phrases/.test((await teacherActive.textContent()) ?? ""));
+    check("[li5] system suggestion preserved alongside the applied one", (await sysRec.textContent())?.includes("Quiz: At the market") ?? false);
+
+    // Switch to the learner WITHOUT a reload (SPA sign-out keeps the in-memory applied state).
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.getByText("Choose a demo persona").waitFor();
+    await page.getByRole("button", { name: /Linh \(Learner\)/ }).click();
+    await page.waitForURL("**/app/**");
+    await page.getByRole("heading", { name: "My Learning" }).waitFor();
+    const lReason = page.getByTestId("li-recommendation-reason");
+    await lReason.waitFor();
+    const lText = (await lReason.textContent()) ?? "";
+    check("[li5] learner now sees a TEACHER-recommended next step", (await page.locator('[data-source="teacher"]').count()) >= 1);
+    check("[li5] teacher recommendation reaches the learner by title, no ids", /Quiz: Opinion phrases/.test(lText) && !/ACT-/.test(lText));
   } finally {
     await browser.close();
     server.close();
