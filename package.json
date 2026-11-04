@@ -4,6 +4,7 @@
   "type": "module",
   "description": "OGC v2 — isolated development workspace (synthetic only, NON-PRODUCTION). No EduOS/IIOS-r1 source imported.",
   "engines": { "node": ">=20" },
+  "packageManager": "pnpm@10.28.0",
   "scripts": {
     "dev": "pnpm --filter @ogc/web dev",
     "build": "pnpm --filter @ogc/web build",
@@ -17,5 +18,8 @@
     "globals": "15.9.0",
     "typescript": "5.6.2",
     "typescript-eslint": "8.8.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   }
 }
