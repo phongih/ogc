@@ -201,6 +201,25 @@ async function main() {
     await page.keyboard.press("Escape");
     await page.waitForFunction(() => !document.querySelector('[role="dialog"]'));
     check("[a11y] Esc closes the keyboard shortcuts help", true);
+
+    // ── Scenario G — LI-1: learner intelligence (evidence-driven next step + mastery) ──
+    await signIn(page, /Linh \(Learner\)/); // fresh reload → seeded baseline (speaking weakest = 55)
+    await page.getByRole("heading", { name: "My Learning" }).waitFor();
+    await page.getByRole("heading", { name: "Learning intelligence" }).waitFor();
+    const reason = page.getByTestId("li-recommendation-reason");
+    await reason.waitFor();
+    const reasonText = (await reason.textContent()) ?? "";
+    check("[li] next step targets the weakest skill (Speaking)", /Speaking/.test(reasonText));
+    check("[li] recommendation reason cites the mastery value (55)", /55/.test(reasonText));
+    const masteryList = page.getByRole("list", { name: "Skill mastery" });
+    await masteryList.waitFor();
+    check(
+      "[li] mastery strip shows all three skills",
+      (await masteryList.getByRole("progressbar").count()) === 3,
+    );
+    await page.getByRole("link", { name: "Practise now" }).click();
+    await page.waitForURL("**/app/learning/courses/**");
+    check("[li] 'Practise now' deep-links to the recommended course", page.url().includes("/app/learning/courses/"));
   } finally {
     await browser.close();
     server.close();
