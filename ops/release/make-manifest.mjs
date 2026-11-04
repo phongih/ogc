@@ -3,8 +3,8 @@
  * Usage: node make-manifest.mjs <dist_dir> <40-hex-sha> <buildMode> <out_manifest>
  */
 import { createHash } from "node:crypto";
-import { readdirSync, statSync, readFileSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { readdirSync, statSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { join, relative, dirname } from "node:path";
 
 const [, , distDir, sha, buildMode, out] = process.argv;
 if (!distDir || !sha || !buildMode || !out) {
@@ -44,5 +44,6 @@ const manifest = {
   totalBytes: assets.reduce((s, a) => s + a.bytes, 0),
   assets,
 };
+mkdirSync(dirname(out), { recursive: true }); // create the manifest's parent dir if missing
 writeFileSync(out, JSON.stringify(manifest, null, 2) + "\n");
 console.log(`manifest: ${assets.length} assets, ${manifest.totalBytes} bytes, sha ${sha.slice(0, 7)} -> ${out}`);
