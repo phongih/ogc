@@ -2,7 +2,12 @@ import type {
   LearnerProfile,
   LearningActivity,
   ActivityPrerequisite,
+  AppliedRecommendation,
+  AppliedRecommendationPort,
+  ApplyResult,
   InterventionResult,
+  LearnerNextAction,
+  LearnerNextActionPort,
   LearningPathView,
   LearningPathPort,
   MasteryConfidence,
@@ -38,6 +43,7 @@ import { buildPath, recommend } from "../../features/learning/intelligence/recom
 import { computeConfidence } from "../../features/learning/intelligence/confidence";
 import { justify } from "../../features/learning/intelligence/justify";
 import { buildLearningPath } from "../../features/learning/intelligence/pathplan";
+import { friendlyNextReason } from "../../features/learning/intelligence/friendly";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -323,6 +329,141 @@ export const mockTeacherIntelligence: TeacherLearningIntelligencePort = {
       const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
       if (!auth) return latency<TeacherIntervention[]>([]);
       return latency<TeacherIntervention[]>((interventions.get(learnerId) ?? []).map((x) => ({ ...x })));
+    }),
+};
+
+// ── AUTH-026: applied teacher recommendation (reaches the learner) ───────────
+
+const APPLIED_EPOCH = Date.parse("2026-03-01T00:00:00.000Z");
+let appliedSeq = 0;
+const appliedLog = new Map<string, AppliedRecommendation[]>(); // keyed by learnerId
+
+const activityTitle = (id: string): string => activities.find((a) => a.id === id)?.title ?? id;
+
+// The still-eligible active applied recommendation, revalidated against the CURRENT path.
+// Deterministically transitions a stale one to fulfilled/invalidated (persisted) and returns
+// null when nothing is actively reaching the learner.
+function activeAppliedFor(learnerId: string, path: LearningPathView): AppliedRecommendation | null {
+  const log = appliedLog.get(learnerId) ?? [];
+  for (let i = log.length - 1; i >= 0; i--) {
+    const rec = log[i];
+    if (rec.status !== "active") continue;
+    const step = path.steps.find((s) => s.activityId === rec.activityId);
+    if (step?.state === "available") return rec; // still eligible
+    rec.status = step?.state === "completed" ? "fulfilled" : "invalidated"; // revalidate
+    return null;
+  }
+  return null;
+}
+
+export const mockAppliedRecommendation: AppliedRecommendationPort = {
+  applyRecommendation: (viewerPersonaId, learnerId, input) =>
+    withFault("applied.apply", () => {
+      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+      if (!auth) return latency<ApplyResult>({ ok: false, reason: "not_authorized" });
+      if (!input.note || input.note.trim().length === 0)
+        return latency<ApplyResult>({ ok: false, reason: "reason_required" });
+      const path = learnerPathView(learnerId, auth.orgId);
+      if (!path) return latency<ApplyResult>({ ok: false, reason: "no_path" });
+      const step = path.steps.find((s) => s.activityId === input.selectedActivityId);
+      if (!step) return latency<ApplyResult>({ ok: false, reason: "activity_out_of_scope" });
+      if (step.state !== "available")
+        return latency<ApplyResult>({ ok: false, reason: `activity_not_eligible:${step.state}` });
+
+      const log = appliedLog.get(learnerId) ?? [];
+      // One active per learner: supersede any currently-active record.
+      for (const r of log) if (r.status === "active") r.status = "superseded";
+
+      const idx = ++appliedSeq;
+      const rec: AppliedRecommendation = {
+        id: `APP-${idx}`,
+        learnerId,
+        orgId: auth.orgId,
+        activityId: step.activityId,
+        courseId: step.courseId,
+        skill: step.skill,
+        reasonCode: input.reasonCode,
+        note: input.note.trim(),
+        actorPersonaId: viewerPersonaId,
+        teacherId: auth.teacherId,
+        // The system recommendation is PRESERVED (recorded, never overwritten).
+        systemActivityIdAtApply: path.nextStep.recommendation?.activityId ?? null,
+        appliedAt: new Date(APPLIED_EPOCH + idx * 3600000).toISOString(),
+        status: "active",
+      };
+      log.push(rec);
+      appliedLog.set(learnerId, log);
+      return latency<ApplyResult>({ ok: true, applied: { ...rec } });
+    }),
+
+  revertApplied: (viewerPersonaId, learnerId) =>
+    withFault("applied.revert", () => {
+      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+      if (!auth) return latency<ApplyResult>({ ok: false, reason: "not_authorized" });
+      const path = learnerPathView(learnerId, auth.orgId);
+      const active = path ? activeAppliedFor(learnerId, path) : null;
+      if (!active) return latency<ApplyResult>({ ok: false, reason: "no_active_recommendation" });
+      active.status = "reverted";
+      return latency<ApplyResult>({ ok: true, applied: { ...active } });
+    }),
+
+  getActiveApplied: (viewerPersonaId, learnerId) =>
+    withFault("applied.getActive", () => {
+      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+      if (!auth) return latency<AppliedRecommendation | null>(null);
+      const path = learnerPathView(learnerId, auth.orgId);
+      const active = path ? activeAppliedFor(learnerId, path) : null;
+      return latency<AppliedRecommendation | null>(active ? { ...active } : null);
+    }),
+};
+
+export const mockLearnerNextAction: LearnerNextActionPort = {
+  getNextAction: (personaId) =>
+    withFault("applied.getNextAction", () => {
+      const s = learnerFor(personaId);
+      if (!s) return latency<LearnerNextAction | null>(null);
+      const path = learnerPathView(s.learnerId, s.orgId);
+      if (!path) return latency<LearnerNextAction | null>(null);
+
+      // Teacher-applied takes precedence while active + eligible.
+      const active = activeAppliedFor(s.learnerId, path);
+      if (active) {
+        const step = path.steps.find((st) => st.activityId === active.activityId)!;
+        return latency<LearnerNextAction>({
+          source: "teacher",
+          activityId: active.activityId,
+          courseId: active.courseId,
+          skill: active.skill,
+          masteryLevel: step.masteryLevel,
+          confidenceBand: step.confidenceBand,
+          friendlyReason: friendlyNextReason({
+            source: "teacher",
+            skill: active.skill,
+            title: activityTitle(active.activityId),
+            reasonCode: active.reasonCode,
+            note: active.note,
+          }),
+          teacherNote: active.note,
+        });
+      }
+
+      // Otherwise the system recommendation (LI-3 path nextStep).
+      const rec = path.nextStep.recommendation;
+      if (!rec) return latency<LearnerNextAction | null>(null);
+      return latency<LearnerNextAction>({
+        source: "system",
+        activityId: rec.activityId,
+        courseId: rec.courseId,
+        skill: rec.skill,
+        masteryLevel: rec.masteryLevel,
+        confidenceBand: path.nextStep.confidenceBand ?? "low",
+        friendlyReason: friendlyNextReason({
+          source: "system",
+          skill: rec.skill,
+          title: activityTitle(rec.activityId),
+        }),
+        teacherNote: null,
+      });
     }),
 };
 

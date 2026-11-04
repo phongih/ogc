@@ -6,6 +6,7 @@ import {
   masteryConfidence,
   justifiedRecommendation,
   learningPath,
+  learnerNextAction,
 } from "../../lib/api";
 import { getAchievements } from "./achievements";
 
@@ -54,5 +55,13 @@ export const useLearningPath = (personaId: string) =>
   useQuery({
     queryKey: ["li-path", personaId],
     queryFn: () => learningPath.getLearningPath(personaId),
+    enabled: personaId.length > 0,
+  });
+
+// AUTH-026 — the learner's single next action (teacher-applied or system), learner-friendly.
+export const useNextAction = (personaId: string) =>
+  useQuery({
+    queryKey: ["li-next-action", personaId],
+    queryFn: () => learnerNextAction.getNextAction(personaId),
     enabled: personaId.length > 0,
   });
