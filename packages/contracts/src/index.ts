@@ -15,3 +15,4 @@ export * from "./confidence.js";
 export * from "./recommendation.js";
 export * from "./prerequisites.js";
 export * from "./path.js";
+export * from "./intervention.js";

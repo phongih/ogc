@@ -16,6 +16,7 @@ import type {
   JustifiedRecommendationPort,
   PrerequisitePort,
   LearningPathPort,
+  TeacherLearningIntelligencePort,
 } from "@ogc/contracts";
 import { mockCatalog } from "../adapters/mockCatalog";
 import { httpCatalog } from "../adapters/httpCatalog";
@@ -34,6 +35,7 @@ import {
   mockJustifiedRecommendation,
   mockPrerequisite,
   mockLearningPath,
+  mockTeacherIntelligence,
 } from "../adapters/mockProfile";
 
 // Catalog is the only port with a real backend adapter (Slice-7). Selection is
@@ -60,4 +62,5 @@ export const masteryConfidence: MasteryConfidencePort = mockMasteryConfidence;
 export const justifiedRecommendation: JustifiedRecommendationPort = mockJustifiedRecommendation;
 export const prerequisite: PrerequisitePort = mockPrerequisite;
 export const learningPath: LearningPathPort = mockLearningPath;
+export const teacherIntelligence: TeacherLearningIntelligencePort = mockTeacherIntelligence;
 export { directory } from "./directory";

@@ -231,6 +231,38 @@ async function main() {
     await page.getByRole("link", { name: "Practise now" }).click();
     await page.waitForURL("**/app/learning/courses/**");
     check("[li] 'Practise now' deep-links to the recommended course", page.url().includes("/app/learning/courses/"));
+
+    // ── Scenario H — LI-4: teacher learning intelligence + synthetic intervention ──
+    await signIn(page, /Tara \(Teacher\)/);
+    await page.getByRole("heading", { name: "Teaching" }).waitFor();
+    await page.getByRole("link", { name: "Learner overview" }).first().click();
+    await page.getByRole("heading", { name: "Learner overview" }).waitFor();
+    await page.getByText("Linh N.").first().waitFor();
+    await page.getByRole("button", { name: "View intelligence for Linh N." }).click();
+
+    const sysRec = page.getByTestId("ti-system-rec");
+    await sysRec.waitFor();
+    check("[li4] teacher sees the system recommendation", (await sysRec.textContent())?.includes("ACT-") ?? false);
+    const prereq = page.getByRole("list", { name: "Prerequisite status" });
+    await prereq.waitFor();
+    check("[li4] teacher sees a prerequisite-blocked step", (await prereq.locator('[data-state="blocked"]').count()) >= 1);
+
+    // The blocked speaking activity must NOT be selectable; an available one must be.
+    const altSelect = page.getByLabel("Alternative activity", { exact: true });
+    const optionValues = await altSelect.locator("option").evaluateAll((os) => os.map((o) => o.value));
+    check("[li4] blocked activity is not an intervention option", !optionValues.includes("ACT-A2-4"));
+    check("[li4] an available activity is an intervention option", optionValues.includes("ACT-B1-2"));
+
+    // Record an eligible alternative with a required reason.
+    await altSelect.selectOption("ACT-B1-2");
+    await page.getByLabel("Reason code").selectOption("remediation");
+    await page.getByLabel("Intervention note").fill("Focus on opinion phrases first");
+    await page.getByRole("button", { name: "Record recommendation" }).click();
+    const teacherRec = page.getByTestId("ti-teacher-rec");
+    await teacherRec.waitFor();
+    const trText = (await teacherRec.textContent()) ?? "";
+    check("[li4] teacher-selected recommendation is recorded and shown", /ACT-B1-2/.test(trText));
+    check("[li4] system recommendation is preserved alongside the teacher choice", /system:/.test(trText));
   } finally {
     await browser.close();
     server.close();
