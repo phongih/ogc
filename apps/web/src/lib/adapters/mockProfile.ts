@@ -29,6 +29,7 @@ import type {
   SkillConfidence,
   SkillEvidence,
   SupportItem,
+  SupportSignal,
   SupportPort,
 } from "@ogc/contracts";
 import { activities } from "../../fixtures/activities";
@@ -38,6 +39,7 @@ import { placementByLearner } from "../../fixtures/placement";
 import { prerequisiteEdges } from "../../fixtures/prerequisites";
 import { classes, classTeachers, rosters } from "../../fixtures/teaching";
 import { learningStore } from "./store";
+import { absenceStreakFor } from "./mockAttendance";
 import { withFault } from "./faults";
 import { ALL_SKILLS, assessmentTypeForKind, skillForKind } from "../../features/learning/intelligence/skills";
 import { seedProfile, updateMastery } from "../../features/learning/intelligence/mastery";
@@ -512,6 +514,9 @@ export const mockSupport: SupportPort = {
       if (!teacherId) return latency<SupportItem[]>([]);
       const items: SupportItem[] = [];
       const seen = new Set<string>();
+      const ownedClassIds = Object.entries(classTeachers)
+        .filter(([, t]) => t === teacherId)
+        .map(([c]) => c);
       for (const [classId, owner] of Object.entries(classTeachers)) {
         if (owner !== teacherId) continue;
         const className = classes.find((c) => c.id === classId)?.name ?? "Class";
@@ -522,16 +527,21 @@ export const mockSupport: SupportPort = {
           if (!auth) continue; // same-tenant guard
           const placement = placementFor(row.learnerId, auth.orgId);
           const path = learnerPathView(row.learnerId, auth.orgId);
-          if (!placement || !path) continue;
-          const scoped = scopedActivities(row.learnerId, auth.orgId);
-          const returned = learningStore.listSpeaking([row.learnerId], "returned").length;
-          const signals = supportSignals(seedProfile(placement), evidenceFor(row.learnerId, scoped), returned);
+          const signals: SupportSignal[] = [];
+          if (placement && path) {
+            const scoped = scopedActivities(row.learnerId, auth.orgId);
+            const returned = learningStore.listSpeaking([row.learnerId], "returned").length;
+            signals.push(...supportSignals(seedProfile(placement), evidenceFor(row.learnerId, scoped), returned));
+          }
+          // P2 · attendance-v1: the teacher's own marks, in the classes this teacher owns.
+          const streak = absenceStreakFor(row.learnerId, ownedClassIds);
+          if (streak) signals.push({ kind: "absences", source: "attendance", sessions: streak });
           if (signals.length === 0) continue;
           const focus = focusSkill(signals);
           let suggestion =
-            path.steps.find((st) => st.state === "available" && st.skill === focus) ?? null;
+            path?.steps.find((st) => st.state === "available" && st.skill === focus) ?? null;
           let unlocks: string | null = null;
-          if (!suggestion && focus) {
+          if (!suggestion && focus && path) {
             // The focus skill's activity is locked: walk its prerequisite chain (breadth-first)
             // to the nearest AVAILABLE step — that is what the teacher can actually assign.
             const byId = new Map(path.steps.map((st) => [st.activityId, st]));
@@ -552,7 +562,7 @@ export const mockSupport: SupportPort = {
               }
             }
           }
-          const active = activeAppliedFor(row.learnerId, path);
+          const active = path ? activeAppliedFor(row.learnerId, path) : null;
           items.push({
             learnerId: row.learnerId,
             learnerName: row.displayName,

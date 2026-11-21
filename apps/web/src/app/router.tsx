@@ -10,6 +10,7 @@ import { CenterDetail } from "../features/org/CenterDetail";
 import { LearnerHome } from "../features/learner/LearnerHome";
 import { TeacherHome } from "../features/teacher/TeacherHome";
 import { ClassDetail } from "../features/teacher/ClassDetail";
+import { SessionAttendancePage } from "../features/teacher/SessionAttendancePage";
 import { CatalogList } from "../features/catalog/CatalogList";
 import { CourseDetail } from "../features/catalog/CourseDetail";
 import { TutorView } from "../features/tutor/TutorView";
@@ -36,6 +37,7 @@ export const routes = [
       { path: "learning/speaking/:activityId", element: <RequireSection section="learning"><SpeakingStudio /></RequireSection> },
       { path: "teaching", element: <RequireSection section="teaching"><TeacherHome /></RequireSection> },
       { path: "teaching/classes/:classId", element: <RequireSection section="teaching"><ClassDetail /></RequireSection> },
+      { path: "teaching/classes/:classId/sessions/:sessionId", element: <RequireSection section="teaching"><SessionAttendancePage /></RequireSection> },
       { path: "teaching/classes/:classId/plan", element: <RequireSection section="teaching"><LessonPlanEditor /></RequireSection> },
       { path: "catalog", element: <RequireSection section="catalog"><CatalogList /></RequireSection> },
       { path: "catalog/:courseId", element: <RequireSection section="catalog"><CourseDetail /></RequireSection> },

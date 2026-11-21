@@ -17,13 +17,24 @@ const SOURCE_LABEL: Record<SupportSignal["source"], string> = {
   placement: "placement test only",
   practice: "from practice",
   teacher_review: "teacher review",
+  attendance: "attendance record",
 };
+
+// Badge: what the flag rests on. Practice / teacher review beats attendance beats placement.
+export function evidenceLabel(item: SupportItem): { kind: "practice" | "attendance" | "placement"; text: string } {
+  if (item.signals.some((s) => s.source === "practice" || s.source === "teacher_review"))
+    return { kind: "practice", text: "Evidence from practice" };
+  if (item.signals.some((s) => s.source === "attendance"))
+    return { kind: "attendance", text: "Attendance record" };
+  return { kind: "placement", text: "Placement only" };
+}
 
 export function signalText(s: SupportSignal): string {
   const skill = s.skill ? skillLabel(s.skill) : "";
   if (s.kind === "skill_drop")
     return `${skill} dropped ${Math.abs(s.delta ?? 0)} to ${s.level} after the latest practice`;
   if (s.kind === "low_skill") return `${skill} is ${s.level} (below 60)`;
+  if (s.kind === "absences") return `Absent from the last ${s.sessions ?? 0} sessions`;
   return "Speaking rehearsal was returned for another try";
 }
 
@@ -42,8 +53,8 @@ export function NeedsSupportQueue() {
         Learners needing support{q.data && q.data.length > 0 ? ` (${q.data.length})` : ""}
       </h2>
       <p className="mb-3 text-xs text-muted">
-        Evidence from practice is listed first. Placement-only estimates are marked — check them
-        before acting.
+        Evidence from practice or attendance is listed first. Placement-only estimates are marked —
+        check them before acting.
       </p>
       {q.isLoading ? (
         <Spinner label="Loading learners needing support" />
@@ -88,9 +99,10 @@ function SupportCard({ viewer, item }: { viewer: string; item: SupportItem }) {
     onSuccess: () => refreshLearningState(qc),
   });
 
+  const badge = evidenceLabel(item);
   return (
     <Card className="space-y-2">
-      <div data-evidence={item.evidenceBacked ? "practice" : "placement"} className="space-y-2">
+      <div data-evidence={badge.kind} className="space-y-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="font-medium">
             {item.learnerName}{" "}
@@ -98,10 +110,10 @@ function SupportCard({ viewer, item }: { viewer: string; item: SupportItem }) {
           </p>
           <span
             className={`rounded-full border px-2 py-0.5 text-xs ${
-              item.evidenceBacked ? "border-brand text-brand" : "border-border text-muted"
+              badge.kind === "placement" ? "border-border text-muted" : "border-brand text-brand"
             }`}
           >
-            {item.evidenceBacked ? "Evidence from practice" : "Placement only"}
+            {badge.text}
           </span>
         </div>
         <ul className="space-y-1 text-sm" aria-label={`Why ${item.learnerName} is flagged`}>
@@ -173,6 +185,10 @@ function SupportCard({ viewer, item }: { viewer: string; item: SupportItem }) {
               ) : null}
             </form>
           )
+        ) : !item.focusSkill ? (
+          <p className="text-sm text-muted">
+            No skill flagged — check in with {item.learnerName} about attendance.
+          </p>
         ) : (
           <p className="text-sm text-muted">
             No open activity for {item.focusSkill ? skillLabel(item.focusSkill) : "this skill"}{" "}

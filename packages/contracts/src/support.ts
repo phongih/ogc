@@ -15,11 +15,12 @@ export const SupportSignalKind = z.enum([
   "low_skill", // a skill below the support threshold
   "skill_drop", // the latest evidence on a skill lowered it by ≥ the drop threshold
   "speaking_returned", // the teacher returned a speaking rehearsal for another try
+  "absences", // P2: absent from the latest N marked sessions in a row (attendance-v1)
 ]);
 export type SupportSignalKind = z.infer<typeof SupportSignalKind>;
 
 // Where the signal comes from — shown to the teacher verbatim.
-export const SupportSource = z.enum(["placement", "practice", "teacher_review"]);
+export const SupportSource = z.enum(["placement", "practice", "teacher_review", "attendance"]);
 export type SupportSource = z.infer<typeof SupportSource>;
 
 export const SupportSignal = z.object({
@@ -29,6 +30,7 @@ export const SupportSignal = z.object({
   level: z.number().min(0).max(100).optional(),
   delta: z.number().optional(), // negative for a drop
   evidenceCount: z.number().int().nonnegative().optional(),
+  sessions: z.number().int().positive().optional(), // "absences": consecutive absent sessions
 });
 export type SupportSignal = z.infer<typeof SupportSignal>;
 

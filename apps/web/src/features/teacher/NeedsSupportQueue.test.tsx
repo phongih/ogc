@@ -9,10 +9,14 @@ describe("Learners needing support (teacher home)", () => {
   it("baseline lists placement-only flags, labelled as such", async () => {
     renderApp("/app/teaching", "teacher");
     expect(
-      await screen.findByRole("heading", { name: "Learners needing support (3)" }),
+      await screen.findByRole("heading", { name: "Learners needing support (4)" }),
     ).toBeInTheDocument();
     const list = screen.getByRole("list", { name: "Learners needing support" });
     expect(within(list).getAllByText("Placement only")).toHaveLength(3);
+    // P2: Huy is flagged by the teacher's own attendance marks, labelled as such.
+    expect(within(list).getByText("Attendance record")).toBeInTheDocument();
+    expect(within(list).getByText(/Absent from the last 2 sessions/)).toBeInTheDocument();
+    expect(within(list).getByText(/check in with Huy D\. about attendance/)).toBeInTheDocument();
     expect(within(list).getByText(/Speaking is 55 \(below 60\)/)).toBeInTheDocument();
     expect(screen.getByTestId("unlock-00000000-0000-4000-8000-00000000L001")).toHaveTextContent(
       "Speaking is locked behind “Quiz: At the market” — assign that first",

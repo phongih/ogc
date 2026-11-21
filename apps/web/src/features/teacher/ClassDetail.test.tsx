@@ -25,8 +25,8 @@ describe("ClassDetail", () => {
   it("shows the class attendance overview for the owning teacher", async () => {
     renderApp(`/app/teaching/classes/${CLASS_A2}`, "teacher");
     await waitFor(() => expect(screen.getByRole("heading", { name: "Attendance" })).toBeInTheDocument());
-    expect(screen.getByRole("columnheader", { name: "Present" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Rate" })).toBeInTheDocument();
+    expect(await screen.findByRole("columnheader", { name: "Present" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Attended" })).toBeInTheDocument();
   });
 
   it("summarizes class progress as an equal-weight ring over authorized learners", async () => {

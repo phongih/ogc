@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressRing, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
-import { useClassAttendance, useClassRoster } from "./queries";
+import { useClassAttendance, useClassRoster, useClassSessions } from "./queries";
+import { formatCenterDateTime } from "../../lib/centerTime";
 import { useClassProgress } from "../learning/queries";
 import { LearnerIntelligencePanel } from "./LearnerIntelligencePanel";
 
@@ -13,6 +14,7 @@ export function ClassDetail() {
   const [openLearner, setOpenLearner] = useState<{ id: string; name: string } | null>(null);
   const progress = useClassProgress(session?.personaId ?? "", (q.data ?? []).map((r) => r.learnerId));
   const attendance = useClassAttendance(session?.personaId ?? "", classId);
+  const sessions = useClassSessions(session?.personaId ?? "", classId);
 
   // Class-level overall = equal-weight mean across the learners the viewer is authorized to
   // see (fail-closed entries resolve to null and are excluded, not counted as zero).
@@ -95,18 +97,21 @@ export function ClassDetail() {
           />
         </section>
       ) : null}
-      {attendance.data && attendance.data.length > 0 ? (
-        <section aria-label="Attendance">
-          <h2 className="mb-2 text-lg font-medium">Attendance</h2>
+      <section aria-label="Attendance" className="space-y-3">
+        <h2 className="text-lg font-medium">Attendance</h2>
+        <p className="text-xs text-muted">
+          From marked sessions only. Attended = present + late.
+        </p>
+        {attendance.data && attendance.data.length > 0 ? (
           <Card>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-muted">
                   <th className="pb-2 font-medium">Learner</th>
                   <th className="pb-2 font-medium">Present</th>
-                  <th className="pb-2 font-medium">Absent</th>
                   <th className="pb-2 font-medium">Late</th>
-                  <th className="pb-2 font-medium">Rate</th>
+                  <th className="pb-2 font-medium">Absent</th>
+                  <th className="pb-2 font-medium">Attended</th>
                 </tr>
               </thead>
               <tbody>
@@ -114,16 +119,47 @@ export function ClassDetail() {
                   <tr key={a.learnerId} className="border-t border-border">
                     <td className="py-2">{a.displayName}</td>
                     <td className="py-2">{a.present}</td>
-                    <td className="py-2">{a.absent}</td>
                     <td className="py-2">{a.late}</td>
-                    <td className="py-2">{a.rate}%</td>
+                    <td className="py-2">
+                      {a.absent}
+                      {a.absentStreak >= 2 ? (
+                        <span className="ml-2 text-xs text-danger">last {a.absentStreak} in a row</span>
+                      ) : null}
+                    </td>
+                    <td className="py-2">
+                      {a.attendedPct === null ? "—" : `${a.attendedPct}% of ${a.marked}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </Card>
-        </section>
-      ) : null}
+        ) : null}
+        {sessions.data && sessions.data.length > 0 ? (
+          <ul className="space-y-2" aria-label="Sessions">
+            {sessions.data.map((s) => (
+              <li key={s.id}>
+                <Card className="flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    {s.title}{" "}
+                    <span className="text-sm text-muted">· {formatCenterDateTime(s.at)}</span>
+                  </span>
+                  {s.status === "upcoming" ? (
+                    <span className="text-sm text-muted">Upcoming</span>
+                  ) : (
+                    <Link
+                      to={`/app/teaching/classes/${classId}/sessions/${s.id}`}
+                      className="rounded-ogc border border-border px-3 py-1.5 text-sm text-brand hover:bg-surface"
+                    >
+                      {s.status === "to_mark" ? "Take attendance" : "Edit attendance"} · {s.title}
+                    </Link>
+                  )}
+                </Card>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
 
       <section id="plan" aria-label="Lesson planning">
         <h2 className="mb-2 text-lg font-medium">Lesson planning</h2>
