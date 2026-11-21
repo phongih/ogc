@@ -37,3 +37,5 @@ jobs:
           pnpm --filter @ogc/web exec playwright install --with-deps chromium || true
           node e2e/smoke.mjs || echo "smoke E2E skipped/soft-failed (non-blocking)"
           node e2e/catalog-http.mjs || echo "catalog HTTP E2E skipped/soft-failed (non-blocking)"
+          node e2e/practice-journey.mjs || echo "practice journey E2E skipped/soft-failed (non-blocking)"
+          node e2e/speaking-journey.mjs || echo "speaking journey E2E skipped/soft-failed (non-blocking)"

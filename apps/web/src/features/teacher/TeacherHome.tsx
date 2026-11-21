@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } from "../../ui";
+import { SpeakingReviewQueue } from "./SpeakingReviewQueue";
 import { useSession } from "../../app/session";
 import { useTeacherDashboard } from "./queries";
 
@@ -25,6 +26,8 @@ export function TeacherHome() {
           hint="across your classes"
         />
       </div>
+
+      <SpeakingReviewQueue />
 
       <div>
         <h2 className="mb-3 text-lg font-medium">Assigned classes</h2>

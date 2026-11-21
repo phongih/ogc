@@ -13,6 +13,7 @@ import { personaMap } from "../../fixtures/personas";
 import { learnerById } from "../../fixtures/learners";
 import { enrollmentStore, learningStore } from "./store";
 import { withFault } from "./faults";
+import { speakingFor } from "../../fixtures/speaking";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -80,7 +81,13 @@ export const mockLearning: LearningPort = {
   },
 
   completeActivity: (personaId, activityId) =>
-    withFault("learning.completeActivity", () => latency(learningStore.complete(personaId, activityId))),
+    withFault("learning.completeActivity", () =>
+      // P1 speaking: an activity with a Speaking studio counts ONLY via teacher-approved review,
+      // never via a self-declared "Mark complete".
+      speakingFor(activityId)
+        ? latency({ completed: false, reason: "speaking_requires_review" })
+        : latency(learningStore.complete(personaId, activityId)),
+    ),
 
   getEvidence: (personaId, activityId) => {
     const learnerId = personaMap[personaId]?.learnerId;
