@@ -60,6 +60,7 @@ export const ScheduleRefusal = z.enum([
   "unknown_teacher",
   "same_teacher", // substitute = the class's own teacher
   "clash", // the teacher (or room) is already busy then — see `clashes`
+  "access_policy", // the viewer's access policy does not allow this (here)
 ]);
 export type ScheduleRefusal = z.infer<typeof ScheduleRefusal>;
 

@@ -15,6 +15,7 @@ import { nextWeeklySlot } from "../../fixtures/demoClock";
 import { sessionStore } from "./sessionStore";
 import { findClashes } from "./clashes";
 import { withFault } from "./faults";
+import { allows } from "./accessPolicy";
 
 /*
  * P2 · Center setup wizard — MOCK adapter. NON-PRODUCTION, synthetic, browser memory.
@@ -48,6 +49,8 @@ const staffOrg = (viewer: string) => {
   const p = personaMap[viewer];
   return p?.staff ? p.orgId : null;
 };
+// Access policy (narrows only): may this staff member set up centers?
+const maySetUp = (viewer: string) => allows(viewer, "center:setup");
 const hexId = (kind: string, n: number) =>
   `00000000-0000-4000-8000-${kind}${n.toString(16).padStart(8, "0")}`;
 // The first FIRST_WEEKS weeks of a class's weekly slot, in center time.
@@ -93,7 +96,7 @@ export const mockCenterSetup: CenterSetupPort = {
     withFault("centerSetup.getSetupContext", () => {
       const org = staffOrg(viewer);
       const o = organizations.find((x) => x.id === org);
-      if (!org || !o) return latency<SetupContext | null>(null);
+      if (!org || !o || !maySetUp(viewer)) return latency<SetupContext | null>(null);
       return latency<SetupContext>({
         orgId: org,
         orgName: o.name,
@@ -110,6 +113,8 @@ export const mockCenterSetup: CenterSetupPort = {
     withFault("centerSetup.createCenter", () => {
       const org = staffOrg(viewer);
       if (!org) return latency<CenterSetupResult>({ ok: false, reason: "not_staff", failed: [] });
+      if (!maySetUp(viewer))
+        return latency<CenterSetupResult>({ ok: false, reason: "access_policy", failed: [] });
       // Re-check everything server-side, scoped to this org (brand, courses, teachers too).
       const failed = centerSetupChecklist(draft, takenCodes(org))
         .filter((c) => !c.ok)

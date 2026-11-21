@@ -21,6 +21,7 @@ import { rulesFor, resetRules } from "./engineRules";
 import { refill, registerPersistent } from "./persist";
 import { skillLabel } from "../../features/learning/intelligence/skills";
 import { withFault } from "./faults";
+import { decide } from "./accessPolicy";
 
 /*
  * Decision Engine — MOCK runner. NON-PRODUCTION, synthetic, kept in this browser.
@@ -375,6 +376,21 @@ export const mockDecisionEngine: DecisionEnginePort = {
       const list = rulesFor(org);
       const i = list.findIndex((r) => r.id === ruleId);
       if (i < 0) return latency<RuleUpdateResult>({ ok: false, reason: "not_found" });
+      // Access policy (narrows only): may tune rules; "actions" may be read-only.
+      const verdict = decide(viewer, "engine:manage");
+      if (!verdict.ok) return latency<RuleUpdateResult>({ ok: false, reason: "access_policy" });
+      const sameActions = (a: readonly string[], b: readonly string[]) =>
+        a.length === b.length && a.every((x) => b.includes(x));
+      if (
+        patch.actions &&
+        verdict.readonly.includes("actions") &&
+        !sameActions([...new Set(patch.actions)], list[i].actions)
+      )
+        return latency<RuleUpdateResult>({
+          ok: false,
+          reason: "access_policy",
+          detail: "rule actions are read-only for you",
+        });
       const next: Rule = {
         ...list[i],
         ...patch,

@@ -141,7 +141,7 @@ export const RuleUpdateResult = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), rule: Rule }),
   z.object({
     ok: z.literal(false),
-    reason: z.enum(["not_staff", "not_found", "invalid"]),
+    reason: z.enum(["not_staff", "not_found", "invalid", "access_policy"]),
     detail: z.string().optional(),
   }),
 ]);

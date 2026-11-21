@@ -15,6 +15,7 @@ import { sessionStore, type SelfStudyRecord, type StoredSession } from "./sessio
 import { allMarks, makeupItemLive, markOf } from "./mockAttendance";
 import { findClashes } from "./clashes";
 import { withFault } from "./faults";
+import { allows, centerScope, inScope } from "./accessPolicy";
 
 /*
  * P2 · Make-up ledger — MOCK adapter. NON-PRODUCTION, synthetic, browser memory.
@@ -117,8 +118,14 @@ export function makeupItems(orgId: string, now = Date.now()): MakeupItem[] {
   return out.sort((a, b) => RANK(a) - RANK(b) || Date.parse(a.dueAt) - Date.parse(b.dueAt));
 }
 
-function board(orgId: string): MakeupBoard {
-  const items = makeupItems(orgId);
+const classCenter = (classId: string) => classes.find((c) => c.id === classId)?.centerId ?? "";
+// Access policy (narrows only): the centers this staff member arranges make-ups for.
+const mayArrange = (viewer: string, classId: string) =>
+  allows(viewer, "makeup:manage", { centerId: classCenter(classId) });
+
+function board(orgId: string, viewer: string): MakeupBoard {
+  const scope = centerScope(viewer, "makeup:manage");
+  const items = makeupItems(orgId).filter((i) => inScope(scope, classCenter(i.classId)));
   const count = (f: (i: MakeupItem) => boolean) => items.filter(f).length;
   return {
     items,
@@ -181,23 +188,26 @@ export const mockMakeup: MakeupPort = {
   getBoard: (viewer) =>
     withFault("makeup.getBoard", () => {
       const org = staffOrg(viewer);
-      return latency<MakeupBoard | null>(org ? board(org) : null);
+      return latency<MakeupBoard | null>(org ? board(org, viewer) : null);
     }),
 
   listOptions: (viewer, itemId) =>
     withFault("makeup.listOptions", () => {
       const org = staffOrg(viewer);
       const item = org ? findItem(org, itemId) : undefined;
-      if (!org || !item) return latency<MakeupOption[] | null>(null);
+      if (!org || !item || !mayArrange(viewer, item.classId))
+        return latency<MakeupOption[] | null>(null);
       return latency<MakeupOption[]>(
-        optionsFor(org, item).map((s) => ({
-          sessionId: s.id,
-          kind: s.kind === "makeup" ? "makeup" : "join",
-          className: className(s.classId),
-          title: s.title,
-          at: s.at,
-          teacherName: sessionTeacher(s),
-        })),
+        optionsFor(org, item)
+          .filter((s) => mayArrange(viewer, s.classId))
+          .map((s) => ({
+            sessionId: s.id,
+            kind: s.kind === "makeup" ? "makeup" : "join",
+            className: className(s.classId),
+            title: s.title,
+            at: s.at,
+            teacherName: sessionTeacher(s),
+          })),
       );
     }),
 
@@ -207,11 +217,14 @@ export const mockMakeup: MakeupPort = {
       if (!org) return refuse("not_staff");
       const item = findItem(org, itemId);
       if (!item) return refuse("not_found");
+      if (!mayArrange(viewer, item.classId)) return refuse("access_policy");
       if (item.status === "done") return refuse("already_done");
-      if (!optionsFor(org, item).some((s) => s.id === sessionId)) return refuse("not_an_option");
+      const target = optionsFor(org, item).find((s) => s.id === sessionId);
+      if (!target) return refuse("not_an_option");
+      if (!mayArrange(viewer, target.classId)) return refuse("access_policy");
       sessionStore.selfStudies.delete(itemId); // an item is either booked or self-study
       sessionStore.bookings.set(itemId, sessionId);
-      return latency<MakeupResult>({ ok: true, board: board(org) });
+      return latency<MakeupResult>({ ok: true, board: board(org, viewer) });
     }),
 
   openMakeupSession: (viewer, itemId, at, teacherId) =>
@@ -220,6 +233,7 @@ export const mockMakeup: MakeupPort = {
       if (!org) return refuse("not_staff");
       const item = findItem(org, itemId);
       if (!item) return refuse("not_found");
+      if (!mayArrange(viewer, item.classId)) return refuse("access_policy");
       if (item.status === "done") return refuse("already_done");
       if (!(Date.parse(at) > Date.now())) return refuse("in_past");
       if (!teachers.some((t) => t.id === teacherId && t.orgId === org))
@@ -255,7 +269,7 @@ export const mockMakeup: MakeupPort = {
         sessionStore.selfStudies.delete(i.id);
         sessionStore.bookings.set(i.id, s.id);
       }
-      return latency<MakeupResult>({ ok: true, board: board(org) });
+      return latency<MakeupResult>({ ok: true, board: board(org, viewer) });
     }),
 
   assignSelfStudy: (viewer, itemId) =>
@@ -264,6 +278,7 @@ export const mockMakeup: MakeupPort = {
       if (!org) return refuse("not_staff");
       const item = findItem(org, itemId);
       if (!item) return refuse("not_found");
+      if (!mayArrange(viewer, item.classId)) return refuse("access_policy");
       if (item.status === "done") return refuse("already_done");
       sessionStore.bookings.delete(itemId);
       sessionStore.selfStudies.set(itemId, {
@@ -272,7 +287,7 @@ export const mockMakeup: MakeupPort = {
         returnedNote: null,
         confirmedAt: null,
       });
-      return latency<MakeupResult>({ ok: true, board: board(org) });
+      return latency<MakeupResult>({ ok: true, board: board(org, viewer) });
     }),
 
   listMine: (viewer) =>

@@ -15,6 +15,8 @@ import { centerLocalToIso, formatCenterDateTime, isoToCenterLocal } from "../../
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { MakeupBoard } from "./MakeupBoard";
 import { EngineNotifications } from "../engine/EngineNotifications";
+import { AccessBanner } from "../access/AccessBanner";
+import { useMyAccess } from "../access/useMyAccess";
 
 const REFUSAL: Record<string, string> = {
   not_found: "That class or session is not in your center.",
@@ -25,6 +27,7 @@ const REFUSAL: Record<string, string> = {
   unknown_teacher: "Unknown teacher.",
   same_teacher: "That teacher already teaches this class.",
   clash: "That would double-book a teacher or a room:",
+  access_policy: "Your access policy does not allow this here.",
 };
 
 const DAY_MS = 86_400_000;
@@ -40,6 +43,8 @@ function useOpsAction() {
 export function OperationsHome() {
   const { session } = useSession();
   const viewer = session?.personaId ?? "";
+  const me = useMyAccess();
+  const canSetUp = me.data?.allowed["center:setup"] ?? false;
   const q = useQuery({
     queryKey: ["ops-overview", viewer],
     queryFn: () => schedule.getOverview(viewer),
@@ -57,12 +62,17 @@ export function OperationsHome() {
         title="Center operations"
         subtitle="Schedule and teacher assignment · center time · synthetic demo"
       />
-      <Link
-        to="/app/operations/centers/new"
-        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
-      >
-        + Set up a new center
-      </Link>{" "}
+      <AccessBanner />
+      {canSetUp ? (
+        <>
+          <Link
+            to="/app/operations/centers/new"
+            className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+          >
+            + Set up a new center
+          </Link>{" "}
+        </>
+      ) : null}
       <Link
         to="/app/operations/engine"
         className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
@@ -111,6 +121,8 @@ function ClassCard({
   teachers: TeacherRef[];
 }) {
   const act = useOpsAction();
+  const me = useMyAccess();
+  const lockedTeacher = !!me.data?.readonly["schedule:manage"]?.includes("classTeacher");
   const [title, setTitle] = useState("");
   const [at, setAt] = useState("");
   const now = Date.now();
@@ -133,6 +145,7 @@ function ClassCard({
           <span className="text-muted">Class teacher</span>
           <select
             aria-label={`Class teacher for ${cls.className}`}
+            disabled={lockedTeacher}
             className="rounded-ogc border border-border bg-surface p-1.5"
             value={cls.teacher?.id ?? ""}
             onChange={(e) => {
@@ -215,6 +228,8 @@ function SessionRow({
   now: number;
 }) {
   const act = useOpsAction();
+  const me = useMyAccess();
+  const lockedSub = !!me.data?.readonly["schedule:manage"]?.includes("substitute");
   const [mode, setMode] = useState<null | "move" | "cancel">(null);
   const [when, setWhen] = useState("");
   const future = s.state === "scheduled" && !s.started && !s.marked;
@@ -253,6 +268,7 @@ function SessionRow({
               <span className="text-muted">Taught by</span>
               <select
                 aria-label={`Teacher for ${s.title}`}
+                disabled={lockedSub}
                 className="rounded-ogc border border-border bg-surface p-1"
                 value={s.substitute?.id ?? ""}
                 onChange={(e) => {

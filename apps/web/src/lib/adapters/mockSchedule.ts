@@ -14,6 +14,7 @@ import { sessionStore, type StoredSession } from "./sessionStore";
 import { isMarked } from "./mockAttendance";
 import { findClashes, slotOf } from "./clashes";
 import { withFault } from "./faults";
+import { allows, allowsField, centerScope, inScope } from "./accessPolicy";
 
 /*
  * P2 · Center operations — MOCK adapter. NON-PRODUCTION, synthetic, browser memory.
@@ -82,6 +83,11 @@ function staffSession(viewer: string, sessionId: string) {
 }
 
 const future = (iso: string) => Number.isFinite(Date.parse(iso)) && Date.parse(iso) > Date.now();
+const centerOf = (classId: string) => classes.find((c) => c.id === classId)?.centerId;
+// Access policy (narrows only): may this staff member manage this class's center?
+const mayManage = (viewer: string, classId: string) =>
+  allows(viewer, "schedule:manage", { centerId: centerOf(classId) });
+
 const isHistory = (s: StoredSession) => Date.parse(s.at) <= Date.now() || isMarked(s.id);
 
 export const mockSchedule: SchedulePort = {
@@ -92,7 +98,12 @@ export const mockSchedule: SchedulePort = {
       return latency<OperationsOverview>({
         orgId: org,
         teachers: teachers.filter((t) => t.orgId === org).map((t) => ({ id: t.id, name: t.name })),
-        classes: classes.filter((c) => c.orgId === org).map((c) => classSchedule(c.id)),
+        // An access policy can narrow the centers this staff member manages.
+        classes: classes
+          .filter(
+            (c) => c.orgId === org && inScope(centerScope(viewer, "schedule:manage"), c.centerId),
+          )
+          .map((c) => classSchedule(c.id)),
       });
     }),
 
@@ -101,6 +112,7 @@ export const mockSchedule: SchedulePort = {
       if (!staffOrg(viewer)) return refuse("not_staff");
       const s = staffSession(viewer, sessionId);
       if (!s) return refuse("not_found");
+      if (!mayManage(viewer, s.classId)) return refuse("access_policy");
       if (s.state === "cancelled") return refuse("cancelled");
       if (isHistory(s)) return refuse("already_started");
       if (!future(newAt)) return refuse("in_past");
@@ -118,6 +130,7 @@ export const mockSchedule: SchedulePort = {
       if (!staffOrg(viewer)) return refuse("not_staff");
       const s = staffSession(viewer, sessionId);
       if (!s) return refuse("not_found");
+      if (!mayManage(viewer, s.classId)) return refuse("access_policy");
       if (s.state === "cancelled") return refuse("cancelled");
       if (isHistory(s)) return refuse("already_started");
       if (!future(replacementAt)) return refuse("in_past");
@@ -146,6 +159,7 @@ export const mockSchedule: SchedulePort = {
     withFault("schedule.addSession", () => {
       if (!staffOrg(viewer)) return refuse("not_staff");
       if (!staffClass(viewer, classId)) return refuse("not_found");
+      if (!mayManage(viewer, classId)) return refuse("access_policy");
       if (!future(at)) return refuse("in_past");
       const name = title.trim() || "Extra session";
       const probe = {
@@ -170,6 +184,8 @@ export const mockSchedule: SchedulePort = {
       const org = staffOrg(viewer);
       if (!org) return refuse("not_staff");
       if (!staffClass(viewer, classId)) return refuse("not_found");
+      if (!allowsField(viewer, "schedule:manage", { centerId: centerOf(classId) }, "classTeacher"))
+        return refuse("access_policy");
       if (!teachers.some((t) => t.id === teacherId && t.orgId === org))
         return refuse("unknown_teacher");
       // Every future session the class teacher will teach (not those covered by a substitute).
@@ -200,6 +216,8 @@ export const mockSchedule: SchedulePort = {
       if (!org) return refuse("not_staff");
       const s = staffSession(viewer, sessionId);
       if (!s) return refuse("not_found");
+      if (!allowsField(viewer, "schedule:manage", { centerId: centerOf(s.classId) }, "substitute"))
+        return refuse("access_policy");
       if (s.state === "cancelled") return refuse("cancelled");
       if (isMarked(s.id)) return refuse("already_started"); // marked = history
       if (teacherId !== null) {

@@ -91,6 +91,7 @@ export const MakeupRefusal = z.enum([
   "not_submitted", // nothing to confirm yet
   "note_required",
   "clash", // the chosen teacher is already busy then — see `clashes`
+  "access_policy", // the viewer's access policy does not allow this (here)
 ]);
 export type MakeupRefusal = z.infer<typeof MakeupRefusal>;
 

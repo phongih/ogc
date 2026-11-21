@@ -31,6 +31,7 @@ export type IiosScenario = (typeof IIOS_SCENARIOS)[number];
 
 // The opaque token each demo persona presents when its grant is valid. Synthetic fixtures only.
 const VALID_GRANT_BY_PERSONA: Record<string, string> = {
+  "demo-admin": "grant-valid-admin",
   "demo-staff": "grant-valid-staff",
   "demo-teacher": "grant-valid-teacher",
   "demo-teacher-2": "grant-valid-teacher-2",

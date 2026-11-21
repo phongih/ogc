@@ -59,7 +59,13 @@ export function CenterSetupWizard() {
   if (ctx.isLoading) return <Spinner label="Loading center setup" />;
   if (ctx.isError)
     return <ErrorState message="Could not load center setup." onRetry={() => ctx.refetch()} />;
-  if (!ctx.data) return <EmptyState title="Center setup is for center staff" />;
+  if (!ctx.data)
+    return (
+      <EmptyState
+        title="Center setup is for center staff"
+        hint="If you are staff, your access policy may not include center setup — ask your Org Admin."
+      />
+    );
   return <Wizard viewer={viewer} ctx={ctx.data} />;
 }
 

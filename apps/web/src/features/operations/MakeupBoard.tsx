@@ -20,6 +20,7 @@ import { MAKEUP_STATUS, bookingText } from "./makeupText";
 
 const REFUSAL: Record<string, string> = {
   not_staff: "Only center staff can arrange make-ups.",
+  access_policy: "Your access policy does not allow this here.",
   not_found: "That make-up item no longer exists (the absence may have been corrected).",
   already_done: "Already made up.",
   not_an_option: "That session is not a make-up option for this unit.",
