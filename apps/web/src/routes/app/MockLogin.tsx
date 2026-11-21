@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useSession } from "../../app/session";
 import { Button, Card, PageHeader } from "../../ui";
 import type { MockPersona } from "@ogc/mock-authz";
+import { IIOS_SCENARIOS, useIiosScenario, type IiosScenario } from "../../app/iiosGate";
 
 // Synthetic demo personas. No passwords, no real identities (NON-PRODUCTION).
 const ORG = "00000000-0000-4000-8000-000000000001";
@@ -14,6 +15,7 @@ const personas: MockPersona[] = [
 
 export function MockLogin() {
   const { signIn } = useSession();
+  const { scenario, setScenario } = useIiosScenario();
   const navigate = useNavigate();
   return (
     <main id="main" className="mx-auto max-w-md px-4 py-16">
@@ -37,6 +39,23 @@ export function MockLogin() {
           ))}
         </ul>
       </Card>
+      <details className="mt-4 text-sm">
+        <summary className="cursor-pointer text-muted">Simulate the IIOS access decision</summary>
+        <label className="mt-2 block">
+          <span className="text-xs text-muted">Decision IIOS returns for this session (synthetic)</span>
+          <select
+            className="mt-1 block w-full rounded-ogc border border-border bg-surface px-2 py-1.5"
+            value={scenario}
+            onChange={(e) => setScenario(e.target.value as IiosScenario)}
+          >
+            {IIOS_SCENARIOS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+      </details>
       <p className="mt-4 text-xs text-muted">
         This mock sign-in performs no authentication and is not a security boundary.
       </p>
