@@ -1,8 +1,16 @@
 import type { GuardianPort, GuardianDashboard, GuardianLinkView } from "@ogc/contracts";
 import { personaMap } from "../../fixtures/personas";
-import { lessons } from "../../fixtures/learning";
+import { lessons as fixtureLessons, lessonSession } from "../../fixtures/learning";
+import { sessionStore } from "./sessionStore";
 import { learnerById } from "../../fixtures/learners";
 import { learningStore } from "./store";
+
+// P2: lesson times come from the live schedule (reschedule / cancel-with-replacement follow).
+const liveLessons = () =>
+  fixtureLessons.map((l) => {
+    const sid = lessonSession[l.id];
+    return sid ? { ...l, scheduledAt: sessionStore.liveAt(sid) } : l;
+  });
 
 const latency = <T>(v: T, ms = 80): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -12,7 +20,10 @@ const latency = <T>(v: T, ms = 80): Promise<T> =>
 function overallProgress(learnerId: string): number {
   const courseIds = learnerById[learnerId]?.courseIds ?? [];
   if (courseIds.length === 0) return 0;
-  const sum = courseIds.reduce((s, cid) => s + learningStore.courseProgress(learnerId, cid).progressPct, 0);
+  const sum = courseIds.reduce(
+    (s, cid) => s + learningStore.courseProgress(learnerId, cid).progressPct,
+    0,
+  );
   return Math.round(sum / courseIds.length);
 }
 
@@ -23,6 +34,7 @@ export const mockGuardian: GuardianPort = {
     const p = personaMap[personaId];
     if (!p || !p.guardianId) return latency<GuardianDashboard | null>(null); // fail-closed
     const linkedIds = p.linkedLearnerIds ?? [];
+    const lessons = liveLessons();
 
     const links: GuardianLinkView[] = linkedIds.map((learnerId) => {
       const nextLesson = lessons.find((l) => l.scheduledAt !== null);

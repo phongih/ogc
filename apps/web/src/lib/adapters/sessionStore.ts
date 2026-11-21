@@ -22,11 +22,20 @@ const SEED_OWNERS = { ...classTeachers };
 const sessions = new Map<string, StoredSession>();
 // P2 · make-up bookings: make-up item id (`${missedSessionId}::${learnerId}`) → session id.
 const bookings = new Map<string, string>();
+// P2 · self-study make-ups (item id → record). An item is EITHER booked into a session OR self-study.
+export interface SelfStudyRecord {
+  submittedAt: string | null;
+  note: string | null;
+  returnedNote: string | null;
+  confirmedAt: string | null;
+}
+const selfStudies = new Map<string, SelfStudyRecord>();
 let seq = 0;
 
 function reset(): void {
   sessions.clear();
   bookings.clear();
+  selfStudies.clear();
   seq = 0;
   for (const s of seedSessions)
     sessions.set(s.id, {
@@ -50,7 +59,15 @@ const byTime = (a: StoredSession, b: StoredSession) => Date.parse(a.at) - Date.p
 export const sessionStore = {
   reset,
   bookings,
+  selfStudies,
   get: (id: string) => sessions.get(id),
+  /** Where a session lives now: follows cancel-with-replacement to the session that replaced it. */
+  liveAt(id: string): string | null {
+    let s = sessions.get(id);
+    for (let hops = 0; s && s.state === "cancelled" && s.replacedBy && hops < 20; hops++)
+      s = sessions.get(s.replacedBy);
+    return s && s.state === "scheduled" ? s.at : null;
+  },
   all: () => [...sessions.values()].sort(byTime),
   forClass: (classId: string) =>
     [...sessions.values()].filter((s) => s.classId === classId).sort(byTime),

@@ -34,12 +34,7 @@ export const PUBLIC_COURSE_FIELDS = [
 ] as const;
 
 // ── Response envelope (public surface) ───────────────────────────────────────
-export const PublicErrorCode = z.enum([
-  "not_found",
-  "validation",
-  "rate_limited",
-  "transient",
-]);
+export const PublicErrorCode = z.enum(["not_found", "validation", "rate_limited", "transient"]);
 export type PublicErrorCode = z.infer<typeof PublicErrorCode>;
 
 export const CursorPageMeta = z.object({

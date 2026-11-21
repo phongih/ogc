@@ -29,7 +29,11 @@ export interface TutorPort {
   listConversations(personaId: string): Promise<Conversation[]>;
   // personaId scopes access: a persona can only read/write its own conversations (fail-closed).
   getConversation(personaId: string, conversationId: string): Promise<Conversation | null>;
-  createConversation(personaId: string, title: string, lessonContext?: LessonContext | null): Promise<Conversation>;
+  createConversation(
+    personaId: string,
+    title: string,
+    lessonContext?: LessonContext | null,
+  ): Promise<Conversation>;
   // Deterministic: same input always yields the same tutor reply. No external LLM.
   send(personaId: string, conversationId: string, text: string): Promise<Message[]>;
   suggestedPrompts(): Promise<string[]>;

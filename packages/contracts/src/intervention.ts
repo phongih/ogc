@@ -66,6 +66,10 @@ export type InterventionResult = z.infer<typeof InterventionResult>;
 // read the view or intervene. Guardian/learner/staff and cross-org teachers are denied.
 export interface TeacherLearningIntelligencePort {
   getLearnerView(viewerPersonaId: string, learnerId: string): Promise<TeacherLearningView | null>;
-  intervene(viewerPersonaId: string, learnerId: string, input: InterventionInput): Promise<InterventionResult>;
+  intervene(
+    viewerPersonaId: string,
+    learnerId: string,
+    input: InterventionInput,
+  ): Promise<InterventionResult>;
   listInterventions(viewerPersonaId: string, learnerId: string): Promise<TeacherIntervention[]>;
 }

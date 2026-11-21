@@ -1,9 +1,17 @@
 import type { LearnerPort, LearnerDashboard, EnrolledCourse } from "@ogc/contracts";
 import { personaMap } from "../../fixtures/personas";
-import { lessons } from "../../fixtures/learning";
+import { lessons as fixtureLessons, lessonSession } from "../../fixtures/learning";
+import { sessionStore } from "./sessionStore";
 import { courses } from "../../fixtures/catalog";
 import { enrollmentStore, learningStore } from "./store";
 import { withFault } from "./faults";
+
+// P2: lesson times come from the live schedule (reschedule / cancel-with-replacement follow).
+const liveLessons = () =>
+  fixtureLessons.map((l) => {
+    const sid = lessonSession[l.id];
+    return sid ? { ...l, scheduledAt: sessionStore.liveAt(sid) } : l;
+  });
 
 const latency = <T>(v: T, ms = 100): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -11,36 +19,39 @@ const latency = <T>(v: T, ms = 100): Promise<T> =>
 export const mockLearner: LearnerPort = {
   getDashboard: (personaId) =>
     withFault("learner.getDashboard", () => {
-    const p = personaMap[personaId];
-    if (!p || !p.learnerId) return latency(null); // fail-closed: no learner scope for this persona
-    const learnerId = p.learnerId;
-    // Enrolled courses are derived from the shared enrollment store (reflects new enrollments).
-    const enrolled: EnrolledCourse[] = enrollmentStore
-      .list(personaId)
-      .map((rec) => {
-        const course = courses.find((c) => c.id === rec.courseId);
-        if (!course) return null;
-        const nextLesson = lessons.find((l) => l.courseId === course.id && l.scheduledAt !== null);
-        // Progress is the activity-derived value (single source of truth), not the seed.
-        const progressPct = learningStore.courseProgress(learnerId, course.id).progressPct;
-        return {
-          course,
-          state: rec.state,
-          progressPct,
-          nextLessonId: nextLesson?.id ?? null,
-        } satisfies EnrolledCourse;
-      })
-      .filter((x): x is EnrolledCourse => x !== null);
+      const p = personaMap[personaId];
+      if (!p || !p.learnerId) return latency(null); // fail-closed: no learner scope for this persona
+      const learnerId = p.learnerId;
+      const lessons = liveLessons();
+      // Enrolled courses are derived from the shared enrollment store (reflects new enrollments).
+      const enrolled: EnrolledCourse[] = enrollmentStore
+        .list(personaId)
+        .map((rec) => {
+          const course = courses.find((c) => c.id === rec.courseId);
+          if (!course) return null;
+          const nextLesson = lessons.find(
+            (l) => l.courseId === course.id && l.scheduledAt !== null,
+          );
+          // Progress is the activity-derived value (single source of truth), not the seed.
+          const progressPct = learningStore.courseProgress(learnerId, course.id).progressPct;
+          return {
+            course,
+            state: rec.state,
+            progressPct,
+            nextLessonId: nextLesson?.id ?? null,
+          } satisfies EnrolledCourse;
+        })
+        .filter((x): x is EnrolledCourse => x !== null);
 
-    const dashboard: LearnerDashboard = {
-      learnerId: p.learnerId,
-      learnerName: "Linh N.",
-      orgId: p.orgId,
-      enrolled,
-      upcoming: lessons.filter(
-        (l) => l.scheduledAt !== null && enrolled.some((e) => e.course.id === l.courseId),
-      ),
-    };
-    return latency(dashboard);
+      const dashboard: LearnerDashboard = {
+        learnerId: p.learnerId,
+        learnerName: "Linh N.",
+        orgId: p.orgId,
+        enrolled,
+        upcoming: lessons.filter(
+          (l) => l.scheduledAt !== null && enrolled.some((e) => e.course.id === l.courseId),
+        ),
+      };
+      return latency(dashboard);
     }),
 };

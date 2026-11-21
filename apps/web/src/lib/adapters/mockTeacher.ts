@@ -28,6 +28,7 @@ export const mockTeacher: TeacherPort = {
         classId: s.classId,
         title: s.title,
         at: s.at,
+        ...(s.kind === "makeup" ? { makeup: true } : {}),
         ...(s.substituteId === me
           ? { asSubstitute: true }
           : s.substituteId
@@ -40,7 +41,8 @@ export const mockTeacher: TeacherPort = {
       orgId: p.orgId,
       classes: owned.map((c) => ({
         ...c,
-        nextSessionAt: future.find((s) => s.classId === c.id)?.at ?? null,
+        // The class's own next lesson — a make-up session is not the class's next session.
+        nextSessionAt: future.find((s) => s.classId === c.id && s.kind === "regular")?.at ?? null,
       })),
       upcoming,
     };
