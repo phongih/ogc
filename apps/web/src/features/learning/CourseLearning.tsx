@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
+import { speakingFor } from "../../fixtures/speaking";
 import { useCourse } from "../catalog/queries";
 import { useActivities, useActivityAttempts, useCompleteActivity, useCourseProgress } from "./queries";
 
@@ -68,6 +69,10 @@ export function CourseLearning() {
                     <span className="text-sm text-muted" aria-live="polite">
                       Completing…
                     </span>
+                  ) : speakingFor(a.id) ? (
+                    <Link to={`/app/learning/speaking/${a.id}`} className="inline-block">
+                      <Button variant="ghost">Open speaking studio</Button>
+                    </Link>
                   ) : (
                     <Button
                       onClick={() => complete.mutate(a.id)}

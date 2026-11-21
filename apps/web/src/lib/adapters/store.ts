@@ -12,11 +12,13 @@ import type {
   PracticeResult,
   PracticeSubmission,
   PracticeSubmitResult,
+  SpeakingReview,
 } from "@ogc/contracts";
 import { courses } from "../../fixtures/catalog";
 import { learnerEnrollments } from "../../fixtures/learning";
 import { activities } from "../../fixtures/activities";
 import { practiceFor } from "../../fixtures/practice";
+import { speakingFor } from "../../fixtures/speaking";
 import { organizations } from "../../fixtures/directory";
 import { seedConversations } from "../../fixtures/tutor";
 import { LEARNER_LINH, personaMap } from "../../fixtures/personas";
@@ -85,6 +87,11 @@ let evidenceSeq = 0;
 // to surface the structured result to the learner UI. Synthetic, in-memory only.
 const practiceResults = new Map<string, PracticeResult>();
 const practiceKey = (learnerId: string, activityId: string) => `${learnerId}::${activityId}`;
+
+// P1 speaking studio: latest rehearsal + its review per (learnerId, activityId). Synthetic.
+const speakingReviews = new Map<string, SpeakingReview>();
+const speakingResults = new Map<string, PracticeResult>();
+let speakingSeq = 0;
 
 // Deterministic assessment score (0..100): pure hash of learnerId + activityId.
 // NOT random, NOT an external model, repeatable across runs.
@@ -307,6 +314,112 @@ export const learningStore = {
 
     practiceResults.set(practiceKey(learnerId, activityId), result);
     return { ok: true, result };
+  },
+
+  // ── P1 · Speaking studio (MOCK) — rehearsal → teacher review → only then mastery ──────────
+  // A rehearsal is scored deterministically but writes NO attempt: it stays a pending review.
+  // Retry is allowed while pending/returned (latest rehearsal replaces the previous one); once a
+  // teacher approves, the completed attempt is written and the activity is closed.
+  submitSpeaking: (
+    personaId: string,
+    activityId: string,
+    submission: PracticeSubmission,
+  ): { ok: boolean; reason?: string; result?: PracticeResult; review?: SpeakingReview; idempotentReplay?: boolean } => {
+    const learnerId = personaMap[personaId]?.learnerId;
+    if (!learnerId) return { ok: false, reason: "not_a_learner" };
+    const activity = activityById(activityId);
+    if (!activity) return { ok: false, reason: "unknown_activity" };
+    const orgId = personaMap[personaId]?.orgId;
+    if (activity.orgId !== orgId || !orgId) return { ok: false, reason: "cross_org_denied" };
+    if (!enrollMapFor(personaId).has(activity.courseId)) return { ok: false, reason: "not_enrolled" };
+    const script = speakingFor(activityId);
+    if (!script) return { ok: false, reason: "speaking_not_available" };
+    if (!submission.attemptId || submission.attemptId.trim().length === 0)
+      return { ok: false, reason: "attempt_id_required" };
+
+    const key = practiceKey(learnerId, activityId);
+    const existing = speakingReviews.get(key);
+    if (existing && existing.attemptId === submission.attemptId) {
+      const prior = speakingResults.get(key);
+      return prior ? { ok: true, result: prior, review: { ...existing }, idempotentReplay: true } : { ok: false, reason: "replay_unavailable" };
+    }
+    if (existing?.status === "approved" || attemptsFor(learnerId).get(activityId)?.state === "completed")
+      return { ok: false, reason: "already_completed" };
+
+    const result = scorePractice(script, learnerId, submission);
+    const review: SpeakingReview = {
+      learnerId,
+      orgId,
+      activityId,
+      attemptId: submission.attemptId,
+      status: "pending",
+      submittedAt: new Date(LEARNING_EPOCH + ++speakingSeq * 60000).toISOString(),
+      reviewedAt: null,
+      reviewerNote: null,
+    };
+    speakingReviews.set(key, review);
+    speakingResults.set(key, result);
+    return { ok: true, result, review: { ...review } };
+  },
+
+  getSpeaking: (learnerId: string, activityId: string): { review: SpeakingReview; result: PracticeResult } | null => {
+    const key = practiceKey(learnerId, activityId);
+    const review = speakingReviews.get(key);
+    const result = speakingResults.get(key);
+    return review && result ? { review: { ...review }, result } : null;
+  },
+
+  listSpeaking: (learnerIds: string[], status: SpeakingReview["status"]): SpeakingReview[] =>
+    [...speakingReviews.values()]
+      .filter((r) => learnerIds.includes(r.learnerId) && r.status === status)
+      .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt))
+      .map((r) => ({ ...r })),
+
+  // Caller (adapter) has already authorized the reviewing teacher. Only a PENDING review can be
+  // approved; approval writes the completed attempt + evidence so LI-1 mastery picks it up.
+  approveSpeaking: (learnerId: string, activityId: string): { ok: boolean; reason?: string; review?: SpeakingReview } => {
+    const key = practiceKey(learnerId, activityId);
+    const review = speakingReviews.get(key);
+    const result = speakingResults.get(key);
+    if (!review || !result) return { ok: false, reason: "no_rehearsal" };
+    if (review.status !== "pending") return { ok: false, reason: `not_pending:${review.status}` };
+    const m = attemptsFor(learnerId);
+    if (m.get(activityId)?.state === "completed") return { ok: false, reason: "already_completed" };
+
+    const idx = ++attemptSeq;
+    const completedAt = new Date(LEARNING_EPOCH + idx * 3600000).toISOString();
+    m.set(activityId, { id: review.attemptId, learnerId, activityId, state: "completed", completedAt, score: result.score });
+    const ev = evidenceFor(learnerId);
+    const list = ev.get(activityId) ?? [];
+    list.push({
+      id: `EVID-${++evidenceSeq}`,
+      learnerId,
+      activityId,
+      kind: "practice_result",
+      text: `speaking rehearsal approved by teacher · natural replies ${result.correct}/${result.total} · ${result.scoringVersion}`,
+      at: completedAt,
+    });
+    ev.set(activityId, list);
+    practiceResults.set(key, result);
+    const next: SpeakingReview = { ...review, status: "approved", reviewedAt: completedAt, reviewerNote: null };
+    speakingReviews.set(key, next);
+    return { ok: true, review: { ...next } };
+  },
+
+  returnSpeaking: (learnerId: string, activityId: string, note: string): { ok: boolean; reason?: string; review?: SpeakingReview } => {
+    const key = practiceKey(learnerId, activityId);
+    const review = speakingReviews.get(key);
+    if (!review) return { ok: false, reason: "no_rehearsal" };
+    if (review.status !== "pending") return { ok: false, reason: `not_pending:${review.status}` };
+    if (!note || note.trim().length === 0) return { ok: false, reason: "note_required" };
+    const next: SpeakingReview = {
+      ...review,
+      status: "returned",
+      reviewedAt: new Date(LEARNING_EPOCH + ++speakingSeq * 60000).toISOString(),
+      reviewerNote: note.trim(),
+    };
+    speakingReviews.set(key, next);
+    return { ok: true, review: { ...next } };
   },
 };
 

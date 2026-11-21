@@ -3,7 +3,8 @@
  *
  * Presentation only. The mission IS the existing learner next action (LI-3 recommendation, or the
  * teacher-applied override from AUTH-026); no new decision logic. Duration is not invented: the
- * card shows the real number of questions when the activity has an interactive practice set.
+ * card shows the real number of questions (practice) or turns (speaking role-play).
+ * A speaking mission opens the Speaking studio and shows its teacher-review state.
  * SYNTHETIC / NON-PRODUCTION.
  */
 import { Link } from "react-router-dom";
@@ -11,6 +12,9 @@ import type { LearnerNextAction } from "@ogc/contracts";
 import { Button, Card } from "../../ui";
 import { activities } from "../../fixtures/activities";
 import { practiceFor } from "../../fixtures/practice";
+import { speakingFor } from "../../fixtures/speaking";
+import { useSession } from "../../app/session";
+import { useMySpeakingFeedback } from "../learning/speaking/queries";
 import { skillLabel } from "../learning/intelligence/skills";
 
 export function missionTitle(action: LearnerNextAction): string {
@@ -19,6 +23,12 @@ export function missionTitle(action: LearnerNextAction): string {
     `${skillLabel(action.skill)} practice`
   );
 }
+
+const SPEAKING_STATUS = {
+  pending: "Waiting for your teacher's review",
+  returned: "Your teacher asked you to try again",
+  approved: "Approved by your teacher",
+} as const;
 
 export function TodaysMission({ action }: { action: LearnerNextAction | null | undefined }) {
   if (!action) {
@@ -34,8 +44,15 @@ export function TodaysMission({ action }: { action: LearnerNextAction | null | u
       </section>
     );
   }
+  return <Mission action={action} />;
+}
 
+function Mission({ action }: { action: LearnerNextAction }) {
+  const { session } = useSession();
   const practice = practiceFor(action.activityId);
+  const speaking = speakingFor(action.activityId);
+  const spoken = useMySpeakingFeedback(session?.personaId ?? "", action.activityId, !!speaking);
+  const status = spoken.data?.review.status;
   const fromTeacher = action.source === "teacher";
 
   return (
@@ -60,6 +77,7 @@ export function TodaysMission({ action }: { action: LearnerNextAction | null | u
             <p className="mt-1 text-sm text-muted">
               {skillLabel(action.skill)}
               {practice ? ` · ${practice.items.length} questions` : ""}
+              {speaking ? ` · ${speaking.items.length} turns · role-play` : ""}
             </p>
           </div>
 
@@ -76,8 +94,22 @@ export function TodaysMission({ action }: { action: LearnerNextAction | null | u
             </blockquote>
           ) : null}
 
+          {status ? (
+            <p
+              className="text-sm font-medium"
+              data-testid="mission-speaking-status"
+              data-review-status={status}
+            >
+              {SPEAKING_STATUS[status]}
+            </p>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-4">
-            {practice ? (
+            {speaking ? (
+              <Link to={`/app/learning/speaking/${action.activityId}`} className="inline-block">
+                <Button>{status ? "Open speaking studio" : "Start speaking"}</Button>
+              </Link>
+            ) : practice ? (
               <Link to={`/app/learning/practice/${action.activityId}`} className="inline-block">
                 <Button>Practice now</Button>
               </Link>
@@ -86,7 +118,7 @@ export function TodaysMission({ action }: { action: LearnerNextAction | null | u
                 <Button>Start now</Button>
               </Link>
             )}
-            {practice ? (
+            {practice || speaking ? (
               <Link
                 to={`/app/learning/courses/${action.courseId}`}
                 className="text-sm text-muted underline"

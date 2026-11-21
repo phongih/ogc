@@ -17,6 +17,7 @@ import { LessonPlanEditor } from "../features/lessonplan/LessonPlanEditor";
 import { GuardianHome } from "../features/guardian/GuardianHome";
 import { CourseLearning } from "../features/learning/CourseLearning";
 import { PracticeView } from "../features/learning/practice/PracticeView";
+import { SpeakingStudio } from "../features/learning/speaking/SpeakingStudio";
 
 export const routes = [
   { path: "/", element: <Landing /> },
@@ -32,6 +33,7 @@ export const routes = [
       { path: "learning", element: <RequireSection section="learning"><LearnerHome /></RequireSection> },
       { path: "learning/courses/:courseId", element: <RequireSection section="learning"><CourseLearning /></RequireSection> },
       { path: "learning/practice/:activityId", element: <RequireSection section="learning"><PracticeView /></RequireSection> },
+      { path: "learning/speaking/:activityId", element: <RequireSection section="learning"><SpeakingStudio /></RequireSection> },
       { path: "teaching", element: <RequireSection section="teaching"><TeacherHome /></RequireSection> },
       { path: "teaching/classes/:classId", element: <RequireSection section="teaching"><ClassDetail /></RequireSection> },
       { path: "teaching/classes/:classId/plan", element: <RequireSection section="teaching"><LessonPlanEditor /></RequireSection> },

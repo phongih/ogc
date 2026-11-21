@@ -26,4 +26,11 @@ describe("CourseLearning", () => {
     // Completion is announced through a status region (a11y feedback).
     await waitFor(() => expect(screen.getByText(/activity marked complete/i)).toBeInTheDocument());
   });
+
+  it("a speaking activity has no 'Mark complete' — it opens the Speaking studio (teacher review)", async () => {
+    renderApp(`/app/learning/courses/${A2}`, "learner");
+    const link = await screen.findByRole("link", { name: "Open speaking studio" });
+    expect(link).toHaveAttribute("href", "/app/learning/speaking/ACT-A2-4");
+    expect(screen.queryByRole("button", { name: /Complete .*Speaking/i })).toBeNull();
+  });
 });

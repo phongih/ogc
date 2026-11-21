@@ -53,16 +53,29 @@ describe("P1 · Today's mission", () => {
   });
 
   it("activity without a practice set → 'Start now' opens the course; no question count", () => {
-    renderUI(<TodaysMission action={{ ...base, activityId: "ACT-A2-4", skill: "speaking" }} />);
-    expect(screen.getByTestId("mission-title")).toHaveTextContent(
-      "Speaking: Describe your weekend",
-    );
+    renderUI(<TodaysMission action={{ ...base, activityId: "ACT-A2-1", skill: "reading" }} />);
+    expect(screen.getByTestId("mission-title")).toHaveTextContent("Read: Making weekend plans");
     expect(screen.getByRole("link", { name: "Start now" })).toHaveAttribute(
       "href",
       `/app/learning/courses/${courses[0].id}`,
     );
     expect(screen.queryByRole("link", { name: "Practice now" })).toBeNull();
-    expect(screen.queryByText(/questions/)).toBeNull();
+    expect(screen.queryByText(/questions|turns/)).toBeNull();
+  });
+
+  it("speaking activity → 'Start speaking' opens the Speaking studio, shows turns", () => {
+    renderUI(<TodaysMission action={{ ...base, activityId: "ACT-A2-4", skill: "speaking" }} />, {
+      role: "learner",
+    });
+    expect(screen.getByTestId("mission-title")).toHaveTextContent(
+      "Speaking: Describe your weekend",
+    );
+    expect(screen.getByText(/4 turns · role-play/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Start speaking" })).toHaveAttribute(
+      "href",
+      "/app/learning/speaking/ACT-A2-4",
+    );
+    expect(screen.queryByRole("link", { name: "Practice now" })).toBeNull();
   });
 
   it("teacher-applied mission shows the badge and the teacher's note", () => {

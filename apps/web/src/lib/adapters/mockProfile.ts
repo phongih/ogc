@@ -255,7 +255,7 @@ function learnerPathView(learnerId: string, orgId: string): LearningPathView | n
 // Fail-closed teacher→learner authorization: the viewer must be a teacher who OWNS a class
 // whose roster contains the learner, AND share the learner's tenant. Returns null otherwise
 // (guardians, learners, staff and cross-org/unrelated teachers are all denied).
-function teacherOwnsLearner(viewerPersonaId: string, learnerId: string): { teacherId: string; orgId: string } | null {
+export function teacherOwnsLearner(viewerPersonaId: string, learnerId: string): { teacherId: string; orgId: string } | null {
   const viewer = personaMap[viewerPersonaId];
   const teacherId = viewer?.teacherId;
   if (!teacherId) return null;

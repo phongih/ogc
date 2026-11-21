@@ -21,3 +21,4 @@ export * from "./integration.js";
 export * from "./practice.js";
 export * from "./clientCatalog.js";
 export * from "./iiosContext.js";
+export * from "./speaking.js";

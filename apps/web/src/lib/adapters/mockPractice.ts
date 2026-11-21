@@ -21,7 +21,7 @@ const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
 
 // The learnerId a persona may act on, with the activity in its tenant, or null (fail-closed).
-function scopeFor(personaId: string, activityId: string): { learnerId: string } | null {
+export function scopeFor(personaId: string, activityId: string): { learnerId: string } | null {
   const p = personaMap[personaId];
   if (!p?.learnerId) return null;
   const learner = learnerById[p.learnerId];
