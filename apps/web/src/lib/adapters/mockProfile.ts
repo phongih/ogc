@@ -1,3 +1,4 @@
+import { refill, registerPersistent } from "./persist";
 import type {
   LearnerProfile,
   LearningActivity,
@@ -41,7 +42,11 @@ import { classes, classTeachers, rosters } from "../../fixtures/teaching";
 import { learningStore } from "./store";
 import { absenceStreakFor } from "./mockAttendance";
 import { withFault } from "./faults";
-import { ALL_SKILLS, assessmentTypeForKind, skillForKind } from "../../features/learning/intelligence/skills";
+import {
+  ALL_SKILLS,
+  assessmentTypeForKind,
+  skillForKind,
+} from "../../features/learning/intelligence/skills";
 import { seedProfile, updateMastery } from "../../features/learning/intelligence/mastery";
 import { buildPath, recommend } from "../../features/learning/intelligence/recommend";
 import { computeConfidence } from "../../features/learning/intelligence/confidence";
@@ -84,7 +89,8 @@ function evidenceFor(learnerId: string, scoped: LearningActivity[]): SkillEviden
   for (const a of scoped) {
     if (!a.assessed) continue;
     const att = learningStore.getAttempt(learnerId, a.id);
-    if (!att || att.state !== "completed" || att.score === null || att.completedAt === null) continue;
+    if (!att || att.state !== "completed" || att.score === null || att.completedAt === null)
+      continue;
     out.push({
       attemptId: att.id,
       skill: skillForKind(a.kind),
@@ -139,7 +145,8 @@ function qualityEvidenceFor(learnerId: string, scoped: LearningActivity[]): Qual
   for (const a of scoped) {
     if (!a.assessed) continue;
     const att = learningStore.getAttempt(learnerId, a.id);
-    if (!att || att.state !== "completed" || att.score === null || att.completedAt === null) continue;
+    if (!att || att.state !== "completed" || att.score === null || att.completedAt === null)
+      continue;
     out.push({
       attemptId: att.id,
       skill: skillForKind(a.kind),
@@ -182,9 +189,15 @@ export const mockJustifiedRecommendation: JustifiedRecommendationPort = {
     withFault("recommend.getJustified", () => {
       const s = learnerFor(personaId);
       // Fail-closed: a non-learner persona gets a well-formed "nothing to recommend" verdict.
-      if (!s) return latency<JustifiedRecommendation>(justify(null, {} as Record<Skill, SkillConfidence>));
+      if (!s)
+        return latency<JustifiedRecommendation>(
+          justify(null, {} as Record<Skill, SkillConfidence>),
+        );
       const profile = profileFor(s.learnerId, s.orgId);
-      if (!profile) return latency<JustifiedRecommendation>(justify(null, {} as Record<Skill, SkillConfidence>));
+      if (!profile)
+        return latency<JustifiedRecommendation>(
+          justify(null, {} as Record<Skill, SkillConfidence>),
+        );
       const scoped = scopedActivities(s.learnerId, s.orgId);
       const rec = recommend(profile, scoped, completedIds(s.learnerId, scoped));
       return latency<JustifiedRecommendation>(justify(rec, confidenceFor(s.learnerId, s.orgId)));
@@ -209,7 +222,9 @@ export const mockPrerequisite: PrerequisitePort = {
   getPrerequisites: (personaId) =>
     withFault("prereq.getPrerequisites", () => {
       const s = learnerFor(personaId);
-      return latency<ActivityPrerequisite[]>(s ? scopedEdges(scopedActivities(s.learnerId, s.orgId)) : []);
+      return latency<ActivityPrerequisite[]>(
+        s ? scopedEdges(scopedActivities(s.learnerId, s.orgId)) : [],
+      );
     }),
 };
 
@@ -260,7 +275,11 @@ function learnerPathView(learnerId: string, orgId: string): LearningPathView | n
 // Hard prerequisite gate (owner decision 21/11): the activity ids that still block `activityId`
 // for this learner, [] when it is open, or null when it is not in the learner's path at all.
 // Single source of truth = the same LI-3 path the learner and the teacher already see.
-export function prerequisitesBlocking(learnerId: string, orgId: string, activityId: string): string[] | null {
+export function prerequisitesBlocking(
+  learnerId: string,
+  orgId: string,
+  activityId: string,
+): string[] | null {
   const path = learnerPathView(learnerId, orgId);
   const step = path?.steps.find((s) => s.activityId === activityId);
   if (!step) return null;
@@ -270,14 +289,19 @@ export function prerequisitesBlocking(learnerId: string, orgId: string, activity
 // Fail-closed teacher→learner authorization: the viewer must be a teacher who OWNS a class
 // whose roster contains the learner, AND share the learner's tenant. Returns null otherwise
 // (guardians, learners, staff and cross-org/unrelated teachers are all denied).
-export function teacherOwnsLearner(viewerPersonaId: string, learnerId: string): { teacherId: string; orgId: string } | null {
+export function teacherOwnsLearner(
+  viewerPersonaId: string,
+  learnerId: string,
+): { teacherId: string; orgId: string } | null {
   const viewer = personaMap[viewerPersonaId];
   const teacherId = viewer?.teacherId;
   if (!teacherId) return null;
   const owned = Object.entries(classTeachers)
     .filter(([, t]) => t === teacherId)
     .map(([classId]) => classId);
-  const onRoster = owned.some((classId) => (rosters[classId] ?? []).some((r) => r.learnerId === learnerId));
+  const onRoster = owned.some((classId) =>
+    (rosters[classId] ?? []).some((r) => r.learnerId === learnerId),
+  );
   if (!onRoster) return null;
   const learner = learnerById[learnerId];
   if (!learner || learner.orgId !== viewer.orgId) return null; // cross-org guard
@@ -302,7 +326,13 @@ export const mockTeacherIntelligence: TeacherLearningIntelligencePort = {
         orgId: auth.orgId,
         skills: confidenceFor(learnerId, auth.orgId),
       };
-      return latency<TeacherLearningView>({ learnerId, orgId: auth.orgId, profile, confidence, path });
+      return latency<TeacherLearningView>({
+        learnerId,
+        orgId: auth.orgId,
+        profile,
+        confidence,
+        path,
+      });
     }),
 
   intervene: (viewerPersonaId, learnerId, input) =>
@@ -317,7 +347,10 @@ export const mockTeacherIntelligence: TeacherLearningIntelligencePort = {
       if (!step) return latency<InterventionResult>({ ok: false, reason: "activity_out_of_scope" });
       // Prerequisites are never bypassed: only an AVAILABLE activity may be selected.
       if (step.state !== "available")
-        return latency<InterventionResult>({ ok: false, reason: `activity_not_eligible:${step.state}` });
+        return latency<InterventionResult>({
+          ok: false,
+          reason: `activity_not_eligible:${step.state}`,
+        });
 
       const idx = ++interventionSeq;
       const rec: TeacherIntervention = {
@@ -343,7 +376,9 @@ export const mockTeacherIntelligence: TeacherLearningIntelligencePort = {
     withFault("teacher.listInterventions", () => {
       const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
       if (!auth) return latency<TeacherIntervention[]>([]);
-      return latency<TeacherIntervention[]>((interventions.get(learnerId) ?? []).map((x) => ({ ...x })));
+      return latency<TeacherIntervention[]>(
+        (interventions.get(learnerId) ?? []).map((x) => ({ ...x })),
+      );
     }),
 };
 
@@ -531,7 +566,13 @@ export const mockSupport: SupportPort = {
           if (placement && path) {
             const scoped = scopedActivities(row.learnerId, auth.orgId);
             const returned = learningStore.listSpeaking([row.learnerId], "returned").length;
-            signals.push(...supportSignals(seedProfile(placement), evidenceFor(row.learnerId, scoped), returned));
+            signals.push(
+              ...supportSignals(
+                seedProfile(placement),
+                evidenceFor(row.learnerId, scoped),
+                returned,
+              ),
+            );
           }
           // P2 · attendance-v1: the teacher's own marks, in the classes this teacher owns.
           const streak = absenceStreakFor(row.learnerId, ownedClassIds);
@@ -545,7 +586,9 @@ export const mockSupport: SupportPort = {
             // The focus skill's activity is locked: walk its prerequisite chain (breadth-first)
             // to the nearest AVAILABLE step — that is what the teacher can actually assign.
             const byId = new Map(path.steps.map((st) => [st.activityId, st]));
-            for (const locked of path.steps.filter((st) => st.state === "blocked" && st.skill === focus)) {
+            for (const locked of path.steps.filter(
+              (st) => st.state === "blocked" && st.skill === focus,
+            )) {
               const queue = [...locked.blockedBy];
               const seenIds = new Set<string>();
               while (queue.length > 0 && !suggestion) {
@@ -579,7 +622,20 @@ export const mockSupport: SupportPort = {
       }
       // Evidence-backed first; then the lowest flagged level.
       const minLevel = (i: SupportItem) => Math.min(...i.signals.map((x) => x.level ?? 100));
-      items.sort((a, b) => Number(b.evidenceBacked) - Number(a.evidenceBacked) || minLevel(a) - minLevel(b));
+      items.sort(
+        (a, b) => Number(b.evidenceBacked) - Number(a.evidenceBacked) || minLevel(a) - minLevel(b),
+      );
       return latency(items);
     }),
 };
+
+registerPersistent("intelligence", {
+  dump: () => ({ interventions, interventionSeq, appliedLog, appliedSeq }),
+  load: (raw) => {
+    const d = raw as Record<string, unknown>;
+    refill(interventions, d.interventions);
+    refill(appliedLog, d.appliedLog);
+    interventionSeq = Number(d.interventionSeq) || 0;
+    appliedSeq = Number(d.appliedSeq) || 0;
+  },
+});

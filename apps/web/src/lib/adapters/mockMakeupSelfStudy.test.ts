@@ -1,3 +1,4 @@
+import { nextWeeklySlot } from "../../fixtures/demoClock";
 // P2 · slice 4 — self-study confirmed by the class teacher; learner / guardian see their make-ups;
 // learner / guardian lesson times follow the live schedule; teacher dashboard labels make-ups.
 import { beforeEach, describe, expect, it } from "vitest";
@@ -148,7 +149,7 @@ describe("live schedule reaches every role", () => {
 
   it("a make-up session is labelled on the teacher dashboard and is not the class's next session", async () => {
     const huy1 = (await mockMakeup.getBoard(S))!.items.find((i) => i.unitTitle === "B1 — Unit 1")!;
-    const soon = new Date(Date.now() + DAY).toISOString(); // before B1's next regular session
+    const soon = nextWeeklySlot([0, 1, 2, 3, 4, 5, 6], 14); // next 14:00 ICT — no class then
     await mockMakeup.openMakeupSession(S, huy1.id, soon, TEACHER_BEN);
     const tara = (await mockTeacher.getDashboard(T))!;
     expect(tara.upcoming.find((s) => s.title === "B1 — Unit 1")).toMatchObject({

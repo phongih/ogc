@@ -1,3 +1,4 @@
+import { nextWeeklySlot } from "../../fixtures/demoClock";
 // P2 · make-up ledger: derived from attendance, closed only by attending a make-up, 14-day deadline.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mockMakeup } from "./mockMakeup";
@@ -145,7 +146,7 @@ describe("make-up — a make-up session for everyone missing a unit", () => {
     const r = await mockMakeup.openMakeupSession(
       S,
       huy1.id,
-      new Date(Date.now() + 2 * DAY).toISOString(),
+      nextWeeklySlot([0, 1, 2, 3, 4, 5, 6], 14, 0, Date.now() + DAY), // 14:00 ICT: no class then
       TEACHER_BEN,
     );
     expect(r.ok).toBe(true);

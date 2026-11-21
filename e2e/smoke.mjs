@@ -71,6 +71,8 @@ async function main() {
   const browser = await chromium.launch();
   // Each scenario signs in fresh: a full reload resets the in-memory session AND store,
   // so scenarios are independent and progress is the deterministic seeded baseline.
+  // Since demo data is kept in localStorage (persist.ts), this suite clears it on every page load
+  // to keep that baseline; persistence itself is covered by persistence-journey.mjs.
   async function signIn(page, personaRe) {
     await page.goto(`${base}/login`, { waitUntil: "networkidle" });
     await page.getByText("Choose a demo persona").waitFor();
@@ -81,6 +83,7 @@ async function main() {
 
   try {
     const page = await browser.newPage();
+    await page.addInitScript(() => window.localStorage.removeItem("ogc.demo"));
 
     // 0) Public landing renders.
     await page.goto(`${base}/`, { waitUntil: "networkidle" });
