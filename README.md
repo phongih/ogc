@@ -7,7 +7,7 @@
 - No PostgreSQL provisioning, no production/public deployment, no real learner data, no production credentials.
 - **No source imported from EduOS or frozen IIOS security r1.**
 - Mock authorization is explicitly **NON-PRODUCTION** and is designed to be swapped for a governed backend adapter later.
-- Local git only — no remote, push, or PR.
+- Hosted on GitHub (`phongih/ogc`): every change goes through a branch + PR and must pass CI before merge. No deploy from CI; live promotion stays owner-approved (see `ops/release/README.md`).
 
 ## Layout
 - `packages/contracts` — typed API contracts (zod + TS). Independent of any implementation.
