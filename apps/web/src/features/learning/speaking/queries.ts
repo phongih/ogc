@@ -1,3 +1,4 @@
+import { refreshLearningState } from "../../../lib/invalidate";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PracticeSubmission } from "@ogc/contracts";
 import { speaking } from "../../../lib/api";
@@ -48,6 +49,6 @@ export function useReviewSpeaking(viewerPersonaId: string) {
         ? speaking.approve(viewerPersonaId, a.learnerId, a.activityId)
         : speaking.returnForRetry(viewerPersonaId, a.learnerId, a.activityId, a.note ?? ""),
     // Approval writes a completed attempt → mastery, path, next action and progress all change.
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: () => refreshLearningState(qc),
   });
 }

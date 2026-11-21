@@ -1,3 +1,4 @@
+import { refreshLearningState } from "../../lib/invalidate";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { learning, progressView } from "../../lib/api";
 
@@ -40,8 +41,7 @@ export function useCompleteActivity(personaId: string, courseId: string) {
     mutationFn: (activityId: string) => learning.completeActivity(personaId, activityId),
     onSuccess: () => {
       // Completion feeds progress across routes/roles: refresh learning + learner dashboard.
-      qc.invalidateQueries({ queryKey: ["learning"] });
-      qc.invalidateQueries({ queryKey: ["learner", personaId] });
+      refreshLearningState(qc);
       void courseId;
     },
   });
