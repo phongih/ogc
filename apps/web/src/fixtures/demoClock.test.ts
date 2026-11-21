@@ -1,24 +1,33 @@
-// Demo clock: upcoming sessions are the NEXT real occurrence of each class's weekly slot.
+// Demo clock: upcoming sessions are the NEXT real occurrence of each class's weekly slot,
+// in CENTER time (Asia/Ho_Chi_Minh, UTC+7) — not UTC, not the viewer's timezone.
 import { describe, expect, it } from "vitest";
 import { A2_MORNING_NEXT, B1_EVENING_NEXT, nextWeeklySlot } from "./demoClock";
 import { lessons } from "./learning";
 import { classes, upcomingSessions } from "./teaching";
+import { formatCenterDateTime } from "../lib/centerTime";
 
-const SAT_21_NOV = Date.parse("2026-11-21T11:00:00.000Z"); // a Saturday
+// Sat 21/11/2026 18:00 in Vietnam
+const SAT_21_NOV_1800_ICT = Date.parse("2026-11-21T11:00:00.000Z");
 
-describe("nextWeeklySlot", () => {
-  it("Mon/Wed 09:00 from a Saturday → next Monday 09:00", () => {
-    expect(nextWeeklySlot([1, 3], 9, 0, SAT_21_NOV)).toBe("2026-11-23T09:00:00.000Z");
+describe("nextWeeklySlot (center time)", () => {
+  it("Mon/Wed 09:00 from a Saturday → next Monday 09:00 in Vietnam (= 02:00Z)", () => {
+    expect(nextWeeklySlot([1, 3], 9, 0, SAT_21_NOV_1800_ICT)).toBe("2026-11-23T02:00:00.000Z");
   });
-  it("same day, before the slot → today; after the slot → the next slot day", () => {
-    const mon0800 = Date.parse("2026-11-23T08:00:00.000Z");
-    const mon1000 = Date.parse("2026-11-23T10:00:00.000Z");
-    expect(nextWeeklySlot([1, 3], 9, 0, mon0800)).toBe("2026-11-23T09:00:00.000Z");
-    expect(nextWeeklySlot([1, 3], 9, 0, mon1000)).toBe("2026-11-25T09:00:00.000Z");
+  it("same center day, before the slot → today; after the slot → next slot day", () => {
+    const mon0800ict = Date.parse("2026-11-23T01:00:00.000Z");
+    const mon1000ict = Date.parse("2026-11-23T03:00:00.000Z");
+    expect(nextWeeklySlot([1, 3], 9, 0, mon0800ict)).toBe("2026-11-23T02:00:00.000Z");
+    expect(nextWeeklySlot([1, 3], 9, 0, mon1000ict)).toBe("2026-11-25T02:00:00.000Z");
   });
-  it("Tue/Thu 18:00 from Thursday 19:00 → next Tuesday", () => {
-    expect(nextWeeklySlot([2, 4], 18, 0, Date.parse("2026-11-26T19:00:00.000Z"))).toBe(
-      "2026-12-01T18:00:00.000Z",
+  it("Tue/Thu 18:00 from Thursday 19:00 Vietnam → next Tuesday 18:00 (= 11:00Z)", () => {
+    expect(nextWeeklySlot([2, 4], 18, 0, Date.parse("2026-11-26T12:00:00.000Z"))).toBe(
+      "2026-12-01T11:00:00.000Z",
+    );
+  });
+  it("uses the CENTER weekday even when UTC is still on the previous day", () => {
+    // Mon 23/11 05:00 ICT is Sun 22/11 22:00Z — the Monday 09:00 slot is still ahead today.
+    expect(nextWeeklySlot([1, 3], 9, 0, Date.parse("2026-11-22T22:00:00.000Z"))).toBe(
+      "2026-11-23T02:00:00.000Z",
     );
   });
 });
@@ -34,10 +43,12 @@ describe("synthetic schedule is always upcoming and matches the class names", ()
     expect(dates.length).toBeGreaterThan(0);
     for (const d of dates) expect(Date.parse(d)).toBeGreaterThan(now);
   });
-  it("A2 Morning is on Mon/Wed 09:00, B1 Evening on Tue/Thu 18:00 (UTC)", () => {
-    expect([1, 3]).toContain(new Date(A2_MORNING_NEXT).getUTCDay());
-    expect(new Date(A2_MORNING_NEXT).getUTCHours()).toBe(9);
-    expect([2, 4]).toContain(new Date(B1_EVENING_NEXT).getUTCDay());
-    expect(new Date(B1_EVENING_NEXT).getUTCHours()).toBe(18);
+  it("A2 Morning reads Mon/Wed 09:00 and B1 Evening Tue/Thu 18:00 in center time", () => {
+    expect(formatCenterDateTime(A2_MORNING_NEXT)).toMatch(
+      /^(Mon|Wed), \d{2}\/\d{2}\/\d{4}, 09:00$/,
+    );
+    expect(formatCenterDateTime(B1_EVENING_NEXT)).toMatch(
+      /^(Tue|Thu), \d{2}\/\d{2}\/\d{4}, 18:00$/,
+    );
   });
 });

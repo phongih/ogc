@@ -10,6 +10,7 @@ import {
   useNextAction,
 } from "./queries";
 import { relativeDay } from "../../lib/time";
+import { CENTER_UTC_OFFSET_MIN, formatCenterDateTime } from "../../lib/centerTime";
 import { ALL_SKILLS, skillLabel } from "../learning/intelligence/skills";
 import { confidenceWord, masteryWord } from "../learning/intelligence/friendly";
 import { TodaysMission } from "./TodaysMission";
@@ -204,9 +205,9 @@ export function LearnerHome() {
                   <Card className="flex items-center justify-between transition hover:border-brand">
                     <span>{l.title}</span>
                     <span className="text-sm text-muted">
-                      {relativeDay(l.scheduledAt)}
+                      {relativeDay(l.scheduledAt, Date.now(), CENTER_UTC_OFFSET_MIN)}
                       {l.scheduledAt
-                        ? ` · ${new Date(l.scheduledAt).toLocaleDateString("en-GB", { timeZone: "UTC" })}`
+                        ? ` · ${formatCenterDateTime(l.scheduledAt)}`
                         : ""}{" "}
                       · {l.durationMin}m
                     </span>

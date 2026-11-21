@@ -29,4 +29,10 @@ describe("TeacherHome", () => {
     expect(within(screen.getByText("Classes").closest("div") as HTMLElement).getByText("2")).toBeInTheDocument();
     expect(within(screen.getByText("Learners").closest("div") as HTMLElement).getByText("21")).toBeInTheDocument();
   });
+
+  it("sessions show in center time with the class's own weekday and hour", async () => {
+    renderApp("/app/teaching", "teacher");
+    expect(await screen.findByText(/^(Mon|Wed), \d{2}\/\d{2}\/\d{4}, 09:00$/)).toBeInTheDocument(); // A2 — Unit 7
+    expect(screen.getByText(/^(Tue|Thu), \d{2}\/\d{2}\/\d{4}, 18:00$/)).toBeInTheDocument(); // B1 — Unit 3
+  });
 });

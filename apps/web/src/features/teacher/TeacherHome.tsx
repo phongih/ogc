@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } from "../../ui";
 import { SpeakingReviewQueue } from "./SpeakingReviewQueue";
+import { formatCenterDate, formatCenterDateTime } from "../../lib/centerTime";
 import { NeedsSupportQueue } from "./NeedsSupportQueue";
 import { useSession } from "../../app/session";
 import { useTeacherDashboard } from "./queries";
@@ -44,7 +45,7 @@ export function TeacherHome() {
                   <h3 className="font-medium">{c.name}</h3>
                   <p className="mt-1 text-sm text-muted">
                     {c.learnerCount} learners · next{" "}
-                    {c.nextSessionAt ? new Date(c.nextSessionAt).toLocaleDateString() : "—"}
+                    {c.nextSessionAt ? formatCenterDate(c.nextSessionAt) : "—"}
                   </p>
                   <div className="mt-3 flex gap-2">
                     <Link to={`/app/teaching/classes/${c.id}`}>
@@ -71,7 +72,7 @@ export function TeacherHome() {
               <li key={s.id}>
                 <Card className="flex items-center justify-between">
                   <span>{s.title}</span>
-                  <span className="text-sm text-muted">{new Date(s.at).toLocaleString()}</span>
+                  <span className="text-sm text-muted">{formatCenterDateTime(s.at)}</span>
                 </Card>
               </li>
             ))}
