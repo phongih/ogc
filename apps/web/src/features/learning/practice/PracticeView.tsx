@@ -5,6 +5,7 @@ import { useSession } from "../../../app/session";
 import { skillLabel } from "../intelligence/skills";
 import { useNextAction } from "../../learner/queries";
 import { usePractice, useSubmitPractice } from "./queries";
+import { LockedNotice, useActivityLock } from "../PrerequisiteLock";
 
 export function PracticeView() {
   const { session } = useSession();
@@ -14,6 +15,7 @@ export function PracticeView() {
   const q = usePractice(personaId, activityId);
   const submit = useSubmitPractice(personaId, activityId);
   const next = useNextAction(personaId);
+  const lock = useActivityLock(personaId, activityId);
 
   // One stable attempt id per mounted attempt → a re-submit is idempotent (no double-count).
   const attemptId = useRef(`ATT-PRAC-${activityId}-${Math.random().toString(36).slice(2, 8)}`).current;
@@ -26,6 +28,13 @@ export function PracticeView() {
     [items, answers],
   );
 
+  if (lock.locked && !submit.data)
+    return (
+      <section className="space-y-6">
+        <PageHeader title="Practice" subtitle="Locked · synthetic" />
+        <LockedNotice lock={lock} />
+      </section>
+    );
   if (q.isLoading) return <Spinner label="Loading practice" />;
   if (q.isError) return <ErrorState message="Could not load this practice." onRetry={() => q.refetch()} />;
   if (!q.data)

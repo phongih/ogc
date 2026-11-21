@@ -7,6 +7,15 @@ import { courses } from "../../fixtures/catalog";
 const A2 = courses[0].id;
 
 describe("CourseLearning", () => {
+  it("a blocked activity cannot be started: it says which activity to finish first", async () => {
+    // Runs first (shared module store): Linh has not done the quiz, so the speaking activity is locked.
+    renderApp(`/app/learning/courses/${A2}`, "learner");
+    expect(await screen.findByTestId("locked-ACT-A2-4")).toHaveTextContent(
+      "Finish “Quiz: At the market” first",
+    );
+    expect(screen.queryByRole("link", { name: "Open speaking studio" })).toBeNull();
+  });
+
   it("shows activities and lets the learner complete one, updating progress", async () => {
     renderApp(`/app/learning/courses/${A2}`, "learner");
 

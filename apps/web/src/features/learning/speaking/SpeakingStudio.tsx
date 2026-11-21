@@ -10,6 +10,7 @@ import type { SpeakingFeedback } from "@ogc/contracts";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../../ui";
 import { useSession } from "../../../app/session";
 import { useMySpeakingFeedback, useSpeakingStudio, useSubmitRehearsal } from "./queries";
+import { LockedNotice, useActivityLock } from "../PrerequisiteLock";
 
 const newAttemptId = (activityId: string) =>
   `ATT-SPK-${activityId}-${Math.random().toString(36).slice(2, 8)}`;
@@ -21,12 +22,20 @@ export function SpeakingStudio() {
   const studio = useSpeakingStudio(personaId, activityId);
   const prior = useMySpeakingFeedback(personaId, activityId);
   const submit = useSubmitRehearsal(personaId, activityId);
+  const lock = useActivityLock(personaId, activityId);
 
   const attemptId = useRef(newAttemptId(activityId));
   const [rehearsing, setRehearsing] = useState(false);
   const [turn, setTurn] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
+  if (lock.locked)
+    return (
+      <section className="space-y-6">
+        <PageHeader title="Speaking studio" subtitle="Locked · synthetic" />
+        <LockedNotice lock={lock} />
+      </section>
+    );
   if (studio.isLoading || prior.isLoading) return <Spinner label="Loading speaking studio" />;
   if (studio.isError)
     return (
