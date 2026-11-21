@@ -86,6 +86,9 @@ async function main() {
     await nextReason.waitFor();
     const nextText = (await nextReason.textContent()) ?? "";
     check("[practice] updated next step shown with no internal ids", nextText.length > 0 && !/ACT-/.test(nextText));
+    // Regression (21/11): the result page must show the FRESH next step, not the quiz just done.
+    await page.getByTestId("practice-next-reason").filter({ hasText: "Speaking: Describe your weekend" }).waitFor({ timeout: 5000 });
+    check("[practice] next step is fresh (the unlocked speaking activity, not the quiz just done)", true);
 
     // Idempotency at the UI: the completed activity no longer offers 'Practice now'.
     await page.getByRole("link", { name: "← Back to My Learning" }).click();

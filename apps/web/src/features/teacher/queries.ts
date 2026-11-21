@@ -1,3 +1,4 @@
+import { refreshLearningState } from "../../lib/invalidate";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InterventionInput } from "@ogc/contracts";
 import { teacher, teacherIntelligence, appliedRecommendation } from "../../lib/api";
@@ -36,7 +37,7 @@ export const useIntervene = (viewerPersonaId: string, learnerId: string) => {
   return useMutation({
     mutationFn: (input: InterventionInput) =>
       teacherIntelligence.intervene(viewerPersonaId, learnerId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ti-interventions", viewerPersonaId, learnerId] }),
+    onSuccess: () => refreshLearningState(qc),
   });
 };
 
@@ -53,7 +54,7 @@ export const useApplyRecommendation = (viewerPersonaId: string, learnerId: strin
   return useMutation({
     mutationFn: (input: InterventionInput) =>
       appliedRecommendation.applyRecommendation(viewerPersonaId, learnerId, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["applied-active", viewerPersonaId, learnerId] }),
+    onSuccess: () => refreshLearningState(qc),
   });
 };
 
@@ -61,6 +62,6 @@ export const useRevertApplied = (viewerPersonaId: string, learnerId: string) => 
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => appliedRecommendation.revertApplied(viewerPersonaId, learnerId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["applied-active", viewerPersonaId, learnerId] }),
+    onSuccess: () => refreshLearningState(qc),
   });
 };

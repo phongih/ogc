@@ -1,3 +1,4 @@
+import { refreshLearningState } from "../../lib/invalidate";
 /*
  * P1 · Learners needing support (owning teacher). Evidence first (owner decision 21/11): each
  * flag says WHY and FROM WHAT — a placement-only estimate is labelled as such. Acting reuses
@@ -80,7 +81,7 @@ function SupportCard({ viewer, item }: { viewer: string; item: SupportItem }) {
         reasonCode: "remediation",
         note,
       }),
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: () => refreshLearningState(qc),
   });
 
   return (
