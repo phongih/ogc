@@ -8,3 +8,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Short release SHA of this build (see vite.config.ts). */
+declare const __OGC_BUILD__: string;

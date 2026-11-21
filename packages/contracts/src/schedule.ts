@@ -36,6 +36,8 @@ export type ScheduledSession = z.infer<typeof ScheduledSession>;
 export const ClassSchedule = z.object({
   classId: Id,
   className: z.string().min(1),
+  centerId: z.string(), // P2: classes are grouped by center on Center operations
+  centerName: z.string(),
   teacher: TeacherRef.nullable(),
   learnerCount: z.number().int().nonnegative(),
   sessions: z.array(ScheduledSession), // chronological
