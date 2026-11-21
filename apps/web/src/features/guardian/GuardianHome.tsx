@@ -1,4 +1,5 @@
 import type { GuardianLinkView } from "@ogc/contracts";
+import { formatCenterDateTime } from "../../lib/centerTime";
 import { Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner, StatTile } from "../../ui";
 import { useSession } from "../../app/session";
 import { useGuardianDashboard } from "./queries";
@@ -32,7 +33,7 @@ function LinkedLearnerCard({ link, viewerPersonaId }: { link: GuardianLinkView; 
       <p className="text-sm text-muted">
         Next session:{" "}
         {link.nextSessionAt
-          ? new Date(link.nextSessionAt).toLocaleString("en-GB", { timeZone: "UTC" })
+          ? formatCenterDateTime(link.nextSessionAt)
           : "None scheduled"}
       </p>
 
