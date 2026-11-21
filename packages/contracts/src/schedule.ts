@@ -57,12 +57,17 @@ export const ScheduleRefusal = z.enum([
   "cancelled", // already cancelled
   "unknown_teacher",
   "same_teacher", // substitute = the class's own teacher
+  "clash", // the teacher (or room) is already busy then — see `clashes`
 ]);
 export type ScheduleRefusal = z.infer<typeof ScheduleRefusal>;
 
 export const ScheduleResult = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), classSchedule: ClassSchedule }),
-  z.object({ ok: z.literal(false), reason: ScheduleRefusal }),
+  z.object({
+    ok: z.literal(false),
+    reason: ScheduleRefusal,
+    clashes: z.array(z.string()).optional(),
+  }),
 ]);
 export type ScheduleResult = z.infer<typeof ScheduleResult>;
 

@@ -23,6 +23,7 @@ const REFUSAL: Record<string, string> = {
   cancelled: "That session is already cancelled.",
   unknown_teacher: "Unknown teacher.",
   same_teacher: "That teacher already teaches this class.",
+  clash: "That would double-book a teacher or a room:",
 };
 
 const DAY_MS = 86_400_000;
@@ -287,8 +288,15 @@ function SessionRow({
 function ActionError({ result }: { result: ScheduleResult | undefined }) {
   if (!result || result.ok) return null;
   return (
-    <p role="alert" className="text-sm text-danger">
-      {REFUSAL[result.reason] ?? "Could not change the schedule."}
-    </p>
+    <div role="alert" className="text-sm text-danger">
+      <p>{REFUSAL[result.reason] ?? "Could not change the schedule."}</p>
+      {result.clashes?.length ? (
+        <ul className="list-disc pl-5">
+          {result.clashes.map((c) => (
+            <li key={c}>{c}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }

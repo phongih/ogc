@@ -155,8 +155,8 @@ export const CenterSetupResult = z.discriminatedUnion("ok", [
   }),
   z.object({
     ok: z.literal(false),
-    reason: z.enum(["not_staff", "incomplete", "invalid_fee"]),
-    failed: z.array(z.string()), // checklist keys / fee course ids that failed
+    reason: z.enum(["not_staff", "incomplete", "invalid_fee", "clash"]),
+    failed: z.array(z.string()), // checklist keys / fee course ids / clash messages
   }),
 ]);
 export type CenterSetupResult = z.infer<typeof CenterSetupResult>;
@@ -165,6 +165,8 @@ export interface CenterSetupPort {
   // Staff only, own organization only (fail-closed: null / not_staff).
   getSetupContext(viewerPersonaId: string): Promise<SetupContext | null>;
   createCenter(viewerPersonaId: string, draft: CenterSetupDraft): Promise<CenterSetupResult>;
+  // Teacher / room double-bookings the draft's first weeks would create (plain-word messages).
+  previewClashes(viewerPersonaId: string, draft: CenterSetupDraft): Promise<string[]>;
   getFees(
     viewerPersonaId: string,
     centerId: string,

@@ -11,6 +11,7 @@ import { personaMap, teachers } from "../../fixtures/personas";
 import { classTeachers, classes } from "../../fixtures/teaching";
 import { sessionStore, type StoredSession } from "./sessionStore";
 import { isMarked } from "./mockAttendance";
+import { findClashes, slotOf } from "./clashes";
 import { withFault } from "./faults";
 
 /*
@@ -24,6 +25,8 @@ const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
 
 const refuse = (reason: ScheduleRefusal) => latency<ScheduleResult>({ ok: false, reason });
+const clash = (clashes: string[]) =>
+  latency<ScheduleResult>({ ok: false, reason: "clash", clashes });
 
 function staffOrg(viewerPersonaId: string): string | null {
   const p = personaMap[viewerPersonaId];
@@ -98,6 +101,11 @@ export const mockSchedule: SchedulePort = {
       if (s.state === "cancelled") return refuse("cancelled");
       if (isHistory(s)) return refuse("already_started");
       if (!future(newAt)) return refuse("in_past");
+      const moved = findClashes(
+        [{ ...slotOf(s), at: new Date(newAt).toISOString() }],
+        new Set([s.id]),
+      );
+      if (moved.length) return clash(moved);
       sessionStore.update(s.id, { at: new Date(newAt).toISOString() });
       return latency<ScheduleResult>({ ok: true, classSchedule: classSchedule(s.classId) });
     }),
@@ -111,6 +119,11 @@ export const mockSchedule: SchedulePort = {
       if (isHistory(s)) return refuse("already_started");
       if (!future(replacementAt)) return refuse("in_past");
       // The whole class keeps the lesson: same title, new time. No learner loses it.
+      const replClashes = findClashes(
+        [{ ...slotOf(s), at: new Date(replacementAt).toISOString() }],
+        new Set([s.id]),
+      );
+      if (replClashes.length) return clash(replClashes);
       const repl = sessionStore.add({
         classId: s.classId,
         title: s.title,
@@ -132,6 +145,19 @@ export const mockSchedule: SchedulePort = {
       if (!staffClass(viewer, classId)) return refuse("not_found");
       if (!future(at)) return refuse("in_past");
       const name = title.trim() || "Extra session";
+      const probe = {
+        id: "probe",
+        classId,
+        title: name,
+        at: new Date(at).toISOString(),
+        state: "scheduled" as const,
+        kind: "regular" as const,
+        substituteId: null,
+        replacedBy: null,
+        replaces: null,
+      };
+      const extra = findClashes([slotOf(probe)]);
+      if (extra.length) return clash(extra);
       sessionStore.add({ classId, title: name, at: new Date(at).toISOString() });
       return latency<ScheduleResult>({ ok: true, classSchedule: classSchedule(classId) });
     }),
@@ -143,6 +169,21 @@ export const mockSchedule: SchedulePort = {
       if (!staffClass(viewer, classId)) return refuse("not_found");
       if (!teachers.some((t) => t.id === teacherId && t.orgId === org))
         return refuse("unknown_teacher");
+      // Every future session the class teacher will teach (not those covered by a substitute).
+      const now = Date.now();
+      const taught = sessionStore
+        .forClass(classId)
+        .filter(
+          (x) =>
+            x.state === "scheduled" &&
+            Date.parse(x.at) > now &&
+            (!x.substituteId || x.substituteId === teacherId),
+        );
+      const reassign = findClashes(
+        taught.map((x) => slotOf(x, teacherId)),
+        new Set(taught.map((x) => x.id)),
+      );
+      if (reassign.length) return clash(reassign);
       classTeachers[classId] = teacherId;
       // A substitute who is now the class's own teacher is no longer a substitute.
       for (const s of sessionStore.forClass(classId))
@@ -162,6 +203,10 @@ export const mockSchedule: SchedulePort = {
         if (!teachers.some((t) => t.id === teacherId && t.orgId === org))
           return refuse("unknown_teacher");
         if (classTeachers[s.classId] === teacherId) return refuse("same_teacher");
+      }
+      if (teacherId !== null) {
+        const sub = findClashes([slotOf(s, teacherId)], new Set([s.id]));
+        if (sub.length) return clash(sub);
       }
       sessionStore.update(s.id, { substituteId: teacherId });
       return latency<ScheduleResult>({ ok: true, classSchedule: classSchedule(s.classId) });

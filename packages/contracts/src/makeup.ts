@@ -90,12 +90,17 @@ export const MakeupRefusal = z.enum([
   "not_self_study", // the item is not arranged as self-study
   "not_submitted", // nothing to confirm yet
   "note_required",
+  "clash", // the chosen teacher is already busy then — see `clashes`
 ]);
 export type MakeupRefusal = z.infer<typeof MakeupRefusal>;
 
 export const MakeupResult = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), board: MakeupBoard }),
-  z.object({ ok: z.literal(false), reason: MakeupRefusal }),
+  z.object({
+    ok: z.literal(false),
+    reason: MakeupRefusal,
+    clashes: z.array(z.string()).optional(),
+  }),
 ]);
 export type MakeupResult = z.infer<typeof MakeupResult>;
 

@@ -37,7 +37,22 @@ describe("Center operations", () => {
     expect(within(a2).getByText("Started · not marked yet")).toBeInTheDocument();
   });
 
-  it("staff reassign a class teacher", async () => {
+  it("staff reassign a class teacher (no clash: Ben is free Mon/Wed 09:00)", async () => {
+    const user = userEvent.setup();
+    renderApp("/app/operations", "staff");
+    const a2 = await screen.findByRole("region", { name: "A2 Morning — Mon/Wed" });
+    await user.selectOptions(
+      within(a2).getByLabelText("Class teacher for A2 Morning — Mon/Wed"),
+      "Ben",
+    );
+    await waitFor(() =>
+      expect(
+        within(a2).getByLabelText("Class teacher for A2 Morning — Mon/Wed"),
+      ).toHaveDisplayValue("Ben"),
+    );
+  });
+
+  it("reassigning B1 Evening to Ben is refused: he already teaches A2 Evening Tue/Thu 18:00", async () => {
     const user = userEvent.setup();
     renderApp("/app/operations", "staff");
     const b1 = await screen.findByRole("region", { name: "B1 Evening — Tue/Thu" });
@@ -45,10 +60,11 @@ describe("Center operations", () => {
       within(b1).getByLabelText("Class teacher for B1 Evening — Tue/Thu"),
       "Ben",
     );
-    await waitFor(() =>
-      expect(
-        within(b1).getByLabelText("Class teacher for B1 Evening — Tue/Thu"),
-      ).toHaveDisplayValue("Ben"),
+    const alert = await within(b1).findByRole("alert");
+    expect(alert).toHaveTextContent("That would double-book a teacher or a room:");
+    expect(alert).toHaveTextContent(/Ben already teaches A2 Evening — Tue\/Thu on Tue, /);
+    expect(within(b1).getByLabelText("Class teacher for B1 Evening — Tue/Thu")).toHaveDisplayValue(
+      "Tara",
     );
   });
 

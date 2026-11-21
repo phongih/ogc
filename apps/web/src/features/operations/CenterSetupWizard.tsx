@@ -159,6 +159,7 @@ function Wizard({ viewer, ctx }: { viewer: string; ctx: SetupContext }) {
           {step === 4 ? <FeesStep draft={draft} set={set} ctx={ctx} /> : null}
           {step === 5 ? (
             <ReviewStep
+              viewer={viewer}
               draft={draft}
               ctx={ctx}
               canOpen={required && feesOk}
@@ -615,6 +616,7 @@ function FeesStep({ draft, set, ctx }: StepProps) {
 }
 
 function ReviewStep({
+  viewer,
   draft,
   ctx,
   canOpen,
@@ -622,6 +624,7 @@ function ReviewStep({
   pending,
   onOpen,
 }: {
+  viewer: string;
   draft: CenterSetupDraft;
   ctx: SetupContext;
   canOpen: boolean;
@@ -630,6 +633,18 @@ function ReviewStep({
   onOpen: () => void;
 }) {
   const course = (id: string) => ctx.courses.find((c) => c.id === id);
+  // Double-bookings this draft would create (teacher busy elsewhere, or a room used twice).
+  const clashes = useQuery({
+    queryKey: [
+      "center-setup-clashes",
+      viewer,
+      JSON.stringify(draft.classes),
+      JSON.stringify(draft.rooms),
+    ],
+    queryFn: () => centerSetup.previewClashes(viewer, draft),
+    enabled: canOpen,
+  });
+  const clashList = clashes.data ?? [];
   return (
     <div className="space-y-3 text-sm">
       <p>
@@ -667,7 +682,21 @@ function ReviewStep({
               .join(", ")
           : "none"}
       </p>
-      <Button disabled={!canOpen || pending} onClick={onOpen}>
+      {clashList.length ? (
+        <div role="alert" className="text-danger" aria-label="Schedule clashes">
+          <p className="font-medium">These classes would double-book a teacher or a room:</p>
+          <ul className="list-disc pl-5">
+            {clashList.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+          <p className="text-xs">Change the day, time, room or teacher in step 4.</p>
+        </div>
+      ) : null}
+      <Button
+        disabled={!canOpen || pending || clashes.isLoading || clashList.length > 0}
+        onClick={onOpen}
+      >
         Open {draft.name || "the center"}
       </Button>
       {!canOpen ? (
