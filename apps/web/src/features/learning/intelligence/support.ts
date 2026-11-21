@@ -11,10 +11,18 @@ export const SUPPORT_VERSION = "support-v1";
 export const SUPPORT_LOW_SKILL = 60; // a skill strictly below this is flagged
 export const SUPPORT_DROP = 5; // the latest evidence lowering a skill by ≥ this is flagged
 
+// Decision Engine (21/11): the thresholds are staff-tunable rules; these are the defaults.
+export interface SupportThresholds {
+  low: number | null; // null = the "skill below threshold" rule is off
+  drop: number | null; // null = the "skill dropped" rule is off
+}
+export const DEFAULT_THRESHOLDS: SupportThresholds = { low: SUPPORT_LOW_SKILL, drop: SUPPORT_DROP };
+
 export function supportSignals(
   seed: LearnerProfile,
   evidence: readonly SkillEvidence[],
   speakingReturnedCount = 0,
+  t: SupportThresholds = DEFAULT_THRESHOLDS,
 ): SupportSignal[] {
   let cur = seed;
   const lastDelta = new Map<Skill, number>();
@@ -28,7 +36,7 @@ export function supportSignals(
   for (const skill of ALL_SKILLS) {
     const m = cur.skills[skill];
     const d = lastDelta.get(skill);
-    if (d !== undefined && d <= -SUPPORT_DROP)
+    if (t.drop !== null && d !== undefined && d <= -t.drop)
       out.push({
         kind: "skill_drop",
         source: "practice",
@@ -37,13 +45,14 @@ export function supportSignals(
         delta: d,
         evidenceCount: m.evidenceCount,
       });
-    if (m.level < SUPPORT_LOW_SKILL)
+    if (t.low !== null && m.level < t.low)
       out.push({
         kind: "low_skill",
         source: m.evidenceCount > 0 ? "practice" : "placement",
         skill,
         level: m.level,
         evidenceCount: m.evidenceCount,
+        threshold: t.low,
       });
   }
   if (speakingReturnedCount > 0)

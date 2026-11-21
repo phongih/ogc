@@ -24,14 +24,54 @@ describe("AUTH-026 applied recommendation — system baseline (no apply)", () =>
 
 describe("AUTH-026 applied recommendation — eligibility & authz on apply (fail-closed)", () => {
   it("rejects a blocked, out-of-scope, note-less, or unauthorized apply", async () => {
-    expect((await app.applyRecommendation(TEACHER, LEARNER_LINH, { selectedActivityId: "ACT-A2-4", reasonCode: "pacing", note: "x" })).reason).toBe("activity_not_eligible:blocked");
-    expect((await app.applyRecommendation(TEACHER, LEARNER_LINH, { selectedActivityId: "ACT-B2-1", reasonCode: "pacing", note: "x" })).reason).toBe("activity_out_of_scope");
-    expect((await app.applyRecommendation(TEACHER, LEARNER_LINH, { selectedActivityId: "ACT-B1-2", reasonCode: "pacing", note: "  " })).reason).toBe("reason_required");
+    expect(
+      (
+        await app.applyRecommendation(TEACHER, LEARNER_LINH, {
+          selectedActivityId: "ACT-A2-4",
+          reasonCode: "pacing",
+          note: "x",
+        })
+      ).reason,
+    ).toBe("activity_not_eligible:blocked");
+    expect(
+      (
+        await app.applyRecommendation(TEACHER, LEARNER_LINH, {
+          selectedActivityId: "ACT-B2-1",
+          reasonCode: "pacing",
+          note: "x",
+        })
+      ).reason,
+    ).toBe("activity_out_of_scope");
+    expect(
+      (
+        await app.applyRecommendation(TEACHER, LEARNER_LINH, {
+          selectedActivityId: "ACT-B1-2",
+          reasonCode: "pacing",
+          note: "  ",
+        })
+      ).reason,
+    ).toBe("reason_required");
     for (const persona of ["demo-guardian", "demo-learner", "demo-staff"]) {
-      expect((await app.applyRecommendation(persona, LEARNER_LINH, { selectedActivityId: "ACT-B1-2", reasonCode: "pacing", note: "x" })).reason).toBe("not_authorized");
+      expect(
+        (
+          await app.applyRecommendation(persona, LEARNER_LINH, {
+            selectedActivityId: "ACT-B1-2",
+            reasonCode: "pacing",
+            note: "x",
+          })
+        ).reason,
+      ).toBe("not_authorized");
     }
     // Cross-tenant: Tara does not teach the org2 learner.
-    expect((await app.applyRecommendation(TEACHER, LEARNER_ORG2, { selectedActivityId: "ACT-B1-2", reasonCode: "pacing", note: "x" })).reason).toBe("not_authorized");
+    expect(
+      (
+        await app.applyRecommendation(TEACHER, LEARNER_ORG2, {
+          selectedActivityId: "ACT-B1-2",
+          reasonCode: "pacing",
+          note: "x",
+        })
+      ).reason,
+    ).toBe("not_authorized");
   });
 });
 
@@ -66,7 +106,11 @@ describe("AUTH-026 applied recommendation — apply reaches the learner, system 
 
 describe("AUTH-026 applied recommendation — supersede, revert, revalidation", () => {
   it("a second apply supersedes the first (one active per learner)", async () => {
-    await app.applyRecommendation(TEACHER, LEARNER_LINH, { selectedActivityId: "ACT-A2-3", reasonCode: "pacing", note: "switch" });
+    await app.applyRecommendation(TEACHER, LEARNER_LINH, {
+      selectedActivityId: "ACT-A2-3",
+      reasonCode: "pacing",
+      note: "switch",
+    });
     const active = await app.getActiveApplied(TEACHER, LEARNER_LINH);
     expect(active!.activityId).toBe("ACT-A2-3");
     const na = await nextAction.getNextAction("demo-learner");
@@ -83,7 +127,11 @@ describe("AUTH-026 applied recommendation — supersede, revert, revalidation", 
   });
 
   it("an applied recommendation self-invalidates when the learner completes it (fulfilled → back to system)", async () => {
-    await app.applyRecommendation(TEACHER, LEARNER_LINH, { selectedActivityId: "ACT-B1-2", reasonCode: "pacing", note: "do this" });
+    await app.applyRecommendation(TEACHER, LEARNER_LINH, {
+      selectedActivityId: "ACT-B1-2",
+      reasonCode: "pacing",
+      note: "do this",
+    });
     expect((await nextAction.getNextAction("demo-learner"))!.source).toBe("teacher");
     // Learner completes the applied activity.
     expect(learningStore.complete("demo-learner", "ACT-B1-2").completed).toBe(true);

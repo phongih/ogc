@@ -20,7 +20,10 @@ interface CatalogConfig {
 
 function config(): CatalogConfig {
   const g = (globalThis as unknown as { __OGC_CATALOG__?: Partial<CatalogConfig> }).__OGC_CATALOG__;
-  const base = g?.base ?? (import.meta.env.VITE_CATALOG_API_BASE as string | undefined) ?? "http://127.0.0.1:8787/api/v1";
+  const base =
+    g?.base ??
+    (import.meta.env.VITE_CATALOG_API_BASE as string | undefined) ??
+    "http://127.0.0.1:8787/api/v1";
   return { base };
 }
 
@@ -38,7 +41,11 @@ async function getJson(url: string): Promise<{ status: number; body: unknown }> 
 }
 
 export const httpCatalog: CatalogPort = {
-  async listCourses(orgId: string, filter?: CourseFilter, page?: CatalogPageRequest): Promise<CatalogPage> {
+  async listCourses(
+    orgId: string,
+    filter?: CourseFilter,
+    page?: CatalogPageRequest,
+  ): Promise<CatalogPage> {
     const slug = slugForOrg(orgId);
     // Fail-closed: unknown org → empty page, and NO request is issued to any backend.
     if (slug === null) return { items: [], nextCursor: null };

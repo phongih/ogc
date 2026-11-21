@@ -5,6 +5,7 @@ import { SpeakingReviewQueue } from "./SpeakingReviewQueue";
 import { formatCenterDate, formatCenterDateTime } from "../../lib/centerTime";
 import { NeedsSupportQueue } from "./NeedsSupportQueue";
 import { SessionsToMark } from "./SessionsToMark";
+import { EngineNotifications } from "../engine/EngineNotifications";
 import { SelfStudyToConfirm } from "./SelfStudyToConfirm";
 import { useSession } from "../../app/session";
 import { useTeacherDashboard } from "./queries";
@@ -42,6 +43,8 @@ export function TeacherHome() {
           hint="across your classes"
         />
       </div>
+
+      <EngineNotifications />
 
       <SessionsToMark />
 

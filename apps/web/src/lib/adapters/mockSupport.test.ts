@@ -23,7 +23,14 @@ describe("needs-support queue", () => {
     expect(q[0].learnerName).toBe("Huy D.");
     const linh = q.find((i) => i.learnerName === "Linh N.")!;
     expect(linh.signals).toEqual([
-      { kind: "low_skill", source: "placement", skill: "speaking", level: 55, evidenceCount: 0 },
+      {
+        kind: "low_skill",
+        source: "placement",
+        skill: "speaking",
+        level: 55,
+        evidenceCount: 0,
+        threshold: 60,
+      },
     ]);
     expect(linh.className).toBe("A2 Morning — Mon/Wed");
     // Speaking's own activity is locked → suggest the nearest open prerequisite that unlocks it.

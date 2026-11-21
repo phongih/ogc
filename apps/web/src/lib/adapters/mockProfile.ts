@@ -1,4 +1,5 @@
 import { refill, registerPersistent } from "./persist";
+import { activeRule, queues } from "./engineRules";
 import type {
   LearnerProfile,
   LearningActivity,
@@ -539,6 +540,41 @@ export const mockRecommendation: RecommendationPort = {
     }),
 };
 
+/**
+ * Support signals for one learner under the organization's Decision Engine rules.
+ * "queue": what "Learners needing support" shows (rule enabled AND its queue action on).
+ * "engine": what the engine detects (rule enabled, any action). Callers enforce authorization.
+ */
+export function learnerSignals(
+  learnerId: string,
+  orgId: string,
+  classIds: readonly string[],
+  mode: "queue" | "engine",
+): SupportSignal[] {
+  const pick = (k: Parameters<typeof queues>[1]) =>
+    mode === "queue" ? queues(orgId, k) : activeRule(orgId, k);
+  const low = pick("skill_low");
+  const drop = pick("skill_drop");
+  const spoke = pick("speaking_returned");
+  const absent = pick("absence_streak");
+  const out: SupportSignal[] = [];
+  const placement = placementFor(learnerId, orgId);
+  if (placement && learnerPathView(learnerId, orgId)) {
+    const scoped = scopedActivities(learnerId, orgId);
+    const returned = spoke ? learningStore.listSpeaking([learnerId], "returned").length : 0;
+    out.push(
+      ...supportSignals(seedProfile(placement), evidenceFor(learnerId, scoped), returned, {
+        low: low ? low.params.threshold : null,
+        drop: drop ? drop.params.drop : null,
+      }),
+    );
+  }
+  // P2 · attendance-v1: own-class marks; N from the rule.
+  const streak = absent ? absenceStreakFor(learnerId, classIds, absent.params.sessions) : null;
+  if (streak) out.push({ kind: "absences", source: "attendance", sessions: streak });
+  return out;
+}
+
 // ── P1 · Learners needing support (owning teacher) ───────────────────────────────────────────
 // Evidence first (owner decision 21/11): every flag states its source. Reuses the LI-1 fold, the
 // LI-3 path (only an AVAILABLE activity is suggested) and AUTH-026 (current assignment).
@@ -560,23 +596,9 @@ export const mockSupport: SupportPort = {
           seen.add(row.learnerId);
           const auth = teacherOwnsLearner(viewerPersonaId, row.learnerId);
           if (!auth) continue; // same-tenant guard
-          const placement = placementFor(row.learnerId, auth.orgId);
           const path = learnerPathView(row.learnerId, auth.orgId);
-          const signals: SupportSignal[] = [];
-          if (placement && path) {
-            const scoped = scopedActivities(row.learnerId, auth.orgId);
-            const returned = learningStore.listSpeaking([row.learnerId], "returned").length;
-            signals.push(
-              ...supportSignals(
-                seedProfile(placement),
-                evidenceFor(row.learnerId, scoped),
-                returned,
-              ),
-            );
-          }
-          // P2 · attendance-v1: the teacher's own marks, in the classes this teacher owns.
-          const streak = absenceStreakFor(row.learnerId, ownedClassIds);
-          if (streak) signals.push({ kind: "absences", source: "attendance", sessions: streak });
+          // Thresholds and which signals count come from the Decision Engine rules (21/11).
+          const signals = learnerSignals(row.learnerId, auth.orgId, ownedClassIds, "queue");
           if (signals.length === 0) continue;
           const focus = focusSkill(signals);
           let suggestion =

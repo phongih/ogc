@@ -30,8 +30,10 @@ function completionRefusal(personaId: string, activityId: string): string | null
   if (!activity) return "unknown_activity";
   if (activity.orgId !== p.orgId) return "cross_org_denied";
   if (!enrollmentStore.get(personaId, activity.courseId)) return "not_enrolled";
-  if (learningStore.getAttempt(p.learnerId, activityId)?.state === "completed") return "already_completed";
-  if ((prerequisitesBlocking(p.learnerId, p.orgId, activityId)?.length ?? 0) > 0) return "prerequisite_required";
+  if (learningStore.getAttempt(p.learnerId, activityId)?.state === "completed")
+    return "already_completed";
+  if ((prerequisitesBlocking(p.learnerId, p.orgId, activityId)?.length ?? 0) > 0)
+    return "prerequisite_required";
   if (speakingFor(activityId)) return "speaking_requires_review";
   if (practiceFor(activityId)) return "practice_required";
   return null;
@@ -80,7 +82,9 @@ function summaryFor(learnerId: string): LearnerProgressSummary {
     .map((cid) => snapshotFor(learnerId, cid))
     .filter((s): s is ProgressSnapshot => s !== null);
   const overallPct =
-    snaps.length === 0 ? 0 : Math.round(snaps.reduce((s, x) => s + x.progressPct, 0) / snaps.length);
+    snaps.length === 0
+      ? 0
+      : Math.round(snaps.reduce((s, x) => s + x.progressPct, 0) / snaps.length);
   return {
     learnerId,
     orgId: learner?.orgId ?? "",
@@ -126,7 +130,8 @@ export const mockLearning: LearningPort = {
 
   listMyProgress: (personaId) => {
     const learnerId = personaMap[personaId]?.learnerId;
-    if (!learnerId) return withFault("learning.listMyProgress", () => latency<ProgressSnapshot[]>([]));
+    if (!learnerId)
+      return withFault("learning.listMyProgress", () => latency<ProgressSnapshot[]>([]));
     // Union of the learner's synthetic courses and any courses the persona has enrolled in.
     const courseIds = new Set<string>(learnerById[learnerId]?.courseIds ?? []);
     for (const e of enrollmentStore.list(personaId)) courseIds.add(e.courseId);
@@ -144,7 +149,9 @@ function teacherAuthorized(viewerPersonaId: string, learnerId: string): boolean 
   const ownedClasses = Object.entries(classTeachers)
     .filter(([, t]) => t === teacherId)
     .map(([classId]) => classId);
-  return ownedClasses.some((classId) => (rosters[classId] ?? []).some((r) => r.learnerId === learnerId));
+  return ownedClasses.some((classId) =>
+    (rosters[classId] ?? []).some((r) => r.learnerId === learnerId),
+  );
 }
 
 function guardianAuthorized(viewerPersonaId: string, learnerId: string): boolean {

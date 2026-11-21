@@ -26,7 +26,14 @@ describe("supportSignals", () => {
   it("placement only: a low skill is flagged and labelled as placement", () => {
     const s = supportSignals(seedProfile(P), []);
     expect(s).toEqual([
-      { kind: "low_skill", source: "placement", skill: "speaking", level: 55, evidenceCount: 0 },
+      {
+        kind: "low_skill",
+        source: "placement",
+        skill: "speaking",
+        level: 55,
+        evidenceCount: 0,
+        threshold: 60,
+      },
     ]);
   });
 
@@ -49,6 +56,7 @@ describe("supportSignals", () => {
       skill: "use_of_english",
       level: 59,
       evidenceCount: 1,
+      threshold: 60,
     });
   });
 

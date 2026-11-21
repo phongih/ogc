@@ -76,6 +76,8 @@ export const mockPractice: PracticePort = {
     withFault("practice.submitPractice", () => {
       if (submissionLocked(personaId, activityId))
         return latency<PracticeSubmitResult>({ ok: false, reason: "prerequisite_required" });
-      return latency<PracticeSubmitResult>(learningStore.submitPractice(personaId, activityId, submission));
+      return latency<PracticeSubmitResult>(
+        learningStore.submitPractice(personaId, activityId, submission),
+      );
     }),
 };

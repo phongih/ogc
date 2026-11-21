@@ -199,6 +199,14 @@ export const learningStore = {
   getAttempt: (learnerId: string, activityId: string): LearningAttempt | null =>
     attemptsFor(learnerId).get(activityId) ?? null,
 
+  /** Latest evidence time for a learner (any activity), or null. Decision Engine "no practice". */
+  lastEvidenceAt: (learnerId: string): string | null => {
+    let last: string | null = null;
+    for (const list of evidenceFor(learnerId).values())
+      for (const e of list) if (!last || e.at > last) last = e.at;
+    return last;
+  },
+
   getEvidence: (learnerId: string, activityId: string): LearningEvidence[] =>
     (evidenceFor(learnerId).get(activityId) ?? []).map((e) => ({ ...e })),
 

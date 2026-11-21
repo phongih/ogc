@@ -91,3 +91,6 @@ export const makeup: MakeupPort = mockMakeup;
 import type { CenterSetupPort } from "@ogc/contracts";
 import { mockCenterSetup } from "../adapters/mockCenterSetup";
 export const centerSetup: CenterSetupPort = mockCenterSetup;
+import type { DecisionEnginePort } from "@ogc/contracts";
+import { mockDecisionEngine } from "../adapters/mockDecisionEngine";
+export const decisionEngine: DecisionEnginePort = mockDecisionEngine;

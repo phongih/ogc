@@ -1,15 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { mockProgressView } from "./mockLearning";
 import { learningStore } from "./store";
-import {
-  LEARNER_LINH,
-  LEARNER_MINH,
-} from "../../fixtures/personas";
-import {
-  LEARNER_HUY,
-  LEARNER_THAO,
-  learnerDirectory,
-} from "../../fixtures/learners";
+import { LEARNER_LINH, LEARNER_MINH } from "../../fixtures/personas";
+import { LEARNER_HUY, LEARNER_THAO, learnerDirectory } from "../../fixtures/learners";
 import { courses } from "../../fixtures/catalog";
 
 const STAFF = "demo-staff"; // org staff: authorized to view same-org learners
