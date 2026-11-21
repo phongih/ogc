@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } from "../../ui";
 import { SpeakingReviewQueue } from "./SpeakingReviewQueue";
@@ -8,9 +9,13 @@ import { SelfStudyToConfirm } from "./SelfStudyToConfirm";
 import { useSession } from "../../app/session";
 import { useTeacherDashboard } from "./queries";
 
+// The next few sessions; a new class brings weeks of them (seen 21/11: Ben had 14 listed).
+const UPCOMING_SHOWN = 6;
+
 export function TeacherHome() {
   const { session } = useSession();
   const q = useTeacherDashboard(session?.personaId ?? "");
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
 
   if (q.isLoading) return <Spinner label="Loading your teaching" />;
   if (q.isError)
@@ -81,7 +86,7 @@ export function TeacherHome() {
           <EmptyState title="No upcoming sessions" />
         ) : (
           <ul className="space-y-2">
-            {d.upcoming.map((s) => (
+            {(showAllUpcoming ? d.upcoming : d.upcoming.slice(0, UPCOMING_SHOWN)).map((s) => (
               <li key={s.id}>
                 <Card className="flex items-center justify-between">
                   <span>
@@ -99,6 +104,13 @@ export function TeacherHome() {
             ))}
           </ul>
         )}
+        {d.upcoming.length > UPCOMING_SHOWN ? (
+          <Button variant="ghost" className="mt-2" onClick={() => setShowAllUpcoming((v) => !v)}>
+            {showAllUpcoming
+              ? "Show fewer sessions"
+              : `Show all ${d.upcoming.length} upcoming sessions`}
+          </Button>
+        ) : null}
       </div>
     </section>
   );

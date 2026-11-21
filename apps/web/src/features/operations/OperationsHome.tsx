@@ -63,12 +63,35 @@ export function OperationsHome() {
         + Set up a new center
       </Link>
       <MakeupBoard viewer={viewer} teachers={q.data.teachers} />
-      {q.data.classes.map((c) => (
-        <ClassCard key={c.classId} viewer={viewer} cls={c} teachers={q.data!.teachers} />
+      {centersOf(q.data.classes).map((center) => (
+        <section key={center.id} aria-label={center.name} className="space-y-4">
+          <h2 className="border-b border-border pb-1 text-xl font-medium">
+            {center.name}{" "}
+            <span className="text-sm font-normal text-muted">
+              · {center.classes.length} {center.classes.length === 1 ? "class" : "classes"}
+            </span>
+          </h2>
+          {center.classes.map((c) => (
+            <ClassCard key={c.classId} viewer={viewer} cls={c} teachers={q.data!.teachers} />
+          ))}
+        </section>
       ))}
     </section>
   );
 }
+
+// Group classes by center, keeping the overview's order (seeded centers first, new ones after).
+function centersOf(list: ClassSchedule[]) {
+  const out: { id: string; name: string; classes: ClassSchedule[] }[] = [];
+  for (const c of list) {
+    const g = out.find((x) => x.id === c.centerId);
+    if (g) g.classes.push(c);
+    else out.push({ id: c.centerId, name: c.centerName, classes: [c] });
+  }
+  return out;
+}
+
+const UPCOMING_SHOWN = 3;
 
 function ClassCard({
   viewer,
@@ -86,7 +109,13 @@ function ClassCard({
   // History older than the latest marked session is noise here: show what staff can still act on,
   // plus the most recent marked session for context.
   const lastMarked = [...cls.sessions].reverse().find((s) => s.marked);
-  const shown = cls.sessions.filter((s) => s === lastMarked || !s.marked);
+  const actionable = cls.sessions.filter((s) => s === lastMarked || !s.marked);
+  // Long schedules (a new class has weeks of sessions): history + what needs action + the next
+  // few upcoming; the rest behind "Show all".
+  const [showAll, setShowAll] = useState(false);
+  const upcoming = actionable.filter((s) => s.state === "scheduled" && !s.started);
+  const hidden = showAll ? [] : upcoming.slice(UPCOMING_SHOWN);
+  const shown = actionable.filter((s) => !hidden.includes(s));
 
   return (
     <section aria-label={cls.className} className="space-y-3">
@@ -117,6 +146,13 @@ function ClassCard({
             <SessionRow key={s.id} viewer={viewer} s={s} cls={cls} teachers={teachers} now={now} />
           ))}
         </ul>
+        {hidden.length > 0 || showAll ? (
+          <Button variant="ghost" onClick={() => setShowAll((v) => !v)}>
+            {showAll
+              ? `Show fewer · ${cls.className}`
+              : `Show all ${upcoming.length} upcoming · ${cls.className}`}
+          </Button>
+        ) : null}
 
         <form
           className="flex flex-wrap items-end gap-2 border-t border-border pt-3"

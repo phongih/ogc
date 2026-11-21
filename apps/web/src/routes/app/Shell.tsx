@@ -154,6 +154,10 @@ export function Shell() {
         </RequireIiosContext>
       </main>
 
+      <footer className="mx-auto max-w-6xl px-4 pb-6 text-xs text-muted" data-testid="build-id">
+        OGC · build {__OGC_BUILD__} · synthetic demo
+      </footer>
+
       <KeyboardHelp />
     </div>
   );
