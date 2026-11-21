@@ -17,16 +17,55 @@ export const organizations: Organization[] = [
 ];
 
 export const brands: Brand[] = [
-  { id: "00000000-0000-4000-8000-0000000000a1", orgId: organizations[0].id, name: "Nova English", slug: "nova-english" },
-  { id: "00000000-0000-4000-8000-0000000000a2", orgId: organizations[0].id, name: "Nova Juniors", slug: "nova-juniors" },
-  { id: "00000000-0000-4000-8000-0000000000b1", orgId: organizations[1].id, name: "Lumen Academy", slug: "lumen-academy" },
+  {
+    id: "00000000-0000-4000-8000-0000000000a1",
+    orgId: organizations[0].id,
+    name: "Nova English",
+    slug: "nova-english",
+  },
+  {
+    id: "00000000-0000-4000-8000-0000000000a2",
+    orgId: organizations[0].id,
+    name: "Nova Juniors",
+    slug: "nova-juniors",
+  },
+  {
+    id: "00000000-0000-4000-8000-0000000000b1",
+    orgId: organizations[1].id,
+    name: "Lumen Academy",
+    slug: "lumen-academy",
+  },
 ];
 
 export const centers: Center[] = [
-  { id: "00000000-0000-4000-8000-000000000c01", orgId: organizations[0].id, brandId: brands[0].id, name: "Nova English — District 1", city: "Ho Chi Minh City" },
-  { id: "00000000-0000-4000-8000-000000000c02", orgId: organizations[0].id, brandId: brands[0].id, name: "Nova English — Thu Duc", city: "Ho Chi Minh City" },
-  { id: "00000000-0000-4000-8000-000000000c03", orgId: organizations[0].id, brandId: brands[1].id, name: "Nova Juniors — Cau Giay", city: "Hanoi" },
-  { id: "00000000-0000-4000-8000-000000000c04", orgId: organizations[1].id, brandId: brands[2].id, name: "Lumen Academy — Hai Chau", city: "Da Nang" },
+  {
+    id: "00000000-0000-4000-8000-000000000c01",
+    orgId: organizations[0].id,
+    brandId: brands[0].id,
+    name: "Nova English — District 1",
+    city: "Ho Chi Minh City",
+  },
+  {
+    id: "00000000-0000-4000-8000-000000000c02",
+    orgId: organizations[0].id,
+    brandId: brands[0].id,
+    name: "Nova English — Thu Duc",
+    city: "Ho Chi Minh City",
+  },
+  {
+    id: "00000000-0000-4000-8000-000000000c03",
+    orgId: organizations[0].id,
+    brandId: brands[1].id,
+    name: "Nova Juniors — Cau Giay",
+    city: "Hanoi",
+  },
+  {
+    id: "00000000-0000-4000-8000-000000000c04",
+    orgId: organizations[1].id,
+    brandId: brands[2].id,
+    name: "Lumen Academy — Hai Chau",
+    city: "Da Nang",
+  },
 ];
 
 export const centerDetails: Record<string, CenterDetail> = Object.fromEntries(

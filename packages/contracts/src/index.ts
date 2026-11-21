@@ -25,3 +25,4 @@ export * from "./speaking.js";
 export * from "./support.js";
 export * from "./attendance.js";
 export * from "./schedule.js";
+export * from "./makeup.js";

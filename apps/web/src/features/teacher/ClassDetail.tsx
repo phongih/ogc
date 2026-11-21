@@ -144,6 +144,7 @@ export function ClassDetail() {
               <li key={s.id}>
                 <Card className="flex flex-wrap items-center justify-between gap-2">
                   <span>
+                    {s.kind === "makeup" ? "Make-up · " : ""}
                     {s.title}{" "}
                     <span className="text-sm text-muted">· {formatCenterDateTime(s.at)}</span>
                   </span>

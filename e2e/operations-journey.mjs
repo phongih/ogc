@@ -81,6 +81,24 @@ async function main() {
     check("[ops] Unit 7 cancelled with a replacement", (await a2.getByText("Upcoming · replacement").count()) === 1);
     await shot(page, "01-operations");
 
+    // Make-up ledger: An missed A2 Unit 5 → join A2 Evening's Unit 5 (Ben); Huy missed B1 Unit 1 →
+    // no other class teaches it → open a make-up session.
+    const board = page.getByRole("region", { name: "Make-up lessons" });
+    check("[makeup] every absence is listed", /3 to arrange/.test(await board.getByTestId("makeup-counts").textContent()));
+    await board.getByRole("button", { name: "Find a session · An P. · A2 — Unit 5" }).click();
+    const pick = board.getByLabel("Make-up session for An P. · A2 — Unit 5");
+    await pick.locator("option").nth(1).waitFor({ state: "attached" });
+    await pick.selectOption({ index: 1 });
+    await board.getByRole("button", { name: "Book" }).click();
+    await board.getByText(/joins A2 Evening — Tue\/Thu/).waitFor();
+    check("[makeup] An booked into A2 Evening (same unit)", true);
+    await board.getByRole("button", { name: "Open a make-up session · Huy D. · B1 — Unit 1" }).click();
+    await board.getByLabel("Make-up teacher for Huy D. · B1 — Unit 1").selectOption({ label: "Ben" });
+    await board.getByRole("button", { name: "Open and book everyone missing B1 — Unit 1" }).click();
+    await board.getByTestId("makeup-counts").filter({ hasText: "1 to arrange · 2 booked" }).waitFor();
+    check("[makeup] Huy booked into a make-up session", true);
+    await shot(page, "01b-makeup-board");
+
     await signOut();
     await persona(/Ben \(Teacher\)/);
     await page.getByRole("heading", { name: "Attendance to take (1)" }).waitFor();

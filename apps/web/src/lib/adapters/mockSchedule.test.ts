@@ -22,12 +22,14 @@ const a2Marked = () => seedSessions.filter((s) => s.classId === A2 && s.seededMa
 beforeEach(() => __resetAttendanceForTests());
 
 describe("mockSchedule — access", () => {
-  it("staff of the tenant see both classes and both teachers; nobody else does", async () => {
+  it("staff of the tenant see every class and both teachers; nobody else does", async () => {
     const o = (await mockSchedule.getOverview(S))!;
     expect(o.classes.map((c) => c.className)).toEqual([
       "A2 Morning — Mon/Wed",
       "B1 Evening — Tue/Thu",
+      "A2 Evening — Tue/Thu",
     ]);
+    expect(o.classes[2].teacher?.name).toBe("Ben");
     expect(o.teachers.map((t) => t.name)).toEqual(["Tara", "Ben"]);
     expect(o.classes[0].teacher?.name).toBe("Tara");
     for (const other of ["demo-teacher", "demo-teacher-2", "demo-learner", "demo-guardian"])
@@ -115,7 +117,7 @@ describe("mockSchedule — teachers", () => {
     expect((await mockSchedule.assignTeacher(S, A2, TEACHER_BEN)).ok).toBe(true);
     const ben = (await mockTeacher.getDashboard("demo-teacher-2"))!;
     expect(ben.teacherName).toBe("Ben");
-    expect(ben.classes.map((c) => c.id)).toEqual([A2]);
+    expect(ben.classes.map((c) => c.id)).toEqual([A2, classes[2].id]);
     const tara = (await mockTeacher.getDashboard("demo-teacher"))!;
     expect(tara.classes.map((c) => c.id)).toEqual([classes[1].id]);
     expect(

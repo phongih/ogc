@@ -25,6 +25,7 @@ export const ClassSession = z.object({
   title: z.string().min(1),
   at: z.string(), // ISO instant
   status: ClassSessionStatus,
+  kind: z.enum(["regular", "makeup"]).optional(), // P2: a make-up session (guests only)
 });
 export type ClassSession = z.infer<typeof ClassSession>;
 
@@ -32,6 +33,7 @@ export const SessionAttendanceRow = z.object({
   learnerId: Id,
   displayName: z.string().min(1),
   mark: AttendanceMark.nullable(), // null = not marked yet
+  makeupFor: z.string().nullable().optional(), // P2: a guest making up a missed unit ("A2 Morning — Mon/Wed")
 });
 export type SessionAttendanceRow = z.infer<typeof SessionAttendanceRow>;
 

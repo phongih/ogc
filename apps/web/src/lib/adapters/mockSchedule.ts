@@ -42,6 +42,7 @@ function toScheduled(s: StoredSession, now: number): ScheduledSession {
     title: s.title,
     at: s.at,
     state: s.state,
+    kind: s.kind,
     started: Date.parse(s.at) <= now,
     marked: isMarked(s.id),
     substitute: teacherRef(s.substituteId),
@@ -115,7 +116,12 @@ export const mockSchedule: SchedulePort = {
         title: s.title,
         at: new Date(replacementAt).toISOString(),
         replaces: s.id,
+        kind: s.kind,
+        substituteId: s.kind === "makeup" ? s.substituteId : null,
       });
+      // Make-up bookings follow the lesson to its new time.
+      for (const [itemId, sid] of sessionStore.bookings)
+        if (sid === s.id) sessionStore.bookings.set(itemId, repl.id);
       sessionStore.update(s.id, { state: "cancelled", replacedBy: repl.id, substituteId: null });
       return latency<ScheduleResult>({ ok: true, classSchedule: classSchedule(s.classId) });
     }),

@@ -17,7 +17,12 @@ export const seedConversations: SeedConversation[] = [
     title: "Practising A2 plans",
     lessonContext: { courseId: courses[0].id, title: "Everyday English A2" },
     messages: [
-      { id: "CONV-001:0", role: "learner", text: "How do I talk about weekend plans?", at: new Date(TUTOR_EPOCH).toISOString() },
+      {
+        id: "CONV-001:0",
+        role: "learner",
+        text: "How do I talk about weekend plans?",
+        at: new Date(TUTOR_EPOCH).toISOString(),
+      },
       {
         id: "CONV-001:1",
         role: "tutor",
@@ -32,11 +37,16 @@ export const seedConversations: SeedConversation[] = [
     title: "B1 opinions warm-up",
     lessonContext: null,
     messages: [
-      { id: "CONV-002:0", role: "learner", text: "Give me a phrase to disagree politely.", at: new Date(TUTOR_EPOCH + 120000).toISOString() },
+      {
+        id: "CONV-002:0",
+        role: "learner",
+        text: "Give me a phrase to disagree politely.",
+        at: new Date(TUTOR_EPOCH + 120000).toISOString(),
+      },
       {
         id: "CONV-002:1",
         role: "tutor",
-        text: "You can say: \"I see your point, but I think…\". Want to practise with a topic?",
+        text: 'You can say: "I see your point, but I think…". Want to practise with a topic?',
         at: new Date(TUTOR_EPOCH + 180000).toISOString(),
       },
     ],

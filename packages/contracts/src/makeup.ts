@@ -1,0 +1,98 @@
+import { z } from "zod";
+import { Id } from "./common.js";
+
+/*
+ * P2 · Make-up ledger — "no learner loses a lesson". ADDITIVE, SYNTHETIC, mock adapter only.
+ *
+ * Owner decisions (21/11):
+ *  - every ABSENT mark in a learner's own class opens a make-up item for that unit; it never
+ *    disappears until the learner is marked present or late at a make-up (or the absence itself
+ *    is corrected by the teacher);
+ *  - ways to make up: join another class's session of the SAME unit, or a separate make-up
+ *    session staff open for the learners missing that unit (self-study + teacher confirmation is
+ *    the next slice);
+ *  - deadline 14 days after the missed session; overdue items go to the top of staff's list.
+ */
+
+export const MAKEUP_DEADLINE_DAYS = 14;
+
+export const MakeupStatus = z.enum(["open", "booked", "done"]);
+export type MakeupStatus = z.infer<typeof MakeupStatus>;
+
+export const MakeupBooking = z.object({
+  sessionId: z.string().min(1),
+  kind: z.enum(["join", "makeup"]), // another class's regular session, or a make-up session
+  className: z.string().min(1),
+  at: z.string(),
+  teacherName: z.string().nullable(),
+});
+export type MakeupBooking = z.infer<typeof MakeupBooking>;
+
+export const MakeupItem = z.object({
+  id: z.string().min(1), // `${missedSessionId}::${learnerId}`
+  learnerId: Id,
+  learnerName: z.string().min(1),
+  classId: Id,
+  className: z.string().min(1),
+  unitTitle: z.string().min(1),
+  missedSessionId: z.string().min(1),
+  missedAt: z.string(),
+  dueAt: z.string(),
+  status: MakeupStatus,
+  overdue: z.boolean(), // not done and past dueAt
+  missedMakeup: z.boolean(), // was absent from the last booked make-up too
+  booking: MakeupBooking.nullable(),
+});
+export type MakeupItem = z.infer<typeof MakeupItem>;
+
+export const MakeupBoard = z.object({
+  items: z.array(MakeupItem), // overdue first, then open, booked, done
+  counts: z.object({
+    open: z.number().int().nonnegative(),
+    booked: z.number().int().nonnegative(),
+    done: z.number().int().nonnegative(),
+    overdue: z.number().int().nonnegative(),
+  }),
+});
+export type MakeupBoard = z.infer<typeof MakeupBoard>;
+
+export const MakeupOption = z.object({
+  sessionId: z.string().min(1),
+  kind: z.enum(["join", "makeup"]),
+  className: z.string().min(1),
+  title: z.string().min(1),
+  at: z.string(),
+  teacherName: z.string().nullable(),
+});
+export type MakeupOption = z.infer<typeof MakeupOption>;
+
+export const MakeupRefusal = z.enum([
+  "not_staff",
+  "not_found",
+  "already_done",
+  "not_an_option",
+  "in_past",
+  "unknown_teacher",
+  "nothing_open",
+]);
+export type MakeupRefusal = z.infer<typeof MakeupRefusal>;
+
+export const MakeupResult = z.discriminatedUnion("ok", [
+  z.object({ ok: z.literal(true), board: MakeupBoard }),
+  z.object({ ok: z.literal(false), reason: MakeupRefusal }),
+]);
+export type MakeupResult = z.infer<typeof MakeupResult>;
+
+// Staff only, own tenant (fail-closed: null / not_staff / not_found).
+export interface MakeupPort {
+  getBoard(viewerPersonaId: string): Promise<MakeupBoard | null>;
+  listOptions(viewerPersonaId: string, itemId: string): Promise<MakeupOption[] | null>;
+  book(viewerPersonaId: string, itemId: string, sessionId: string): Promise<MakeupResult>;
+  // Opens one make-up session for a unit and books every learner still missing that unit into it.
+  openMakeupSession(
+    viewerPersonaId: string,
+    itemId: string,
+    at: string,
+    teacherId: string,
+  ): Promise<MakeupResult>;
+}

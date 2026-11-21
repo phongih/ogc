@@ -7,9 +7,16 @@
  *  - A2: the latest started session is NOT marked yet ("to mark"); An was absent last time,
  *    so marking her absent again raises the attendance signal in the support queue.
  *  - B1: Huy was absent from both marked sessions — he is flagged by attendance alone.
+ *  - A2 Evening (Ben) is one unit behind A2 Morning: An's missed Unit 5 can be made up there.
  */
 import type { AttendanceMark } from "@ogc/contracts";
-import { recentWeeklySlots, A2_MORNING_NEXT, B1_EVENING_NEXT } from "./demoClock";
+import {
+  recentWeeklySlots,
+  A2_EVENING_AFTER,
+  A2_EVENING_NEXT,
+  A2_MORNING_NEXT,
+  B1_EVENING_NEXT,
+} from "./demoClock";
 import { classes } from "./teaching";
 import { LEARNER_LINH, LEARNER_MINH } from "./personas";
 import { LEARNER_AN, LEARNER_HUY, LEARNER_THAO } from "./learners";
@@ -24,10 +31,14 @@ export interface SeedSession {
 
 const A2 = classes[0].id;
 const B1 = classes[1].id;
+const A2E = classes[2].id;
+const KHOA = "00000000-0000-4000-8000-00000000L006";
+const VY = "00000000-0000-4000-8000-00000000L007";
 const LOADED_AT = Date.now();
 
 const a2Past = recentWeeklySlots([1, 3], 9, 4, LOADED_AT); // Units 3–6
 const b1Past = recentWeeklySlots([2, 4], 18, 2, LOADED_AT); // Units 1–2
+const a2ePast = recentWeeklySlots([2, 4], 18, 2, LOADED_AT); // A2 Evening: Units 3–4
 
 const a2Marks: Array<Record<string, AttendanceMark> | null> = [
   { [LEARNER_LINH]: "present", [LEARNER_MINH]: "present", [LEARNER_AN]: "present" },
@@ -57,6 +68,16 @@ export const seedSessions: SeedSession[] = [
     seededMarks: b1Marks[i] ?? null,
   })),
   { id: "SES-002", classId: B1, title: "B1 — Unit 3", at: B1_EVENING_NEXT, seededMarks: null },
+  // P2 · make-up: A2 Evening runs one unit behind A2 Morning (Units 5 and 6 are still ahead).
+  ...a2ePast.map((at, i) => ({
+    id: `A2E-${at.slice(0, 10)}`,
+    classId: A2E,
+    title: `A2 — Unit ${3 + i}`,
+    at,
+    seededMarks: { [KHOA]: "present", [VY]: "present" } as Record<string, AttendanceMark>,
+  })),
+  { id: "SES-003", classId: A2E, title: "A2 — Unit 5", at: A2_EVENING_NEXT, seededMarks: null },
+  { id: "SES-004", classId: A2E, title: "A2 — Unit 6", at: A2_EVENING_AFTER, seededMarks: null },
 ];
 
 // attendance-v1: absent from this many marked sessions in a row → support signal.

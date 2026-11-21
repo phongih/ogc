@@ -1,8 +1,8 @@
 import type { ClassSummary, LearnerRow, Session } from "@ogc/contracts";
 import { organizations, brands, centers } from "./directory";
 import { courses } from "./catalog";
-import { TEACHER_TARA } from "./personas";
-import { A2_MORNING_NEXT, B1_EVENING_NEXT } from "./demoClock";
+import { TEACHER_BEN, TEACHER_TARA } from "./personas";
+import { A2_EVENING_NEXT, A2_MORNING_NEXT, B1_EVENING_NEXT } from "./demoClock";
 
 const ORG = organizations[0].id;
 void brands;
@@ -26,6 +26,17 @@ export const classes: ClassSummary[] = [
     learnerCount: 9,
     nextSessionAt: B1_EVENING_NEXT,
   },
+  // P2 · make-up: a second A2 class, one unit behind A2 Morning, taught by Ben. A learner who
+  // missed a unit in A2 Morning can join the same unit here.
+  {
+    id: "00000000-0000-4000-8000-0000000000k3",
+    orgId: ORG,
+    centerId: centers[0].id,
+    courseId: courses[0].id,
+    name: "A2 Evening — Tue/Thu",
+    learnerCount: 8,
+    nextSessionAt: A2_EVENING_NEXT,
+  },
 ];
 
 // Which synthetic teacher owns which class. Lesson-plan editing, rosters, attendance and the
@@ -34,6 +45,7 @@ export const classes: ClassSummary[] = [
 export const classTeachers: Record<string, string> = {
   [classes[0].id]: TEACHER_TARA,
   [classes[1].id]: TEACHER_TARA,
+  [classes[2].id]: TEACHER_BEN,
 };
 
 export const upcomingSessions: Session[] = [
@@ -50,5 +62,9 @@ export const rosters: Record<string, LearnerRow[]> = {
   [classes[1].id]: [
     { learnerId: "00000000-0000-4000-8000-00000000L004", displayName: "Huy D.", progressPct: 15 },
     { learnerId: "00000000-0000-4000-8000-00000000L005", displayName: "Thao V.", progressPct: 23 },
+  ],
+  [classes[2].id]: [
+    { learnerId: "00000000-0000-4000-8000-00000000L006", displayName: "Khoa L.", progressPct: 40 },
+    { learnerId: "00000000-0000-4000-8000-00000000L007", displayName: "Vy H.", progressPct: 35 },
   ],
 };

@@ -54,6 +54,47 @@ function canMarkSession(viewerPersonaId: string, s: StoredSession): boolean {
 }
 
 export const isMarked = (sessionId: string) => marks.has(sessionId);
+export const markOf = (sessionId: string, learnerId: string): AttendanceMark | null =>
+  marks.get(sessionId)?.get(learnerId) ?? null;
+/** All recorded marks (read-only view) — the make-up ledger derives its items from these. */
+export const allMarks = (): ReadonlyMap<string, ReadonlyMap<string, AttendanceMark>> => marks;
+
+const onRoster = (classId: string, learnerId: string) =>
+  (rosters[classId] ?? []).some((r) => r.learnerId === learnerId);
+
+/**
+ * P2 · a make-up item is live while the learner is still marked ABSENT at a regular session of
+ * their own class. Correcting the absence removes the item (and its booking stops counting).
+ */
+export function makeupItemLive(itemId: string): boolean {
+  const [sessionId, learnerId] = itemId.split("::");
+  const s = sessionStore.get(sessionId);
+  return (
+    !!s &&
+    s.kind === "regular" &&
+    onRoster(s.classId, learnerId) &&
+    markOf(sessionId, learnerId) === "absent"
+  );
+}
+
+function learnerName(learnerId: string): string {
+  for (const list of Object.values(rosters)) {
+    const row = list.find((r) => r.learnerId === learnerId);
+    if (row) return row.displayName;
+  }
+  return "Learner";
+}
+
+// Guests booked into this session to make up a missed unit (live items only).
+function guestsOf(sessionId: string): { learnerId: string; fromClassId: string }[] {
+  const out: { learnerId: string; fromClassId: string }[] = [];
+  for (const [itemId, sid] of sessionStore.bookings) {
+    if (sid !== sessionId || !makeupItemLive(itemId)) continue;
+    const [missed, learnerId] = itemId.split("::");
+    out.push({ learnerId, fromClassId: sessionStore.get(missed)!.classId });
+  }
+  return out;
+}
 
 const started = (s: StoredSession, nowMs: number) => Date.parse(s.at) <= nowMs;
 
@@ -66,7 +107,7 @@ function toSession(s: StoredSession, nowMs = Date.now()): ClassSession {
         : marks.has(s.id)
           ? "marked"
           : "to_mark";
-  return { id: s.id, classId: s.classId, title: s.title, at: s.at, status };
+  return { id: s.id, classId: s.classId, title: s.title, at: s.at, status, kind: s.kind };
 }
 
 function sessionView(s: StoredSession): SessionAttendance {
@@ -74,18 +115,31 @@ function sessionView(s: StoredSession): SessionAttendance {
   return {
     session: toSession(s),
     className: classes.find((c) => c.id === s.classId)?.name ?? "Class",
-    rows: (rosters[s.classId] ?? []).map((r) => ({
-      learnerId: r.learnerId,
-      displayName: r.displayName,
-      mark: m?.get(r.learnerId) ?? null,
-    })),
+    rows: [
+      // A make-up session holds booked guests only; a regular one, the class roster + guests.
+      ...(s.kind === "makeup" ? [] : (rosters[s.classId] ?? [])).map((r) => ({
+        learnerId: r.learnerId,
+        displayName: r.displayName,
+        mark: m?.get(r.learnerId) ?? null,
+        makeupFor: null,
+      })),
+      ...guestsOf(s.id).map((g) => ({
+        learnerId: g.learnerId,
+        displayName: learnerName(g.learnerId),
+        mark: m?.get(g.learnerId) ?? null,
+        makeupFor: classes.find((c) => c.id === g.fromClassId)?.name ?? "another class",
+      })),
+    ],
   };
 }
 
-// Chronological marks for one learner in one class (marked sessions only).
+// Chronological marks for one learner in their OWN class: regular sessions only (a guest's marks
+// in another class, and make-up sessions, are make-up evidence — not this class's attendance).
 function historyFor(classId: string, learnerId: string): AttendanceMark[] {
+  if (!onRoster(classId, learnerId)) return [];
   return sessionStore
     .forClass(classId)
+    .filter((s) => s.kind === "regular")
     .map((s) => marks.get(s.id)?.get(learnerId))
     .filter((x): x is AttendanceMark => !!x);
 }
@@ -133,7 +187,7 @@ export const mockAttendance: AttendancePort = {
       if (!s || !canMarkSession(viewer, s)) return fail("not_found");
       if (s.state === "cancelled") return fail("cancelled");
       if (!started(s, Date.now())) return fail("not_started");
-      const roster = new Set((rosters[s.classId] ?? []).map((r) => r.learnerId));
+      const roster = new Set(sessionView(s).rows.map((r) => r.learnerId)); // roster + guests
       const next = new Map<string, AttendanceMark>();
       for (const m of input.marks) {
         if (!roster.has(m.learnerId)) return fail("not_on_roster");

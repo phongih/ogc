@@ -34,6 +34,8 @@ export function nextWeeklySlot(
 // The two synthetic classes' weekly slots, in center time, matching their names.
 export const A2_MORNING_NEXT = nextWeeklySlot([1, 3], 9); // Mon/Wed 09:00
 export const B1_EVENING_NEXT = nextWeeklySlot([2, 4], 18); // Tue/Thu 18:00
+export const A2_EVENING_NEXT = nextWeeklySlot([2, 4], 18); // P2: Tue/Thu 18:00 (A2 Evening)
+export const A2_EVENING_AFTER = nextWeeklySlot([2, 4], 18, 0, Date.parse(A2_EVENING_NEXT));
 
 /**
  * The last `count` occurrences of the weekly slot that have STARTED by `nowMs` (at ≤ now),
