@@ -11,6 +11,7 @@ export interface PersonaMapping {
   guardianId?: string;
   linkedLearnerIds?: string[];
   staff?: true; // P2: center staff — manages schedule and teacher assignment in its own tenant
+  admin?: true; // Org Admin — staff access + manages access policies (never their own)
 }
 
 export const LEARNER_LINH = "00000000-0000-4000-8000-00000000L001";
@@ -23,6 +24,7 @@ export const GUARDIAN_MAI = "00000000-0000-4000-8000-00000000g001";
 export const LEARNER_ORG2 = "00000000-0000-4000-8000-0000000Lo201";
 
 export const personaMap: Record<string, PersonaMapping> = {
+  "demo-admin": { orgId: ORG, staff: true, admin: true },
   "demo-staff": { orgId: ORG, staff: true },
   "demo-teacher": { orgId: ORG, teacherId: TEACHER_TARA },
   "demo-teacher-2": { orgId: ORG, teacherId: TEACHER_BEN },
@@ -41,3 +43,27 @@ export const teachers: { id: string; name: string; orgId: string }[] = [
 ];
 export const teacherName = (id: string | undefined): string | null =>
   teachers.find((t) => t.id === id)?.name ?? null;
+
+/*
+ * Memberships of each organization, as the organization (EduOS / IIOS, mock) reports them. OGC does
+ * not create or remove these — it only lists them and lets an Org Admin attach an access policy.
+ * "demo-pending" is in the organization with no OGC role yet: it can use nothing.
+ */
+export type MemberRole = "admin" | "staff" | "teacher" | "learner" | "guardian" | null;
+export const members: {
+  personaId: string;
+  displayName: string;
+  role: MemberRole;
+  orgId: string;
+}[] = [
+  { personaId: "demo-admin", displayName: "Olivia (Org Admin)", role: "admin", orgId: ORG },
+  { personaId: "demo-staff", displayName: "Sam (Org Staff)", role: "staff", orgId: ORG },
+  { personaId: "demo-teacher", displayName: "Tara (Teacher)", role: "teacher", orgId: ORG },
+  { personaId: "demo-teacher-2", displayName: "Ben (Teacher)", role: "teacher", orgId: ORG },
+  { personaId: "demo-learner", displayName: "Linh (Learner)", role: "learner", orgId: ORG },
+  { personaId: "demo-learner-2", displayName: "Minh (Learner)", role: "learner", orgId: ORG },
+  { personaId: "demo-guardian", displayName: "Mai (Guardian)", role: "guardian", orgId: ORG },
+  { personaId: "demo-pending", displayName: "Quinn (no role yet)", role: null, orgId: ORG },
+  { personaId: "demo-staff-org2", displayName: "Staff (Lumen)", role: "staff", orgId: ORG2 },
+  { personaId: "demo-learner-org2", displayName: "Learner (Lumen)", role: "learner", orgId: ORG2 },
+];

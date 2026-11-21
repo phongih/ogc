@@ -155,7 +155,7 @@ export const CenterSetupResult = z.discriminatedUnion("ok", [
   }),
   z.object({
     ok: z.literal(false),
-    reason: z.enum(["not_staff", "incomplete", "invalid_fee", "clash"]),
+    reason: z.enum(["not_staff", "incomplete", "invalid_fee", "clash", "access_policy"]),
     failed: z.array(z.string()), // checklist keys / fee course ids / clash messages
   }),
 ]);

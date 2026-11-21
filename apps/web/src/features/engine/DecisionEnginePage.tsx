@@ -14,6 +14,8 @@ import { useSession } from "../../app/session";
 import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDateTime } from "../../lib/centerTime";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { AccessBanner } from "../access/AccessBanner";
+import { useMyAccess } from "../access/useMyAccess";
 
 const TABS = ["Rules", "Events", "Action Log", "Job Status"] as const;
 type Tab = (typeof TABS)[number];
@@ -55,6 +57,7 @@ export function DecisionEnginePage() {
         The engine only logs, notifies teachers / staff in the app, and lists learners in “Learners
         needing support”. It never assigns work, changes scores or moves lessons — people decide.
       </p>
+      <AccessBanner />
       <div
         role="tablist"
         aria-label="Decision Engine"
@@ -84,6 +87,9 @@ export function DecisionEnginePage() {
 }
 
 function RulesTab({ viewer, rules }: { viewer: string; rules: Rule[] }) {
+  const me = useMyAccess();
+  const canManage = me.data?.allowed["engine:manage"] ?? true;
+  const actionsLocked = !!me.data?.readonly["engine:manage"]?.includes("actions");
   const cats = [...new Set(rules.map((r) => r.category))];
   return (
     <div className="space-y-6">
@@ -96,7 +102,13 @@ function RulesTab({ viewer, rules }: { viewer: string; rules: Rule[] }) {
           {rules
             .filter((r) => r.category === c)
             .map((r) => (
-              <RuleCard key={r.id} viewer={viewer} rule={r} />
+              <RuleCard
+                key={r.id}
+                viewer={viewer}
+                rule={r}
+                canManage={canManage}
+                actionsLocked={actionsLocked}
+              />
             ))}
         </section>
       ))}
@@ -104,7 +116,17 @@ function RulesTab({ viewer, rules }: { viewer: string; rules: Rule[] }) {
   );
 }
 
-function RuleCard({ viewer, rule }: { viewer: string; rule: Rule }) {
+function RuleCard({
+  viewer,
+  rule,
+  canManage,
+  actionsLocked,
+}: {
+  viewer: string;
+  rule: Rule;
+  canManage: boolean;
+  actionsLocked: boolean;
+}) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<Required<RuleUpdate>>({
     enabled: rule.enabled,
@@ -144,6 +166,7 @@ function RuleCard({ viewer, rule }: { viewer: string; rule: Rule }) {
         </p>
         <Button
           variant="ghost"
+          disabled={!canManage}
           onClick={() => save.mutate({ enabled: !rule.enabled })}
           aria-label={`${rule.enabled ? "Pause" : "Enable"} ${rule.name}`}
         >
@@ -203,6 +226,7 @@ function RuleCard({ viewer, rule }: { viewer: string; rule: Rule }) {
           <label key={a} className="flex items-center gap-1">
             <input
               type="checkbox"
+              disabled={!canManage || actionsLocked}
               checked={draft.actions.includes(a)}
               onChange={() =>
                 setDraft((d) => ({
@@ -217,7 +241,10 @@ function RuleCard({ viewer, rule }: { viewer: string; rule: Rule }) {
           </label>
         ))}
       </div>
-      {dirty ? (
+      {actionsLocked ? (
+        <p className="text-xs text-muted">Actions are read-only under your access policy.</p>
+      ) : null}
+      {dirty && canManage ? (
         <Button
           onClick={() =>
             save.mutate({
@@ -233,7 +260,11 @@ function RuleCard({ viewer, rule }: { viewer: string; rule: Rule }) {
       ) : null}
       {save.data && !save.data.ok ? (
         <p role="alert" className="text-sm text-danger">
-          Not saved: {save.data.detail ?? save.data.reason}
+          Not saved:{" "}
+          {save.data.detail ??
+            (save.data.reason === "access_policy"
+              ? "your access policy does not allow this"
+              : save.data.reason)}
         </p>
       ) : null}
     </Card>

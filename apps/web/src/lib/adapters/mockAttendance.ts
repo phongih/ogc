@@ -12,6 +12,7 @@ import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { ABSENCE_STREAK_THRESHOLD, seedSessions } from "../../fixtures/attendance";
 import { sessionStore, type StoredSession } from "./sessionStore";
 import { withFault } from "./faults";
+import { allows } from "./accessPolicy";
 
 /*
  * P2 · Session attendance — MOCK adapter. NON-PRODUCTION, synthetic, in browser memory
@@ -47,11 +48,18 @@ function ownsClass(viewerPersonaId: string, classId: string): boolean {
 }
 
 // The owner of the class, or this session's substitute — same tenant either way.
+// An access policy can narrow this further (e.g. own classes only, not as a substitute).
 function canMarkSession(viewerPersonaId: string, s: StoredSession): boolean {
-  if (ownsClass(viewerPersonaId, s.classId)) return true;
+  if (ownsClass(viewerPersonaId, s.classId))
+    return allows(viewerPersonaId, "attendance:mark", { sessionRole: "owner" });
   const viewer = personaMap[viewerPersonaId];
   const cls = classes.find((c) => c.id === s.classId);
-  return !!viewer?.teacherId && s.substituteId === viewer.teacherId && cls?.orgId === viewer.orgId;
+  return (
+    !!viewer?.teacherId &&
+    s.substituteId === viewer.teacherId &&
+    cls?.orgId === viewer.orgId &&
+    allows(viewerPersonaId, "attendance:mark", { sessionRole: "substitute" })
+  );
 }
 
 export const isMarked = (sessionId: string) => marks.has(sessionId);

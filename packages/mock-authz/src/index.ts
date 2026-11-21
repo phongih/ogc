@@ -12,12 +12,13 @@
 
 export const NON_PRODUCTION = true as const;
 
-export type MockRole = "staff" | "teacher" | "guardian" | "learner";
+export type MockRole = "admin" | "staff" | "teacher" | "guardian" | "learner";
 
 /** UI navigation sections (not permissions). */
 export type Section =
   | "directory"
   | "operations"
+  | "access"
   | "learning"
   | "teaching"
   | "catalog"
@@ -44,6 +45,17 @@ export function createMockSession(persona: MockPersona): MockSession {
 }
 
 const SECTIONS_BY_ROLE: Record<MockRole, Section[]> = {
+  // Org Admin: everything staff sees, plus access policies (never their own — see the adapter).
+  admin: [
+    "directory",
+    "operations",
+    "access",
+    "catalog",
+    "tutor",
+    "teaching",
+    "learning",
+    "guardian",
+  ],
   staff: ["directory", "operations", "catalog", "tutor", "teaching", "learning", "guardian"],
   teacher: ["teaching", "catalog", "tutor"],
   guardian: ["guardian", "catalog", "tutor"],

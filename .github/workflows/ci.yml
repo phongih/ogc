@@ -45,3 +45,4 @@ jobs:
           node e2e/center-setup-journey.mjs || echo "center-setup journey E2E skipped/soft-failed (non-blocking)"
           node e2e/persistence-journey.mjs || echo "persistence journey E2E skipped/soft-failed (non-blocking)"
           node e2e/engine-journey.mjs || echo "decision-engine journey E2E skipped/soft-failed (non-blocking)"
+          node e2e/access-journey.mjs || echo "access-policy journey E2E skipped/soft-failed (non-blocking)"

@@ -94,3 +94,8 @@ export const centerSetup: CenterSetupPort = mockCenterSetup;
 import type { DecisionEnginePort } from "@ogc/contracts";
 import { mockDecisionEngine } from "../adapters/mockDecisionEngine";
 export const decisionEngine: DecisionEnginePort = mockDecisionEngine;
+
+// Access policy (Org Admin) — narrows a membership's role; never grants. Mock, synthetic.
+import type { AccessPolicyPort } from "@ogc/contracts";
+import { mockAccessPolicy } from "../adapters/accessPolicy";
+export const accessPolicy: AccessPolicyPort = mockAccessPolicy;

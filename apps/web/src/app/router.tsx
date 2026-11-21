@@ -9,6 +9,7 @@ import { OrgDetail } from "../features/org/OrgDetail";
 import { CenterDetail } from "../features/org/CenterDetail";
 import { OperationsHome } from "../features/operations/OperationsHome";
 import { CenterSetupWizard } from "../features/operations/CenterSetupWizard";
+import { AccessHome } from "../features/access/AccessHome";
 import { DecisionEnginePage } from "../features/engine/DecisionEnginePage";
 import { LearnerHome } from "../features/learner/LearnerHome";
 import { TeacherHome } from "../features/teacher/TeacherHome";
@@ -36,6 +37,7 @@ export const routes = [
       { path: "centers/:centerId", element: <RequireSection section="directory"><CenterDetail /></RequireSection> },
       { path: "operations/engine", element: <RequireSection section="operations"><DecisionEnginePage /></RequireSection> },
       { path: "operations/centers/new", element: <RequireSection section="operations"><CenterSetupWizard /></RequireSection> },
+      { path: "access", element: <RequireSection section="access"><AccessHome /></RequireSection> },
       { path: "operations", element: <RequireSection section="operations"><OperationsHome /></RequireSection> },
       { path: "learning", element: <RequireSection section="learning"><LearnerHome /></RequireSection> },
       { path: "learning/courses/:courseId", element: <RequireSection section="learning"><CourseLearning /></RequireSection> },

@@ -7,6 +7,7 @@ import { IIOS_SCENARIOS, useIiosScenario, type IiosScenario } from "../../app/ii
 // Synthetic demo personas. No passwords, no real identities (NON-PRODUCTION).
 const ORG = "00000000-0000-4000-8000-000000000001";
 const personas: MockPersona[] = [
+  { personaId: "demo-admin", displayName: "Olivia (Org Admin)", role: "admin", orgId: ORG },
   { personaId: "demo-staff", displayName: "Sam (Org Staff)", role: "staff", orgId: ORG },
   { personaId: "demo-teacher", displayName: "Tara (Teacher)", role: "teacher", orgId: ORG },
   { personaId: "demo-teacher-2", displayName: "Ben (Teacher)", role: "teacher", orgId: ORG },
@@ -20,7 +21,10 @@ export function MockLogin() {
   const navigate = useNavigate();
   return (
     <main id="main" className="mx-auto max-w-md px-4 py-16">
-      <PageHeader title="Choose a demo persona" subtitle="Mock sign-in — no credentials, synthetic data only." />
+      <PageHeader
+        title="Choose a demo persona"
+        subtitle="Mock sign-in — no credentials, synthetic data only."
+      />
       <Card>
         <ul className="space-y-2">
           {personas.map((p) => (
@@ -43,7 +47,9 @@ export function MockLogin() {
       <details className="mt-4 text-sm">
         <summary className="cursor-pointer text-muted">Simulate the IIOS access decision</summary>
         <label className="mt-2 block">
-          <span className="text-xs text-muted">Decision IIOS returns for this session (synthetic)</span>
+          <span className="text-xs text-muted">
+            Decision IIOS returns for this session (synthetic)
+          </span>
           <select
             className="mt-1 block w-full rounded-ogc border border-border bg-surface px-2 py-1.5"
             value={scenario}
