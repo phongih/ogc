@@ -21,7 +21,11 @@ describe("mock LI adapters — placement + profile seeding (A1)", () => {
     expect(prof!.learnerId).toBe(LEARNER_LINH);
     expect(prof!.cefrBand).toBe("A2");
     expect(prof!.skills.reading).toEqual({ level: 70, evidenceCount: 0, lastUpdatedAt: null });
-    expect(prof!.skills.use_of_english).toEqual({ level: 65, evidenceCount: 0, lastUpdatedAt: null });
+    expect(prof!.skills.use_of_english).toEqual({
+      level: 65,
+      evidenceCount: 0,
+      lastUpdatedAt: null,
+    });
     expect(prof!.skills.speaking).toEqual({ level: 55, evidenceCount: 0, lastUpdatedAt: null });
   });
 });

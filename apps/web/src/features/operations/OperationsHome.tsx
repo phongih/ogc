@@ -14,6 +14,7 @@ import { refreshLearningState } from "../../lib/invalidate";
 import { centerLocalToIso, formatCenterDateTime, isoToCenterLocal } from "../../lib/centerTime";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { MakeupBoard } from "./MakeupBoard";
+import { EngineNotifications } from "../engine/EngineNotifications";
 
 const REFUSAL: Record<string, string> = {
   not_found: "That class or session is not in your center.",
@@ -61,7 +62,14 @@ export function OperationsHome() {
         className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
       >
         + Set up a new center
+      </Link>{" "}
+      <Link
+        to="/app/operations/engine"
+        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+      >
+        Decision Engine
       </Link>
+      <EngineNotifications />
       <MakeupBoard viewer={viewer} teachers={q.data.teachers} />
       {centersOf(q.data.classes).map((center) => (
         <section key={center.id} aria-label={center.name} className="space-y-4">

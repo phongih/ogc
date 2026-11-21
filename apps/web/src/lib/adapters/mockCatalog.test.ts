@@ -5,7 +5,15 @@ import { courses } from "../../fixtures/catalog";
 
 const ORG = organizations[0].id;
 const ORG2 = organizations[1].id;
-const PUBLIC_KEYS = ["id", "code", "title", "level", "format", "durationWeeks", "objectives"].sort();
+const PUBLIC_KEYS = [
+  "id",
+  "code",
+  "title",
+  "level",
+  "format",
+  "durationWeeks",
+  "objectives",
+].sort();
 
 describe("mockCatalog — public view model + pagination", () => {
   it("lists org-scoped public courses (no internal fields leak)", async () => {
@@ -21,8 +29,16 @@ describe("mockCatalog — public view model + pagination", () => {
   });
 
   it("filters by level, format and query", async () => {
-    expect((await mockCatalog.listCourses(ORG, { level: "B1" }, { limit: 50 })).items.every((c) => c.level === "B1")).toBe(true);
-    expect((await mockCatalog.listCourses(ORG, { format: "online" }, { limit: 50 })).items.every((c) => c.format === "online")).toBe(true);
+    expect(
+      (await mockCatalog.listCourses(ORG, { level: "B1" }, { limit: 50 })).items.every(
+        (c) => c.level === "B1",
+      ),
+    ).toBe(true);
+    expect(
+      (await mockCatalog.listCourses(ORG, { format: "online" }, { limit: 50 })).items.every(
+        (c) => c.format === "online",
+      ),
+    ).toBe(true);
     const q = await mockCatalog.listCourses(ORG, { q: "ielts" }, { limit: 50 });
     expect(q.items.length).toBe(1);
     expect(q.items[0].code).toBe("IELTS-B2");
@@ -37,7 +53,9 @@ describe("mockCatalog — public view model + pagination", () => {
   });
 
   it("rejects a malformed cursor", async () => {
-    await expect(mockCatalog.listCourses(ORG, undefined, { cursor: "!!!notbase64!!!", limit: 1 })).rejects.toThrow();
+    await expect(
+      mockCatalog.listCourses(ORG, undefined, { cursor: "!!!notbase64!!!", limit: 1 }),
+    ).rejects.toThrow();
   });
 
   it("returns an org-scoped course or null (cross-org id not resolvable)", async () => {

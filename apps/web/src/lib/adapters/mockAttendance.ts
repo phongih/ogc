@@ -155,9 +155,13 @@ function trailingAbsences(h: readonly AttendanceMark[]): number {
  * attendance-v1 for the support queue: the learner's longest current absence streak across the
  * given classes, if it reaches the threshold; otherwise null. Callers enforce authorization.
  */
-export function absenceStreakFor(learnerId: string, classIds: readonly string[]): number | null {
+export function absenceStreakFor(
+  learnerId: string,
+  classIds: readonly string[],
+  threshold: number = ABSENCE_STREAK_THRESHOLD, // Decision Engine rule "absent N in a row"
+): number | null {
   const streak = Math.max(0, ...classIds.map((c) => trailingAbsences(historyFor(c, learnerId))));
-  return streak >= ABSENCE_STREAK_THRESHOLD ? streak : null;
+  return streak >= threshold ? streak : null;
 }
 
 export const mockAttendance: AttendancePort = {

@@ -70,9 +70,12 @@ export const mockCatalog: CatalogPort = {
 
     let rows = courses
       .filter((c) => c.orgId === orgId && matches(c, filter)) // org-scoped
-      .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      .sort((a, b) =>
+        a.code < b.code ? -1 : a.code > b.code ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+      );
 
-    if (after) rows = rows.filter((c) => c.code > after.code || (c.code === after.code && c.id > after.id));
+    if (after)
+      rows = rows.filter((c) => c.code > after.code || (c.code === after.code && c.id > after.id));
 
     const slice = rows.slice(0, limit);
     const nextCursor = rows.length > limit ? encodeCursor(slice[slice.length - 1]) : null;

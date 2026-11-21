@@ -31,6 +31,7 @@ export const SupportSignal = z.object({
   delta: z.number().optional(), // negative for a drop
   evidenceCount: z.number().int().nonnegative().optional(),
   sessions: z.number().int().positive().optional(), // "absences": consecutive absent sessions
+  threshold: z.number().optional(), // "low_skill": the rule's threshold (Decision Engine)
 });
 export type SupportSignal = z.infer<typeof SupportSignal>;
 

@@ -13,6 +13,7 @@ import { __resetAttendanceForTests, mockAttendance } from "./mockAttendance";
 import { mockCenterSetup } from "./mockCenterSetup";
 import { mockMakeup } from "./mockMakeup";
 import { mockSchedule } from "./mockSchedule";
+import "./mockDecisionEngine"; // registers "engine" + "engineRules"
 import { mockPractice } from "./mockPractice";
 import { enrollmentStore, learningStore } from "./store";
 import { sessionStore } from "./sessionStore";
@@ -33,6 +34,8 @@ describe("demo persistence", () => {
     expect(registeredKeys().sort()).toEqual([
       "attendance",
       "centerSetup",
+      "engine",
+      "engineRules",
       "intelligence",
       "learning",
       "schedule",

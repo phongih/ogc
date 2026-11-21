@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  mockJustifiedRecommendation,
-  mockMasteryConfidence,
-  mockProfile,
-} from "./mockProfile";
+import { mockJustifiedRecommendation, mockMasteryConfidence, mockProfile } from "./mockProfile";
 import { learningStore } from "./store";
 import { organizations } from "../../fixtures/directory";
 import { LEARNER_ORG2 } from "../../fixtures/personas";
@@ -53,7 +49,9 @@ describe("LI-2 adapter — justification reflects evidence strength (B7 end-to-e
     const c = conf!.skills[recSkill];
     const evidenceBased = c.evidenceCount > 0 && c.band !== "low";
     expect(j.justified).toBe(evidenceBased);
-    expect(j.reasonCode).toBe(evidenceBased ? "evidence_based_weakest" : "exploratory_low_confidence");
+    expect(j.reasonCode).toBe(
+      evidenceBased ? "evidence_based_weakest" : "exploratory_low_confidence",
+    );
   });
 });
 

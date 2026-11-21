@@ -40,7 +40,8 @@ export const mockTutor: TutorPort = {
   listConversations: (personaId) => latency(tutorStore.list(personaId)),
 
   // Fail-closed: returns null for any conversation the persona does not own.
-  getConversation: (personaId, conversationId) => latency(tutorStore.get(personaId, conversationId)),
+  getConversation: (personaId, conversationId) =>
+    latency(tutorStore.get(personaId, conversationId)),
 
   createConversation: (personaId, title, lessonContext?: LessonContext | null) => {
     const orgId = personaMap[personaId]?.orgId ?? "";

@@ -7,7 +7,9 @@ const LUMEN = organizations[1].id; // known → slug "lumen-edu"
 const UNKNOWN = "00000000-0000-4000-8000-0000000unkn0";
 
 function mockFetch(status: number, body: unknown) {
-  const spy = vi.fn(async (..._args: unknown[]) => ({ status, json: async () => body }) as unknown as Response);
+  const spy = vi.fn(
+    async (..._args: unknown[]) => ({ status, json: async () => body }) as unknown as Response,
+  );
   globalThis.fetch = spy as unknown as typeof fetch;
   return spy;
 }

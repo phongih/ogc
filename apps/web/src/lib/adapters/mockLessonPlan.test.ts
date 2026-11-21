@@ -35,7 +35,13 @@ describe("mock lesson plan", () => {
     const classId = classes[0].id;
     const result = await mockLessonPlan.save(
       TEACHER,
-      baseDraft(classId, { status: "ready", title: "", objectives: [], activities: [], assessment: "" }),
+      baseDraft(classId, {
+        status: "ready",
+        title: "",
+        objectives: [],
+        activities: [],
+        assessment: "",
+      }),
     );
     expect(result.saved).toBe(false);
     expect(result.errors.length).toBe(4); // title, objective, activity, assessment
@@ -50,7 +56,10 @@ describe("mock lesson plan", () => {
 
   // NEGATIVE: a teacher cannot edit plans for a class they do not own.
   it("denies editing a class not assigned to the teacher", async () => {
-    const result = await mockLessonPlan.save(TEACHER, baseDraft("00000000-0000-4000-8000-0000000000zz"));
+    const result = await mockLessonPlan.save(
+      TEACHER,
+      baseDraft("00000000-0000-4000-8000-0000000000zz"),
+    );
     expect(result.saved).toBe(false);
     expect(result.errors[0]).toMatch(/not authorized/i);
   });

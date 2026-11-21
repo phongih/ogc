@@ -36,7 +36,7 @@ export function signalText(s: SupportSignal): string {
   const skill = s.skill ? skillLabel(s.skill) : "";
   if (s.kind === "skill_drop")
     return `${skill} dropped ${Math.abs(s.delta ?? 0)} to ${s.level} after the latest practice`;
-  if (s.kind === "low_skill") return `${skill} is ${s.level} (below 60)`;
+  if (s.kind === "low_skill") return `${skill} is ${s.level} (below ${s.threshold ?? 60})`;
   if (s.kind === "absences") return `Absent from the last ${s.sessions ?? 0} sessions`;
   return "Speaking rehearsal was returned for another try";
 }
