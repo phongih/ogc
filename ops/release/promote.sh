@@ -26,6 +26,9 @@ cur="$root/current"
 # Record the rollback target (whatever is live now), if any. Release dirs are never deleted.
 if [[ -L "$cur" ]]; then
   prev_sha="$(basename "$(readlink "$cur")")"
+  # Re-promoting the sha that is already live would overwrite .previous with itself and lose the
+  # real rollback target (seen 21/11 when an old deploy block was re-run). Refuse, touch nothing.
+  [[ "$prev_sha" != "$sha" ]] || die "already live: $sha — nothing promoted, .previous kept ($(cat "$root/.previous" 2>/dev/null || echo none))"
   printf '%s\n' "$prev_sha" > "$root/.previous"
   log "recorded rollback target: $prev_sha"
 fi

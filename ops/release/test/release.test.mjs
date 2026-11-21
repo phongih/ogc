@@ -293,6 +293,17 @@ check("promote + rollback rehearsal: atomic swap, previous preserved, before/aft
   if (!existsSync(join(root, "releases", B, "index.html"))) throw new Error("B release was not preserved");
 });
 
+check("promote: refuses the sha that is already live and keeps the rollback target", () => {
+  const root = tmp();
+  fakeRelease(root, A);
+  fakeRelease(root, B);
+  expectOk(run("promote.sh", [root, A]), "promote A");
+  expectOk(run("promote.sh", [root, B]), "promote B");
+  expectFail(run("promote.sh", [root, B]), "re-promote B (already live)");
+  if (readFileSync(join(root, ".previous"), "utf8").trim() !== A) throw new Error(".previous lost A");
+  if (currentIndex(root) !== `rel ${B}`) throw new Error("current moved");
+});
+
 check("promote: rejects a missing release dir and an unsafe root", () => {
   const root = tmp();
   mkdirSync(root, { recursive: true });
