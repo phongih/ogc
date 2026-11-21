@@ -42,15 +42,28 @@ The toolkit **refuses** the live root `/var/www/ogc` unless `OGC_LIVE=1` is set 
 operator on the VM. A live promotion is an explicit, owner-approved step — Claude never
 runs `promote.sh`/`rollback.sh` against the real VM (AUTH-017). The hardened live flow
 replaces the earlier ad-hoc `git reset --hard` + manual `cp`/`ln`:
+Layout on `eduos@ogc`:
+- `/opt/ogc/src` — git object source only. `git fetch` it; never check out or build in it
+  (its working tree may sit on an old commit — that is fine, `git archive` reads by SHA).
+- `~/ogc-stage/work/<sha>` — SHA-pinned snapshot + build (`.release-sha` inside).
+- `~/ogc-stage/manifests/<sha>.json` — the manifest of every release that went live.
+- `/var/www/ogc/releases/<sha>` + `current` / `.previous` — the live root.
+
 ```bash
-# on eduos@ogc, after owner approval, for a CI-passed SHA:
-ops/release/build-manifest.sh  /opt/ogc/src /opt/ogc/manifests/$SHA.json      # OGC_SHA=$SHA
-ops/release/verify-artifact.sh /opt/ogc/src/apps/web/dist /opt/ogc/manifests/$SHA.json
-sudo mkdir -p /var/www/ogc/releases/$SHA && sudo cp -a /opt/ogc/src/apps/web/dist/. /var/www/ogc/releases/$SHA/
-sudo OGC_LIVE=1 ops/release/promote.sh /var/www/ogc $SHA && sudo systemctl reload nginx
-ops/release/verify-https.sh https://ogc.eduos.vn "assets/"                    # cert-validating
-# rollback if needed: sudo OGC_LIVE=1 ops/release/rollback.sh /var/www/ogc && sudo systemctl reload nginx
+# on eduos@ogc, after owner approval, for a CI-passed SHA on main:
+SHA=<40-hex> ; W=~/ogc-stage/work/$SHA ; M=~/ogc-stage/manifests/$SHA.json
+git -C /opt/ogc/src fetch origin main
+/opt/ogc/src/ops/release/release-checkout.sh /opt/ogc/src "$SHA" "$W"
+"$W"/ops/release/build-manifest.sh  "$W" "$M"
+"$W"/ops/release/verify-artifact.sh "$W/apps/web/dist" "$M"
+node "$W"/ops/release/smoke-routes.mjs "$W/apps/web/dist"                    # self-skips without Playwright
+sudo mkdir -p /var/www/ogc/releases/$SHA && sudo cp -a "$W/apps/web/dist/." /var/www/ogc/releases/$SHA/
+"$W"/ops/release/verify-artifact.sh /var/www/ogc/releases/$SHA "$M"         # the copy, not just the build
+sudo OGC_LIVE=1 "$W"/ops/release/promote.sh /var/www/ogc $SHA && sudo systemctl reload nginx
+"$W"/ops/release/verify-https.sh https://ogc.eduos.vn "assets/"              # cert-validating
+# rollback if needed: sudo OGC_LIVE=1 "$W"/ops/release/rollback.sh /var/www/ogc && sudo systemctl reload nginx
 ```
+Run every script from the snapshot `"$W"`, so the toolkit version matches the release.
 
 ## Boundaries (AUTH-017)
 Synthetic SPA (mock) only · no backend/DB/real data · no security-gate changes · no
