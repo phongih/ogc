@@ -4,7 +4,8 @@
  * fixtures/attendance; a page reload restores the seed.
  */
 import { seedSessions } from "../../fixtures/attendance";
-import { classTeachers } from "../../fixtures/teaching";
+import { classTeachers, classes, rosters } from "../../fixtures/teaching";
+import { centerDetails, centers } from "../../fixtures/directory";
 
 export interface StoredSession {
   id: string;
@@ -19,6 +20,12 @@ export interface StoredSession {
 }
 
 const SEED_OWNERS = { ...classTeachers };
+// P2 · center setup wizard adds centers / classes in memory; reset removes them again.
+const SEED_CLASS_COUNT = classes.length;
+const SEED_CENTER_COUNT = centers.length;
+const SEED_ROSTER_KEYS = new Set(Object.keys(rosters));
+const SEED_DETAIL_KEYS = new Set(Object.keys(centerDetails));
+const resetHooks: (() => void)[] = [];
 const sessions = new Map<string, StoredSession>();
 // P2 · make-up bookings: make-up item id (`${missedSessionId}::${learnerId}`) → session id.
 const bookings = new Map<string, string>();
@@ -51,6 +58,11 @@ function reset(): void {
     });
   for (const k of Object.keys(classTeachers)) delete classTeachers[k];
   Object.assign(classTeachers, SEED_OWNERS);
+  classes.length = SEED_CLASS_COUNT;
+  centers.length = SEED_CENTER_COUNT;
+  for (const k of Object.keys(rosters)) if (!SEED_ROSTER_KEYS.has(k)) delete rosters[k];
+  for (const k of Object.keys(centerDetails)) if (!SEED_DETAIL_KEYS.has(k)) delete centerDetails[k];
+  for (const h of resetHooks) h();
 }
 reset();
 
@@ -58,6 +70,7 @@ const byTime = (a: StoredSession, b: StoredSession) => Date.parse(a.at) - Date.p
 
 export const sessionStore = {
   reset,
+  onReset: (h: () => void) => void resetHooks.push(h),
   bookings,
   selfStudies,
   get: (id: string) => sessions.get(id),
