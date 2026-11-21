@@ -1,10 +1,6 @@
 import { organizations } from "./directory";
 import { courses } from "./catalog";
-import {
-  LEARNER_LINH,
-  LEARNER_MINH,
-  LEARNER_ORG2,
-} from "./personas";
+import { LEARNER_LINH, LEARNER_MINH, LEARNER_ORG2 } from "./personas";
 
 const ORG = organizations[0].id;
 const ORG2 = organizations[1].id;

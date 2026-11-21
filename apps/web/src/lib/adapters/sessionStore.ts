@@ -12,6 +12,7 @@ export interface StoredSession {
   title: string;
   at: string;
   state: "scheduled" | "cancelled";
+  kind: "regular" | "makeup"; // P2: a make-up session holds booked guests only
   substituteId: string | null;
   replacedBy: string | null;
   replaces: string | null;
@@ -19,10 +20,13 @@ export interface StoredSession {
 
 const SEED_OWNERS = { ...classTeachers };
 const sessions = new Map<string, StoredSession>();
+// P2 · make-up bookings: make-up item id (`${missedSessionId}::${learnerId}`) → session id.
+const bookings = new Map<string, string>();
 let seq = 0;
 
 function reset(): void {
   sessions.clear();
+  bookings.clear();
   seq = 0;
   for (const s of seedSessions)
     sessions.set(s.id, {
@@ -31,6 +35,7 @@ function reset(): void {
       title: s.title,
       at: s.at,
       state: "scheduled",
+      kind: "regular",
       substituteId: null,
       replacedBy: null,
       replaces: null,
@@ -44,17 +49,19 @@ const byTime = (a: StoredSession, b: StoredSession) => Date.parse(a.at) - Date.p
 
 export const sessionStore = {
   reset,
+  bookings,
   get: (id: string) => sessions.get(id),
   all: () => [...sessions.values()].sort(byTime),
   forClass: (classId: string) =>
     [...sessions.values()].filter((s) => s.classId === classId).sort(byTime),
   add(
-    s: Omit<StoredSession, "id" | "state" | "substituteId" | "replacedBy" | "replaces"> &
+    s: Omit<StoredSession, "id" | "state" | "kind" | "substituteId" | "replacedBy" | "replaces"> &
       Partial<StoredSession>,
   ): StoredSession {
     const id = s.id ?? `S-${s.classId.slice(-2)}-${++seq}`;
     const row: StoredSession = {
       state: "scheduled",
+      kind: "regular",
       substituteId: null,
       replacedBy: null,
       replaces: null,

@@ -1,10 +1,6 @@
 import type { PlacementResult } from "@ogc/contracts";
 import { organizations } from "./directory";
-import {
-  LEARNER_LINH,
-  LEARNER_MINH,
-  LEARNER_ORG2,
-} from "./personas";
+import { LEARNER_LINH, LEARNER_MINH, LEARNER_ORG2 } from "./personas";
 import { LEARNER_AN, LEARNER_HUY, LEARNER_THAO } from "./learners";
 
 // Deterministic synthetic placement results (LI-1). NON-PRODUCTION — these stand in for

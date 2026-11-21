@@ -87,7 +87,7 @@ export function SessionAttendancePage() {
     <section className="space-y-6">
       <PageHeader
         title={`Attendance · ${s.title}`}
-        subtitle={`${className} · ${formatCenterDateTime(s.at)}`}
+        subtitle={`${s.kind === "makeup" ? "Make-up session · " : ""}${className} · ${formatCenterDateTime(s.at)}`}
       />
       {upcoming ? (
         <Card>
@@ -130,7 +130,14 @@ export function SessionAttendancePage() {
                   key={r.learnerId}
                   className="flex flex-wrap items-center justify-between gap-2 py-2"
                 >
-                  <span>{r.displayName}</span>
+                  <span>
+                    {r.displayName}
+                    {r.makeupFor ? (
+                      <span className="ml-2 rounded-full border border-brand px-2 py-0.5 text-xs text-brand">
+                        Make-up · from {r.makeupFor}
+                      </span>
+                    ) : null}
+                  </span>
                   <fieldset className="flex gap-3" aria-label={`Attendance for ${r.displayName}`}>
                     {MARKS.map((m) => (
                       <label key={m.value} className="flex items-center gap-1 text-sm">

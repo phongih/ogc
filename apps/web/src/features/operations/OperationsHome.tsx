@@ -12,6 +12,7 @@ import { useSession } from "../../app/session";
 import { refreshLearningState } from "../../lib/invalidate";
 import { centerLocalToIso, formatCenterDateTime, isoToCenterLocal } from "../../lib/centerTime";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
+import { MakeupBoard } from "./MakeupBoard";
 
 const REFUSAL: Record<string, string> = {
   not_found: "That class or session is not in your center.",
@@ -53,6 +54,7 @@ export function OperationsHome() {
         title="Center operations"
         subtitle="Schedule and teacher assignment · center time · synthetic demo"
       />
+      <MakeupBoard viewer={viewer} teachers={q.data.teachers} />
       {q.data.classes.map((c) => (
         <ClassCard key={c.classId} viewer={viewer} cls={c} teachers={q.data!.teachers} />
       ))}
@@ -174,7 +176,9 @@ function SessionRow({
           ? "Started · not marked yet"
           : s.replaces
             ? "Upcoming · replacement"
-            : "Upcoming";
+            : s.kind === "makeup"
+              ? "Upcoming · make-up session"
+              : "Upcoming";
 
   const open = (m: "move" | "cancel") => {
     setMode(m);
@@ -185,6 +189,7 @@ function SessionRow({
     <li className="space-y-2 py-2" data-session={s.id}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className={s.state === "cancelled" ? "text-muted line-through" : ""}>
+          {s.kind === "makeup" ? "Make-up · " : ""}
           {s.title} <span className="text-sm text-muted">· {formatCenterDateTime(s.at)}</span>
         </span>
         <span className="text-xs text-muted">{status}</span>

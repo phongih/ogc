@@ -85,3 +85,6 @@ export const attendance: AttendancePort = mockAttendance;
 import type { SchedulePort } from "@ogc/contracts";
 import { mockSchedule } from "../adapters/mockSchedule";
 export const schedule: SchedulePort = mockSchedule;
+import type { MakeupPort } from "@ogc/contracts";
+import { mockMakeup } from "../adapters/mockMakeup";
+export const makeup: MakeupPort = mockMakeup;

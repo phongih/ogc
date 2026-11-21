@@ -52,6 +52,27 @@ describe("Center operations", () => {
     );
   });
 
+  it("make-up board: every absence listed; staff book An into A2 Evening's Unit 5", async () => {
+    const user = userEvent.setup();
+    renderApp("/app/operations", "staff");
+    const board = await screen.findByRole("region", { name: "Make-up lessons" });
+    expect(await within(board).findByTestId("makeup-counts")).toHaveTextContent(
+      "0 overdue · 3 to arrange · 0 booked · 0 made up",
+    );
+    await user.click(
+      within(board).getByRole("button", { name: "Find a session · An P. · A2 — Unit 5" }),
+    );
+    const pick = await within(board).findByLabelText("Make-up session for An P. · A2 — Unit 5");
+    await user.selectOptions(pick, within(pick as HTMLElement).getAllByRole("option")[1]);
+    await user.click(within(board).getByRole("button", { name: "Book" }));
+    await waitFor(() =>
+      expect(within(board).getByTestId("makeup-counts")).toHaveTextContent(
+        "2 to arrange · 1 booked",
+      ),
+    );
+    expect(within(board).getByText(/joins A2 Evening — Tue\/Thu/)).toBeInTheDocument();
+  });
+
   it("is closed to teachers", async () => {
     renderApp("/app/operations", "teacher");
     expect(await screen.findByText(/hidden for the current demo persona/)).toBeInTheDocument();

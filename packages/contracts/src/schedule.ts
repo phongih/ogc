@@ -24,6 +24,7 @@ export const ScheduledSession = z.object({
   title: z.string().min(1),
   at: z.string(), // ISO instant
   state: ScheduledSessionState,
+  kind: z.enum(["regular", "makeup"]), // P2: a make-up session (booked guests only)
   started: z.boolean(),
   marked: z.boolean(),
   substitute: TeacherRef.nullable(), // teaches (and marks) this one session instead of the owner
