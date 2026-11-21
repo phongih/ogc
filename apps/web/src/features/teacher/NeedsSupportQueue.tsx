@@ -72,7 +72,11 @@ function SupportCard({ viewer, item }: { viewer: string; item: SupportItem }) {
   const [open, setOpen] = useState(false);
   // Built when the form OPENS (not on mount): the item may refresh after a cached first paint.
   const defaultNote = () =>
-    item.focusSkill ? `Targeted practice for ${skillLabel(item.focusSkill)}` : "Targeted practice";
+    item.suggestionUnlocksTitle
+      ? `Unlocks “${item.suggestionUnlocksTitle}”`
+      : item.focusSkill
+        ? `Targeted practice for ${skillLabel(item.focusSkill)}`
+        : "Targeted practice";
   const [note, setNote] = useState("");
   const assign = useMutation({
     mutationFn: () =>
@@ -116,9 +120,16 @@ function SupportCard({ viewer, item }: { viewer: string; item: SupportItem }) {
         ) : item.suggestedActivityId ? (
           !open ? (
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm">
-                <span className="text-muted">Suggested:</span> {item.suggestedTitle}
-              </span>
+              {item.suggestionUnlocksTitle ? (
+                <span className="text-sm" data-testid={`unlock-${item.learnerId}`}>
+                  {item.focusSkill ? skillLabel(item.focusSkill) : "This skill"} is locked behind “
+                  {item.suggestedTitle}” — assign that first
+                </span>
+              ) : (
+                <span className="text-sm">
+                  <span className="text-muted">Suggested:</span> {item.suggestedTitle}
+                </span>
+              )}
               <Button
                 variant="ghost"
                 onClick={() => {

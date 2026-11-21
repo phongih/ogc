@@ -17,6 +17,13 @@ describe("needs-support queue", () => {
       { kind: "low_skill", source: "placement", skill: "speaking", level: 55, evidenceCount: 0 },
     ]);
     expect(linh.className).toBe("A2 Morning — Mon/Wed");
+    // Speaking's own activity is locked → suggest the nearest open prerequisite that unlocks it.
+    expect(linh.suggestedActivityId).toBe("ACT-A2-3");
+    expect(linh.suggestionUnlocksTitle).toBe("Speaking: Describe your weekend");
+    // An: no reading activity open or locked → nothing to suggest (honest "no open activity").
+    const an = q.find((i) => i.learnerName === "An P.")!;
+    expect(an.suggestedActivityId).toBeNull();
+    expect(an.suggestionUnlocksTitle).toBeNull();
   });
 
   it("is scoped to the owning teacher (others see nothing)", async () => {
@@ -54,6 +61,7 @@ describe("needs-support queue", () => {
     const linh = (await mockSupport.listNeedsSupport(T)).find((i) => i.learnerId === LEARNER_LINH)!;
     expect(linh.suggestedActivityId).toBe("ACT-B1-2");
     expect(linh.suggestedTitle).toBe("Quiz: Opinion phrases");
+    expect(linh.suggestionUnlocksTitle).toBeNull(); // a direct suggestion on the focus skill
     const res = await mockAppliedRecommendation.applyRecommendation(T, LEARNER_LINH, {
       selectedActivityId: linh.suggestedActivityId!,
       reasonCode: "remediation",
