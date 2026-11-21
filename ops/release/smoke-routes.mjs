@@ -15,7 +15,15 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
 const require = createRequire("/opt/npm-tools/node_modules/");
-const { chromium } = require("playwright");
+// Playwright is a pre-installed global, not a project dep. Where it is absent (e.g. the live VM),
+// SKIP cleanly and non-blocking — as README documents — instead of crashing with MODULE_NOT_FOUND.
+let chromium;
+try {
+  ({ chromium } = require("playwright"));
+} catch {
+  console.log("SKIP  smoke-routes: Playwright not installed (/opt/npm-tools) — non-blocking; check the routes in a browser");
+  process.exit(0);
+}
 
 const DEFAULT_DIST = fileURLToPath(new URL("../../apps/web/dist/", import.meta.url));
 const DIST = process.argv[2] ? resolve(process.argv[2]) + "/" : DEFAULT_DIST;
