@@ -1,5 +1,7 @@
+import { refill, registerPersistent } from "./persist";
 /*
- * NON-PRODUCTION in-memory development store. No DB, no persistence, no network.
+ * NON-PRODUCTION in-memory development store. No DB, no network. (Since 21/11 the demo state is
+ * also saved to this browser's localStorage — see persist.ts.)
  * All state is synthetic and scoped by personaId / orgId. Reset on reload.
  */
 import type {
@@ -40,7 +42,12 @@ function enrollMapFor(personaId: string): Map<string, EnrollmentRecord> {
     // Seed the demo learner's existing enrollments once.
     if (personaMap[personaId]?.learnerId === LEARNER_LINH) {
       for (const e of learnerEnrollments) {
-        m.set(e.course.id, { personaId, courseId: e.course.id, state: e.state, progressPct: e.progressPct });
+        m.set(e.course.id, {
+          personaId,
+          courseId: e.course.id,
+          state: e.state,
+          progressPct: e.progressPct,
+        });
       }
     }
   }
@@ -280,7 +287,9 @@ export const learningStore = {
       // Idempotent replay of the SAME attempt → return the prior result, do not re-count.
       if (existing.id === submission.attemptId) {
         const prior = practiceResults.get(practiceKey(learnerId, activityId));
-        return prior ? { ok: true, result: prior, idempotentReplay: true } : { ok: false, reason: "already_completed" };
+        return prior
+          ? { ok: true, result: prior, idempotentReplay: true }
+          : { ok: false, reason: "already_completed" };
       }
       // A different attempt against an already-completed activity is rejected (no double-count).
       return { ok: false, reason: "already_completed" };
@@ -324,14 +333,21 @@ export const learningStore = {
     personaId: string,
     activityId: string,
     submission: PracticeSubmission,
-  ): { ok: boolean; reason?: string; result?: PracticeResult; review?: SpeakingReview; idempotentReplay?: boolean } => {
+  ): {
+    ok: boolean;
+    reason?: string;
+    result?: PracticeResult;
+    review?: SpeakingReview;
+    idempotentReplay?: boolean;
+  } => {
     const learnerId = personaMap[personaId]?.learnerId;
     if (!learnerId) return { ok: false, reason: "not_a_learner" };
     const activity = activityById(activityId);
     if (!activity) return { ok: false, reason: "unknown_activity" };
     const orgId = personaMap[personaId]?.orgId;
     if (activity.orgId !== orgId || !orgId) return { ok: false, reason: "cross_org_denied" };
-    if (!enrollMapFor(personaId).has(activity.courseId)) return { ok: false, reason: "not_enrolled" };
+    if (!enrollMapFor(personaId).has(activity.courseId))
+      return { ok: false, reason: "not_enrolled" };
     const script = speakingFor(activityId);
     if (!script) return { ok: false, reason: "speaking_not_available" };
     if (!submission.attemptId || submission.attemptId.trim().length === 0)
@@ -341,9 +357,14 @@ export const learningStore = {
     const existing = speakingReviews.get(key);
     if (existing && existing.attemptId === submission.attemptId) {
       const prior = speakingResults.get(key);
-      return prior ? { ok: true, result: prior, review: { ...existing }, idempotentReplay: true } : { ok: false, reason: "replay_unavailable" };
+      return prior
+        ? { ok: true, result: prior, review: { ...existing }, idempotentReplay: true }
+        : { ok: false, reason: "replay_unavailable" };
     }
-    if (existing?.status === "approved" || attemptsFor(learnerId).get(activityId)?.state === "completed")
+    if (
+      existing?.status === "approved" ||
+      attemptsFor(learnerId).get(activityId)?.state === "completed"
+    )
       return { ok: false, reason: "already_completed" };
 
     const result = scorePractice(script, learnerId, submission);
@@ -362,7 +383,10 @@ export const learningStore = {
     return { ok: true, result, review: { ...review } };
   },
 
-  getSpeaking: (learnerId: string, activityId: string): { review: SpeakingReview; result: PracticeResult } | null => {
+  getSpeaking: (
+    learnerId: string,
+    activityId: string,
+  ): { review: SpeakingReview; result: PracticeResult } | null => {
     const key = practiceKey(learnerId, activityId);
     const review = speakingReviews.get(key);
     const result = speakingResults.get(key);
@@ -377,7 +401,10 @@ export const learningStore = {
 
   // Caller (adapter) has already authorized the reviewing teacher. Only a PENDING review can be
   // approved; approval writes the completed attempt + evidence so LI-1 mastery picks it up.
-  approveSpeaking: (learnerId: string, activityId: string): { ok: boolean; reason?: string; review?: SpeakingReview } => {
+  approveSpeaking: (
+    learnerId: string,
+    activityId: string,
+  ): { ok: boolean; reason?: string; review?: SpeakingReview } => {
     const key = practiceKey(learnerId, activityId);
     const review = speakingReviews.get(key);
     const result = speakingResults.get(key);
@@ -388,7 +415,14 @@ export const learningStore = {
 
     const idx = ++attemptSeq;
     const completedAt = new Date(LEARNING_EPOCH + idx * 3600000).toISOString();
-    m.set(activityId, { id: review.attemptId, learnerId, activityId, state: "completed", completedAt, score: result.score });
+    m.set(activityId, {
+      id: review.attemptId,
+      learnerId,
+      activityId,
+      state: "completed",
+      completedAt,
+      score: result.score,
+    });
     const ev = evidenceFor(learnerId);
     const list = ev.get(activityId) ?? [];
     list.push({
@@ -401,12 +435,21 @@ export const learningStore = {
     });
     ev.set(activityId, list);
     practiceResults.set(key, result);
-    const next: SpeakingReview = { ...review, status: "approved", reviewedAt: completedAt, reviewerNote: null };
+    const next: SpeakingReview = {
+      ...review,
+      status: "approved",
+      reviewedAt: completedAt,
+      reviewerNote: null,
+    };
     speakingReviews.set(key, next);
     return { ok: true, review: { ...next } };
   },
 
-  returnSpeaking: (learnerId: string, activityId: string, note: string): { ok: boolean; reason?: string; review?: SpeakingReview } => {
+  returnSpeaking: (
+    learnerId: string,
+    activityId: string,
+    note: string,
+  ): { ok: boolean; reason?: string; review?: SpeakingReview } => {
     const key = practiceKey(learnerId, activityId);
     const review = speakingReviews.get(key);
     if (!review) return { ok: false, reason: "no_rehearsal" };
@@ -433,7 +476,8 @@ function convFor(personaId: string): Conversation[] {
     convByPersona.set(personaId, list);
     // Seed only the primary demo learner with history; other personas start empty (separation).
     if (personaMap[personaId]?.learnerId === LEARNER_LINH) {
-      for (const c of seedConversations) list.push({ ...c, personaId, messages: c.messages.map((m) => ({ ...m })) });
+      for (const c of seedConversations)
+        list.push({ ...c, personaId, messages: c.messages.map((m) => ({ ...m })) });
     }
   }
   return list;
@@ -448,7 +492,12 @@ export const tutorStore = {
   },
   raw: (personaId: string, conversationId: string): Conversation | null =>
     convFor(personaId).find((x) => x.id === conversationId) ?? null,
-  create: (personaId: string, orgId: string, title: string, lessonContext: Conversation["lessonContext"]) => {
+  create: (
+    personaId: string,
+    orgId: string,
+    title: string,
+    lessonContext: Conversation["lessonContext"],
+  ) => {
     const conv: Conversation = {
       id: `CONV-NEW-${++convSeq}`,
       orgId: orgId || ORG,
@@ -476,3 +525,37 @@ export const tutorStore = {
     return true;
   },
 };
+
+registerPersistent("learning", {
+  dump: () => ({
+    enrollments,
+    plans,
+    planSeq,
+    attempts,
+    evidence,
+    attemptSeq,
+    evidenceSeq,
+    practiceResults,
+    speakingReviews,
+    speakingResults,
+    speakingSeq,
+    convByPersona,
+    convSeq,
+  }),
+  load: (raw) => {
+    const d = raw as Record<string, unknown>;
+    refill(enrollments, d.enrollments);
+    refill(plans, d.plans);
+    refill(attempts, d.attempts);
+    refill(evidence, d.evidence);
+    refill(practiceResults, d.practiceResults);
+    refill(speakingReviews, d.speakingReviews);
+    refill(speakingResults, d.speakingResults);
+    refill(convByPersona, d.convByPersona);
+    planSeq = Number(d.planSeq) || 0;
+    attemptSeq = Number(d.attemptSeq) || 0;
+    evidenceSeq = Number(d.evidenceSeq) || 0;
+    speakingSeq = Number(d.speakingSeq) || 0;
+    convSeq = Number(d.convSeq) || 0;
+  },
+});

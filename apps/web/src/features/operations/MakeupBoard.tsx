@@ -150,7 +150,7 @@ function MakeupCard({
                   isoToCenterLocal(new Date(Date.now() + 2 * 86_400_000).toISOString()).slice(
                     0,
                     11,
-                  ) + "17:00",
+                  ) + "14:00", // mid-afternoon: clear of the seeded 09:00 / 18:00 classes
                 );
                 setMode("open");
               }}

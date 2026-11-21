@@ -7,6 +7,32 @@ import { KeyboardHelp } from "../../app/KeyboardHelp";
 import { ThemeToggle } from "../../app/ThemeToggle";
 import { RequireIiosContext } from "../../app/iiosGate";
 import { Button } from "../../ui";
+import { resetDemoAndReload } from "../../lib/adapters/persist";
+
+// Demo data is kept in this browser (persist.ts). Two-step reset, no browser dialog.
+function DemoDataReset() {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming)
+    return (
+      <span>
+        · demo data is saved in this browser ·{" "}
+        <button type="button" className="text-brand underline" onClick={() => setConfirming(true)}>
+          Reset demo data
+        </button>
+      </span>
+    );
+  return (
+    <span role="group" aria-label="Reset demo data">
+      Clear every change and start from the original demo data?{" "}
+      <button type="button" className="text-danger underline" onClick={resetDemoAndReload}>
+        Yes, reset
+      </button>{" "}
+      <button type="button" className="underline" onClick={() => setConfirming(false)}>
+        Cancel
+      </button>
+    </span>
+  );
+}
 
 export function Shell() {
   const { session, signOut } = useSession();
@@ -154,8 +180,9 @@ export function Shell() {
         </RequireIiosContext>
       </main>
 
-      <footer className="mx-auto max-w-6xl px-4 pb-6 text-xs text-muted" data-testid="build-id">
-        OGC · build {__OGC_BUILD__} · synthetic demo
+      <footer className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 pb-6 text-xs text-muted">
+        <span data-testid="build-id">OGC · build {__OGC_BUILD__} · synthetic demo</span>
+        <DemoDataReset />
       </footer>
 
       <KeyboardHelp />

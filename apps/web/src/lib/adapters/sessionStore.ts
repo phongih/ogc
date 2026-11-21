@@ -1,3 +1,4 @@
+import { refill, registerPersistent } from "./persist";
 /*
  * P2 · In-memory class schedule (NON-PRODUCTION, synthetic). One source of truth for sessions:
  * attendance, the teacher dashboard and center operations all read it. Seeded from
@@ -120,3 +121,38 @@ export const sessionStore = {
     return next;
   },
 };
+
+// Demo data survives reload (persist.ts): the schedule, make-up state and wizard-created
+// centers / classes / assignment.
+registerPersistent("schedule", {
+  dump: () => ({
+    sessions,
+    bookings,
+    selfStudies,
+    classMeta,
+    seq,
+    classTeachers: { ...classTeachers },
+    classes: classes.slice(SEED_CLASS_COUNT),
+    centers: centers.slice(SEED_CENTER_COUNT),
+    rosters: Object.fromEntries(Object.entries(rosters).filter(([k]) => !SEED_ROSTER_KEYS.has(k))),
+    centerDetails: Object.fromEntries(
+      Object.entries(centerDetails).filter(([k]) => !SEED_DETAIL_KEYS.has(k)),
+    ),
+  }),
+  load: (raw) => {
+    const d = raw as Record<string, unknown>;
+    refill(sessions, d.sessions);
+    refill(bookings, d.bookings);
+    refill(selfStudies, d.selfStudies);
+    refill(classMeta, d.classMeta);
+    seq = Number(d.seq) || 0;
+    for (const k of Object.keys(classTeachers)) delete classTeachers[k];
+    Object.assign(classTeachers, d.classTeachers ?? SEED_OWNERS);
+    classes.length = SEED_CLASS_COUNT;
+    classes.push(...((d.classes as typeof classes) ?? []));
+    centers.length = SEED_CENTER_COUNT;
+    centers.push(...((d.centers as typeof centers) ?? []));
+    Object.assign(rosters, d.rosters ?? {});
+    Object.assign(centerDetails, d.centerDetails ?? {});
+  },
+});

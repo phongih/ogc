@@ -1,3 +1,4 @@
+import { saveDemoState } from "./adapters/persist";
 import type { QueryClient } from "@tanstack/react-query";
 
 /*
@@ -8,5 +9,6 @@ import type { QueryClient } from "@tanstack/react-query";
  * query. Mock adapters only re-run active queries, so this stays cheap.
  */
 export function refreshLearningState(qc: QueryClient): Promise<void> {
+  saveDemoState(); // every write that matters goes through here — keep the demo across reloads
   return qc.invalidateQueries();
 }

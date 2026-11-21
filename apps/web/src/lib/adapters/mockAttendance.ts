@@ -1,3 +1,4 @@
+import { refill, registerPersistent } from "./persist";
 import type {
   AttendanceMark,
   AttendancePort,
@@ -238,3 +239,8 @@ export const mockAttendance: AttendancePort = {
       );
     }),
 };
+
+registerPersistent("attendance", {
+  dump: () => ({ marks }),
+  load: (raw) => refill(marks, (raw as { marks?: unknown }).marks),
+});

@@ -1,3 +1,4 @@
+import { refill, registerPersistent } from "./persist";
 import type {
   CenterSetupDraft,
   CenterSetupPort,
@@ -211,3 +212,14 @@ export const mockCenterSetup: CenterSetupPort = {
       );
     }),
 };
+
+registerPersistent("centerSetup", {
+  dump: () => ({ codes: { ...codes }, fees, seq }),
+  load: (raw) => {
+    const d = raw as { codes?: Record<string, string>; fees?: unknown; seq?: number };
+    for (const k of Object.keys(codes)) if (!(k in SEED_CODES)) delete codes[k];
+    Object.assign(codes, d.codes ?? {});
+    refill(fees, d.fees);
+    seq = Number(d.seq) || 0;
+  },
+});
