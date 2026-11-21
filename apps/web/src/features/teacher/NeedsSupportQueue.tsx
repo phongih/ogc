@@ -21,7 +21,10 @@ const SOURCE_LABEL: Record<SupportSignal["source"], string> = {
 };
 
 // Badge: what the flag rests on. Practice / teacher review beats attendance beats placement.
-export function evidenceLabel(item: SupportItem): { kind: "practice" | "attendance" | "placement"; text: string } {
+export function evidenceLabel(item: SupportItem): {
+  kind: "practice" | "attendance" | "placement";
+  text: string;
+} {
   if (item.signals.some((s) => s.source === "practice" || s.source === "teacher_review"))
     return { kind: "practice", text: "Evidence from practice" };
   if (item.signals.some((s) => s.source === "attendance"))

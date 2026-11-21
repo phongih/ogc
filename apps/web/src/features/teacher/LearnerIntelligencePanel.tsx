@@ -70,13 +70,16 @@ export function LearnerIntelligencePanel({
     <Card className="space-y-4" aria-label={`Learning intelligence for ${learnerName}`}>
       {/* Mastery + confidence, plain language */}
       <div>
-        <p className="mb-1 text-sm font-medium">Where {learnerName} is · CEFR {v.profile.cefrBand}</p>
+        <p className="mb-1 text-sm font-medium">
+          Where {learnerName} is · CEFR {v.profile.cefrBand}
+        </p>
         <ul className="space-y-0.5 text-sm" aria-label="Mastery by skill">
           {ALL_SKILLS.map((s) => (
             <li key={s} className="flex justify-between">
               <span>{skillLabel(s)}</span>
               <span className="text-muted">
-                {masteryWord(v.profile.skills[s].level)} · {confidenceWord(v.confidence.skills[s].band)}
+                {masteryWord(v.profile.skills[s].level)} ·{" "}
+                {confidenceWord(v.confidence.skills[s].band)}
               </span>
             </li>
           ))}
@@ -94,11 +97,18 @@ export function LearnerIntelligencePanel({
       </div>
 
       {/* Teacher Recommended (applied → reaches the learner) */}
-      <div className="rounded-ogc border border-brand/40 bg-brand/5 p-2 text-sm" data-testid="ti-teacher-rec">
+      <div
+        className="rounded-ogc border border-brand/40 bg-brand/5 p-2 text-sm"
+        data-testid="ti-teacher-rec"
+      >
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs uppercase tracking-wide text-muted">Teacher recommended</p>
           {active.data ? (
-            <Button variant="ghost" onClick={() => revert.mutate()} aria-label="Revert to system suggestion">
+            <Button
+              variant="ghost"
+              onClick={() => revert.mutate()}
+              aria-label="Revert to system suggestion"
+            >
               Revert to system
             </Button>
           ) : null}
@@ -106,11 +116,10 @@ export function LearnerIntelligencePanel({
         {active.data ? (
           <>
             <p data-testid="ti-teacher-active">
-              {titleOf(active.data.activityId)} <span className="text-xs text-muted">· {active.data.reasonCode}</span>
+              {titleOf(active.data.activityId)}{" "}
+              <span className="text-xs text-muted">· {active.data.reasonCode}</span>
             </p>
-            <p className="mt-1 text-xs text-muted">
-              {active.data.note} · reaching the learner now
-            </p>
+            <p className="mt-1 text-xs text-muted">{active.data.note} · reaching the learner now</p>
           </>
         ) : (
           <p className="text-muted">None — the learner is following the system suggestion.</p>

@@ -24,6 +24,8 @@ export const Session = z.object({
   classId: Id,
   title: z.string().min(1),
   at: z.string(),
+  asSubstitute: z.boolean().optional(), // P2: the viewer teaches this one session as a substitute
+  coveredBy: z.string().optional(), // P2: a substitute teaches this session of the viewer's class
 });
 export type Session = z.infer<typeof Session>;
 

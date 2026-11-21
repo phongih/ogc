@@ -7,6 +7,7 @@ import { RequireSection } from "./RequireSection";
 import { OrgList } from "../features/org/OrgList";
 import { OrgDetail } from "../features/org/OrgDetail";
 import { CenterDetail } from "../features/org/CenterDetail";
+import { OperationsHome } from "../features/operations/OperationsHome";
 import { LearnerHome } from "../features/learner/LearnerHome";
 import { TeacherHome } from "../features/teacher/TeacherHome";
 import { ClassDetail } from "../features/teacher/ClassDetail";
@@ -31,6 +32,7 @@ export const routes = [
       { path: "orgs", element: <RequireSection section="directory"><OrgList /></RequireSection> },
       { path: "orgs/:orgId", element: <RequireSection section="directory"><OrgDetail /></RequireSection> },
       { path: "centers/:centerId", element: <RequireSection section="directory"><CenterDetail /></RequireSection> },
+      { path: "operations", element: <RequireSection section="operations"><OperationsHome /></RequireSection> },
       { path: "learning", element: <RequireSection section="learning"><LearnerHome /></RequireSection> },
       { path: "learning/courses/:courseId", element: <RequireSection section="learning"><CourseLearning /></RequireSection> },
       { path: "learning/practice/:activityId", element: <RequireSection section="learning"><PracticeView /></RequireSection> },

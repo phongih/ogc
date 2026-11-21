@@ -16,7 +16,7 @@ import { Id } from "./common.js";
 export const AttendanceMark = z.enum(["present", "late", "absent"]);
 export type AttendanceMark = z.infer<typeof AttendanceMark>;
 
-export const ClassSessionStatus = z.enum(["upcoming", "to_mark", "marked"]);
+export const ClassSessionStatus = z.enum(["upcoming", "to_mark", "marked", "cancelled"]);
 export type ClassSessionStatus = z.infer<typeof ClassSessionStatus>;
 
 export const ClassSession = z.object({
@@ -63,12 +63,13 @@ export const RecordAttendanceResult = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), attendance: SessionAttendance }),
   z.object({
     ok: z.literal(false),
-    reason: z.enum(["not_found", "not_started", "incomplete", "not_on_roster"]),
+    reason: z.enum(["not_found", "not_started", "incomplete", "not_on_roster", "cancelled"]),
   }),
 ]);
 export type RecordAttendanceResult = z.infer<typeof RecordAttendanceResult>;
 
-// Owning teacher + same tenant only; everyone else gets null / not_found (fail-closed).
+// Owning teacher + same tenant (or, for one session, its assigned substitute); everyone else gets
+// null / not_found (fail-closed).
 export interface AttendancePort {
   listClassSessions(viewerPersonaId: string, classId: string): Promise<ClassSession[] | null>;
   getSessionAttendance(
@@ -81,6 +82,7 @@ export interface AttendancePort {
     input: RecordAttendanceInput,
   ): Promise<RecordAttendanceResult>;
   getClassSummary(viewerPersonaId: string, classId: string): Promise<AttendanceSummaryRow[] | null>;
-  // Sessions that have started but are not marked yet, across the viewer's own classes.
+  // Sessions that have started but are not marked yet: the viewer's own classes, plus sessions the
+  // viewer substitutes for.
   listToMark(viewerPersonaId: string): Promise<ClassSession[]>;
 }

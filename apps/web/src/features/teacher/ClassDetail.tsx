@@ -12,13 +12,18 @@ export function ClassDetail() {
   const { session } = useSession();
   const q = useClassRoster(classId);
   const [openLearner, setOpenLearner] = useState<{ id: string; name: string } | null>(null);
-  const progress = useClassProgress(session?.personaId ?? "", (q.data ?? []).map((r) => r.learnerId));
+  const progress = useClassProgress(
+    session?.personaId ?? "",
+    (q.data ?? []).map((r) => r.learnerId),
+  );
   const attendance = useClassAttendance(session?.personaId ?? "", classId);
   const sessions = useClassSessions(session?.personaId ?? "", classId);
 
   // Class-level overall = equal-weight mean across the learners the viewer is authorized to
   // see (fail-closed entries resolve to null and are excluded, not counted as zero).
-  const authorizedVals = Object.values(progress.data ?? {}).filter((v): v is number => typeof v === "number");
+  const authorizedVals = Object.values(progress.data ?? {}).filter(
+    (v): v is number => typeof v === "number",
+  );
   const classPct = authorizedVals.length
     ? Math.round(authorizedVals.reduce((a, b) => a + b, 0) / authorizedVals.length)
     : 0;
@@ -60,11 +65,7 @@ export function ClassDetail() {
                   <tr key={r.learnerId} className="border-t border-border">
                     <td className="py-2">{r.displayName}</td>
                     <td className="py-2">
-                      {overall === null
-                        ? "—"
-                        : overall === undefined
-                          ? "…"
-                          : `${overall}%`}
+                      {overall === null ? "—" : overall === undefined ? "…" : `${overall}%`}
                     </td>
                     <td className="py-2">
                       <Button
@@ -72,7 +73,9 @@ export function ClassDetail() {
                         aria-label={`View intelligence for ${r.displayName}`}
                         onClick={() =>
                           setOpenLearner((cur) =>
-                            cur?.id === r.learnerId ? null : { id: r.learnerId, name: r.displayName },
+                            cur?.id === r.learnerId
+                              ? null
+                              : { id: r.learnerId, name: r.displayName },
                           )
                         }
                       >
@@ -99,9 +102,7 @@ export function ClassDetail() {
       ) : null}
       <section aria-label="Attendance" className="space-y-3">
         <h2 className="text-lg font-medium">Attendance</h2>
-        <p className="text-xs text-muted">
-          From marked sessions only. Attended = present + late.
-        </p>
+        <p className="text-xs text-muted">From marked sessions only. Attended = present + late.</p>
         {attendance.data && attendance.data.length > 0 ? (
           <Card>
             <table className="w-full text-sm">
@@ -123,7 +124,9 @@ export function ClassDetail() {
                     <td className="py-2">
                       {a.absent}
                       {a.absentStreak >= 2 ? (
-                        <span className="ml-2 text-xs text-danger">last {a.absentStreak} in a row</span>
+                        <span className="ml-2 text-xs text-danger">
+                          last {a.absentStreak} in a row
+                        </span>
                       ) : null}
                     </td>
                     <td className="py-2">
@@ -144,7 +147,9 @@ export function ClassDetail() {
                     {s.title}{" "}
                     <span className="text-sm text-muted">· {formatCenterDateTime(s.at)}</span>
                   </span>
-                  {s.status === "upcoming" ? (
+                  {s.status === "cancelled" ? (
+                    <span className="text-sm text-muted">Cancelled · moved</span>
+                  ) : s.status === "upcoming" ? (
                     <span className="text-sm text-muted">Upcoming</span>
                   ) : (
                     <Link

@@ -40,3 +40,4 @@ jobs:
           node e2e/practice-journey.mjs || echo "practice journey E2E skipped/soft-failed (non-blocking)"
           node e2e/speaking-journey.mjs || echo "speaking journey E2E skipped/soft-failed (non-blocking)"
           node e2e/attendance-journey.mjs || echo "attendance journey E2E skipped/soft-failed (non-blocking)"
+          node e2e/operations-journey.mjs || echo "operations journey E2E skipped/soft-failed (non-blocking)"

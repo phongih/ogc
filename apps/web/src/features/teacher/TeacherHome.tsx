@@ -12,8 +12,15 @@ export function TeacherHome() {
   const q = useTeacherDashboard(session?.personaId ?? "");
 
   if (q.isLoading) return <Spinner label="Loading your teaching" />;
-  if (q.isError) return <ErrorState message="Could not load your classes." onRetry={() => q.refetch()} />;
-  if (!q.data) return <EmptyState title="No teacher profile for this persona" hint="Sign in as the teacher demo persona." />;
+  if (q.isError)
+    return <ErrorState message="Could not load your classes." onRetry={() => q.refetch()} />;
+  if (!q.data)
+    return (
+      <EmptyState
+        title="No teacher profile for this persona"
+        hint="Sign in as the teacher demo persona."
+      />
+    );
 
   const d = q.data;
   return (
@@ -74,7 +81,14 @@ export function TeacherHome() {
             {d.upcoming.map((s) => (
               <li key={s.id}>
                 <Card className="flex items-center justify-between">
-                  <span>{s.title}</span>
+                  <span>
+                    {s.title}
+                    {s.asSubstitute ? (
+                      <span className="ml-2 text-xs text-brand">You substitute</span>
+                    ) : s.coveredBy ? (
+                      <span className="ml-2 text-xs text-muted">{s.coveredBy} substitutes</span>
+                    ) : null}
+                  </span>
                   <span className="text-sm text-muted">{formatCenterDateTime(s.at)}</span>
                 </Card>
               </li>
