@@ -16,6 +16,7 @@ import {
   isoToCenterLocal,
 } from "../../lib/centerTime";
 import { Button, Card, ErrorState, Spinner } from "../../ui";
+import { MAKEUP_STATUS, bookingText } from "./makeupText";
 
 const REFUSAL: Record<string, string> = {
   not_staff: "Only center staff can arrange make-ups.",
@@ -25,12 +26,9 @@ const REFUSAL: Record<string, string> = {
   in_past: "Pick a time in the future (center time).",
   unknown_teacher: "Unknown teacher.",
   nothing_open: "Nobody is still missing this unit.",
-};
-
-const STATUS: Record<MakeupItem["status"], string> = {
-  open: "Needs a make-up",
-  booked: "Booked",
-  done: "Made up",
+  not_self_study: "That make-up is not self-study.",
+  not_submitted: "Nothing submitted yet.",
+  note_required: "Add a short note.",
 };
 
 export function MakeupBoard({ viewer, teachers }: { viewer: string; teachers: TeacherRef[] }) {
@@ -51,7 +49,7 @@ export function MakeupBoard({ viewer, teachers }: { viewer: string; teachers: Te
         Every absence stays here until the learner attends a make-up · deadline 14 days.{" "}
         <span data-testid="makeup-counts">
           {counts.overdue} overdue · {counts.open} to arrange · {counts.booked} booked ·{" "}
-          {counts.done} made up
+          {counts.toConfirm} waiting for teacher · {counts.done} made up
         </span>
       </p>
       {items.length === 0 ? (
@@ -118,7 +116,7 @@ function MakeupCard({
           }`}
         >
           {item.overdue ? "Overdue · " : ""}
-          {STATUS[item.status]}
+          {MAKEUP_STATUS[item.status]}
         </span>
       </div>
       {item.missedMakeup ? (
@@ -126,18 +124,24 @@ function MakeupCard({
       ) : null}
       {item.booking ? (
         <p className="text-sm">
-          <span className="text-muted">{item.status === "done" ? "Made up at" : "Booked:"}</span>{" "}
-          {item.booking.kind === "join" ? `joins ${item.booking.className}` : "make-up session"} ·{" "}
-          {formatCenterDateTime(item.booking.at)}
-          {item.booking.teacherName ? ` · ${item.booking.teacherName}` : ""}
+          <span className="text-muted">{item.status === "done" ? "Made up:" : "Arranged:"}</span>{" "}
+          {bookingText(item)}
         </p>
       ) : null}
       {item.status !== "done" && !mode ? (
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => setMode("book")}>
-            {item.status === "booked" ? "Change booking" : "Find a session"} · {label}
+            {item.status === "open" ? "Find a session" : "Change booking"} · {label}
           </Button>
-          {item.status === "booked" ? null : (
+          {item.booking?.kind === "selfstudy" ? null : (
+            <Button
+              variant="ghost"
+              onClick={() => act.mutate(() => makeup.assignSelfStudy(viewer, item.id))}
+            >
+              Assign self-study · {label}
+            </Button>
+          )}
+          {item.status !== "open" ? null : (
             <Button
               variant="ghost"
               onClick={() => {

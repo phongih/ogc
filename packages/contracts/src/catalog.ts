@@ -43,6 +43,10 @@ export interface CatalogPageRequest {
  * `getCourse` is org-scoped so a course id from another tenant is not resolvable.
  */
 export interface CatalogPort {
-  listCourses(orgId: string, filter?: CourseFilter, page?: CatalogPageRequest): Promise<CatalogPage>;
+  listCourses(
+    orgId: string,
+    filter?: CourseFilter,
+    page?: CatalogPageRequest,
+  ): Promise<CatalogPage>;
   getCourse(orgId: string, courseId: string): Promise<PublicCourse | null>;
 }

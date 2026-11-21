@@ -57,7 +57,7 @@ describe("Center operations", () => {
     renderApp("/app/operations", "staff");
     const board = await screen.findByRole("region", { name: "Make-up lessons" });
     expect(await within(board).findByTestId("makeup-counts")).toHaveTextContent(
-      "0 overdue · 3 to arrange · 0 booked · 0 made up",
+      "0 overdue · 3 to arrange · 0 booked · 0 waiting for teacher · 0 made up",
     );
     await user.click(
       within(board).getByRole("button", { name: "Find a session · An P. · A2 — Unit 5" }),

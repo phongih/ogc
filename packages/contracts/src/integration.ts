@@ -69,7 +69,12 @@ export interface IntegrationApplyInput {
 
 // Client-independent identity port. Fail-closed on unauthorized client/tenant.
 export interface IntegrationIdentityPort {
-  mapSubject(ctx: ClientContext, externalSubjectId: string, learnerId: string, provenance: MappingProvenance): Promise<IdentityMappingResult>;
+  mapSubject(
+    ctx: ClientContext,
+    externalSubjectId: string,
+    learnerId: string,
+    provenance: MappingProvenance,
+  ): Promise<IdentityMappingResult>;
   resolveLearner(ctx: ClientContext, externalSubjectId: string): Promise<string | null>;
 }
 
@@ -82,7 +87,11 @@ export interface IntegrationAppliedResult {
   applied?: AppliedRecommendation;
 }
 export interface IntegrationAppliedPort {
-  apply(ctx: ClientContext, learnerId: string, input: IntegrationApplyInput): Promise<IntegrationAppliedResult>;
+  apply(
+    ctx: ClientContext,
+    learnerId: string,
+    input: IntegrationApplyInput,
+  ): Promise<IntegrationAppliedResult>;
   revert(ctx: ClientContext, learnerId: string): Promise<IntegrationAppliedResult>;
   getActive(ctx: ClientContext, learnerId: string): Promise<AppliedRecommendation | null>;
   getNextAction(ctx: ClientContext, learnerId: string): Promise<LearnerNextAction | null>;

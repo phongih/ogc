@@ -14,6 +14,7 @@ import { CENTER_UTC_OFFSET_MIN, formatCenterDateTime } from "../../lib/centerTim
 import { ALL_SKILLS, skillLabel } from "../learning/intelligence/skills";
 import { confidenceWord, masteryWord } from "../learning/intelligence/friendly";
 import { TodaysMission } from "./TodaysMission";
+import { MyMakeups } from "./MyMakeups";
 
 export function LearnerHome() {
   const { session } = useSession();
@@ -42,6 +43,8 @@ export function LearnerHome() {
 
       {/* P1 · one next best action first (design principle 01). Everything else is context below. */}
       {liProfile.data && !next.isLoading ? <TodaysMission action={next.data} /> : null}
+
+      <MyMakeups viewer={session?.personaId ?? ""} />
 
       {d.enrolled.length > 0 ? (
         <Card className="flex items-center gap-5">

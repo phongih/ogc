@@ -106,5 +106,8 @@ export interface LearningPort {
 // authorized (teacher of an assigned class, guardian of a linked learner, or same-org
 // staff). Returns null when the viewer is not authorized for that learner (fail-closed).
 export interface ProgressViewPort {
-  getLearnerProgress(viewerPersonaId: string, learnerId: string): Promise<LearnerProgressSummary | null>;
+  getLearnerProgress(
+    viewerPersonaId: string,
+    learnerId: string,
+  ): Promise<LearnerProgressSummary | null>;
 }

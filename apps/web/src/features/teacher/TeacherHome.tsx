@@ -4,6 +4,7 @@ import { SpeakingReviewQueue } from "./SpeakingReviewQueue";
 import { formatCenterDate, formatCenterDateTime } from "../../lib/centerTime";
 import { NeedsSupportQueue } from "./NeedsSupportQueue";
 import { SessionsToMark } from "./SessionsToMark";
+import { SelfStudyToConfirm } from "./SelfStudyToConfirm";
 import { useSession } from "../../app/session";
 import { useTeacherDashboard } from "./queries";
 
@@ -38,6 +39,8 @@ export function TeacherHome() {
       </div>
 
       <SessionsToMark />
+
+      <SelfStudyToConfirm />
 
       <SpeakingReviewQueue />
 
@@ -82,6 +85,7 @@ export function TeacherHome() {
               <li key={s.id}>
                 <Card className="flex items-center justify-between">
                   <span>
+                    {s.makeup ? "Make-up · " : ""}
                     {s.title}
                     {s.asSubstitute ? (
                       <span className="ml-2 text-xs text-brand">You substitute</span>

@@ -1,9 +1,19 @@
 import type { GuardianLinkView } from "@ogc/contracts";
 import { formatCenterDateTime } from "../../lib/centerTime";
-import { Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner, StatTile } from "../../ui";
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  ProgressBar,
+  ProgressRing,
+  Spinner,
+  StatTile,
+} from "../../ui";
 import { useSession } from "../../app/session";
 import { useGuardianDashboard } from "./queries";
 import { useLearnerProgress } from "../learning/queries";
+import { MyMakeups } from "../learner/MyMakeups";
 
 function consentLabel(status: string): string {
   if (status === "active") return "Consent on file";
@@ -14,7 +24,13 @@ function consentLabel(status: string): string {
 // Read-only progress view for ONE linked learner. The per-course breakdown is fetched
 // through the authorization-checked ProgressViewPort (fail-closed: a learner the guardian
 // is not linked to resolves to null). D-14: there is no add/verify control anywhere here.
-function LinkedLearnerCard({ link, viewerPersonaId }: { link: GuardianLinkView; viewerPersonaId: string }) {
+function LinkedLearnerCard({
+  link,
+  viewerPersonaId,
+}: {
+  link: GuardianLinkView;
+  viewerPersonaId: string;
+}) {
   const prog = useLearnerProgress(viewerPersonaId, link.learnerId);
   const summary = prog.data ?? null;
   const overall = summary?.overallPct ?? link.progressPct;
@@ -32,10 +48,10 @@ function LinkedLearnerCard({ link, viewerPersonaId }: { link: GuardianLinkView; 
       <p className="text-sm">{consentLabel(link.consentStatus)}</p>
       <p className="text-sm text-muted">
         Next session:{" "}
-        {link.nextSessionAt
-          ? formatCenterDateTime(link.nextSessionAt)
-          : "None scheduled"}
+        {link.nextSessionAt ? formatCenterDateTime(link.nextSessionAt) : "None scheduled"}
       </p>
+
+      <MyMakeups viewer={viewerPersonaId} learnerId={link.learnerId} readOnly />
 
       <div>
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">By course</h3>
@@ -68,8 +84,12 @@ export function GuardianHome() {
   const q = useGuardianDashboard(session?.personaId ?? "");
 
   if (q.isLoading) return <Spinner label="Loading guardian workspace" />;
-  if (q.isError) return <ErrorState message="Could not load the guardian workspace." onRetry={() => q.refetch()} />;
-  if (!q.data) return <EmptyState title="No guardian workspace" hint="This persona is not a guardian." />;
+  if (q.isError)
+    return (
+      <ErrorState message="Could not load the guardian workspace." onRetry={() => q.refetch()} />
+    );
+  if (!q.data)
+    return <EmptyState title="No guardian workspace" hint="This persona is not a guardian." />;
 
   const d = q.data;
   const avgProgress =
@@ -86,8 +106,8 @@ export function GuardianHome() {
         deliberately NO control here to add or self-verify a link to a learner.
       */}
       <p className="rounded-ogc border border-border bg-surface px-3 py-2 text-xs text-muted">
-        Linked learners are set up by your learning center. Guardians cannot add or verify a
-        learner link here — this is handled by a governed process (unresolved requirement D-14).
+        Linked learners are set up by your learning center. Guardians cannot add or verify a learner
+        link here — this is handled by a governed process (unresolved requirement D-14).
       </p>
 
       {d.links.length > 0 ? (

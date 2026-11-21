@@ -63,9 +63,16 @@ export type LearnerNextAction = z.infer<typeof LearnerNextAction>;
 
 // Teacher-facing, fail-closed authorization (owning teacher + same tenant).
 export interface AppliedRecommendationPort {
-  applyRecommendation(viewerPersonaId: string, learnerId: string, input: InterventionInput): Promise<ApplyResult>;
+  applyRecommendation(
+    viewerPersonaId: string,
+    learnerId: string,
+    input: InterventionInput,
+  ): Promise<ApplyResult>;
   revertApplied(viewerPersonaId: string, learnerId: string): Promise<ApplyResult>;
-  getActiveApplied(viewerPersonaId: string, learnerId: string): Promise<AppliedRecommendation | null>;
+  getActiveApplied(
+    viewerPersonaId: string,
+    learnerId: string,
+  ): Promise<AppliedRecommendation | null>;
 }
 
 // Learner-facing, self-scoped: resolves teacher-applied vs system into one next action.

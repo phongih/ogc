@@ -2,6 +2,7 @@ import type {
   MakeupBoard,
   MakeupBooking,
   MakeupItem,
+  MakeupItemResult,
   MakeupOption,
   MakeupPort,
   MakeupRefusal,
@@ -10,7 +11,7 @@ import type {
 import { MAKEUP_DEADLINE_DAYS } from "@ogc/contracts";
 import { personaMap, teacherName, teachers } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
-import { sessionStore, type StoredSession } from "./sessionStore";
+import { sessionStore, type SelfStudyRecord, type StoredSession } from "./sessionStore";
 import { allMarks, makeupItemLive, markOf } from "./mockAttendance";
 import { withFault } from "./faults";
 
@@ -45,17 +46,25 @@ function bookingOf(s: StoredSession, fromClassId: string): MakeupBooking {
     className: className(s.classId),
     at: s.at,
     teacherName: sessionTeacher(s),
+    selfStudy: null,
+  };
+}
+
+function selfStudyBooking(classId: string, rec: SelfStudyRecord): MakeupBooking {
+  return {
+    kind: "selfstudy",
+    sessionId: null,
+    className: null,
+    at: null,
+    teacherName: teacherName(classTeachers[classId]), // the class teacher confirms
+    selfStudy: { ...rec },
   };
 }
 
 function itemFor(missed: StoredSession, learnerId: string, now: number): MakeupItem {
   const id = `${missed.id}::${learnerId}`;
   const due = Date.parse(missed.at) + MAKEUP_DEADLINE_DAYS * DAY_MS;
-  const bookedId = sessionStore.bookings.get(id);
-  const booked = bookedId ? sessionStore.get(bookedId) : undefined;
-  const mark = booked ? markOf(booked.id, learnerId) : null;
-  const status = !booked || mark === "absent" ? "open" : mark ? "done" : "booked";
-  return {
+  const base = {
     id,
     learnerId,
     learnerName: learnerName(missed.classId, learnerId),
@@ -65,6 +74,25 @@ function itemFor(missed: StoredSession, learnerId: string, now: number): MakeupI
     missedSessionId: missed.id,
     missedAt: missed.at,
     dueAt: new Date(due).toISOString(),
+  };
+  const self = sessionStore.selfStudies.get(id);
+  if (self) {
+    // Self-study counts only once the learner's class teacher confirms it.
+    const status = self.confirmedAt ? "done" : self.submittedAt ? "to_confirm" : "booked";
+    return {
+      ...base,
+      status,
+      overdue: status !== "done" && now > due,
+      missedMakeup: false,
+      booking: selfStudyBooking(missed.classId, self),
+    };
+  }
+  const bookedId = sessionStore.bookings.get(id);
+  const booked = bookedId ? sessionStore.get(bookedId) : undefined;
+  const mark = booked ? markOf(booked.id, learnerId) : null;
+  const status = !booked || mark === "absent" ? "open" : mark ? "done" : "booked";
+  return {
+    ...base,
     status,
     overdue: status !== "done" && now > due,
     missedMakeup: mark === "absent",
@@ -96,6 +124,7 @@ function board(orgId: string): MakeupBoard {
     counts: {
       open: count((i) => i.status === "open"),
       booked: count((i) => i.status === "booked"),
+      toConfirm: count((i) => i.status === "to_confirm"),
       done: count((i) => i.status === "done"),
       overdue: count((i) => i.overdue),
     },
@@ -122,6 +151,29 @@ function optionsFor(orgId: string, item: MakeupItem): StoredSession[] {
         (s.kind === "makeup" || s.classId !== item.classId) &&
         s.id !== item.booking?.sessionId,
     );
+}
+
+const refuseItem = (reason: MakeupRefusal) => latency<MakeupItemResult>({ ok: false, reason });
+const okItem = (orgId: string, itemId: string) =>
+  latency<MakeupItemResult>({ ok: true, item: makeupItems(orgId).find((i) => i.id === itemId)! });
+
+// Learner: own id. Guardian: pre-established links only (D-14 — no self-asserted link path).
+function ownLearnerIds(viewer: string): string[] {
+  const p = personaMap[viewer];
+  if (p?.learnerId) return [p.learnerId];
+  if (p?.guardianId) return [...(p.linkedLearnerIds ?? [])];
+  return [];
+}
+
+// The learner's OWN class teacher (not a substitute) confirms self-study — same tenant.
+function teachesClass(viewer: string, classId: string): boolean {
+  const p = personaMap[viewer];
+  return !!p?.teacherId && classTeachers[classId] === p.teacherId && classOrg(classId) === p.orgId;
+}
+function teacherItem(viewer: string, itemId: string): MakeupItem | undefined {
+  const p = personaMap[viewer];
+  if (!p?.teacherId) return undefined;
+  return makeupItems(p.orgId).find((i) => i.id === itemId && teachesClass(viewer, i.classId));
 }
 
 export const mockMakeup: MakeupPort = {
@@ -156,6 +208,7 @@ export const mockMakeup: MakeupPort = {
       if (!item) return refuse("not_found");
       if (item.status === "done") return refuse("already_done");
       if (!optionsFor(org, item).some((s) => s.id === sessionId)) return refuse("not_an_option");
+      sessionStore.selfStudies.delete(itemId); // an item is either booked or self-study
       sessionStore.bookings.set(itemId, sessionId);
       return latency<MakeupResult>({ ok: true, board: board(org) });
     }),
@@ -186,7 +239,94 @@ export const mockMakeup: MakeupPort = {
         kind: "makeup",
         substituteId: classTeachers[item.classId] === teacherId ? null : teacherId,
       });
-      for (const i of group) sessionStore.bookings.set(i.id, s.id);
+      for (const i of group) {
+        sessionStore.selfStudies.delete(i.id);
+        sessionStore.bookings.set(i.id, s.id);
+      }
       return latency<MakeupResult>({ ok: true, board: board(org) });
+    }),
+
+  assignSelfStudy: (viewer, itemId) =>
+    withFault("makeup.assignSelfStudy", () => {
+      const org = staffOrg(viewer);
+      if (!org) return refuse("not_staff");
+      const item = findItem(org, itemId);
+      if (!item) return refuse("not_found");
+      if (item.status === "done") return refuse("already_done");
+      sessionStore.bookings.delete(itemId);
+      sessionStore.selfStudies.set(itemId, {
+        submittedAt: null,
+        note: null,
+        returnedNote: null,
+        confirmedAt: null,
+      });
+      return latency<MakeupResult>({ ok: true, board: board(org) });
+    }),
+
+  listMine: (viewer) =>
+    withFault("makeup.listMine", () => {
+      const ids = ownLearnerIds(viewer);
+      const org = personaMap[viewer]?.orgId;
+      if (!org || ids.length === 0) return latency<MakeupItem[]>([]);
+      return latency(makeupItems(org).filter((i) => ids.includes(i.learnerId)));
+    }),
+
+  submitSelfStudy: (viewer, itemId, note) =>
+    withFault("makeup.submitSelfStudy", () => {
+      const p = personaMap[viewer];
+      if (!p?.learnerId) return refuseItem("not_found"); // learners only, own items only
+      const item = makeupItems(p.orgId).find((i) => i.id === itemId && i.learnerId === p.learnerId);
+      if (!item) return refuseItem("not_found");
+      const rec = sessionStore.selfStudies.get(itemId);
+      if (!rec) return refuseItem("not_self_study");
+      if (rec.confirmedAt) return refuseItem("already_done");
+      if (note.trim().length < 10) return refuseItem("note_required");
+      sessionStore.selfStudies.set(itemId, {
+        ...rec,
+        submittedAt: new Date().toISOString(),
+        note: note.trim(),
+        returnedNote: null,
+      });
+      return okItem(p.orgId, itemId);
+    }),
+
+  listToConfirm: (viewer) =>
+    withFault("makeup.listToConfirm", () => {
+      const p = personaMap[viewer];
+      if (!p?.teacherId) return latency<MakeupItem[]>([]);
+      return latency(
+        makeupItems(p.orgId).filter(
+          (i) => i.status === "to_confirm" && teachesClass(viewer, i.classId),
+        ),
+      );
+    }),
+
+  confirmSelfStudy: (viewer, itemId) =>
+    withFault("makeup.confirmSelfStudy", () => {
+      const item = teacherItem(viewer, itemId);
+      if (!item) return refuseItem("not_found");
+      const rec = sessionStore.selfStudies.get(itemId);
+      if (!rec) return refuseItem("not_self_study");
+      if (rec.confirmedAt) return refuseItem("already_done");
+      if (!rec.submittedAt) return refuseItem("not_submitted");
+      sessionStore.selfStudies.set(itemId, { ...rec, confirmedAt: new Date().toISOString() });
+      return okItem(personaMap[viewer]!.orgId, itemId);
+    }),
+
+  returnSelfStudy: (viewer, itemId, note) =>
+    withFault("makeup.returnSelfStudy", () => {
+      const item = teacherItem(viewer, itemId);
+      if (!item) return refuseItem("not_found");
+      const rec = sessionStore.selfStudies.get(itemId);
+      if (!rec) return refuseItem("not_self_study");
+      if (rec.confirmedAt) return refuseItem("already_done");
+      if (!rec.submittedAt) return refuseItem("not_submitted");
+      if (note.trim().length === 0) return refuseItem("note_required");
+      sessionStore.selfStudies.set(itemId, {
+        ...rec,
+        submittedAt: null,
+        returnedNote: note.trim(),
+      });
+      return okItem(personaMap[viewer]!.orgId, itemId);
     }),
 };

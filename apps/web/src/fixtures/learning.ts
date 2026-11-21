@@ -27,6 +27,13 @@ export const lessons: Lesson[] = [
   },
 ];
 
+// P2: which scheduled class session each upcoming lesson IS — the learner / guardian views read
+// the live time from the schedule, so a reschedule or cancel-with-replacement shows up there.
+export const lessonSession: Record<string, string> = {
+  "LSN-A2-07": "SES-001",
+  "LSN-B1-03": "SES-002",
+};
+
 export const learnerEnrollments: EnrolledCourse[] = [
   { course: courses[0], state: "in_progress", progressPct: 62, nextLessonId: "LSN-A2-07" },
   { course: courses[1], state: "enrolled", progressPct: 8, nextLessonId: "LSN-B1-03" },

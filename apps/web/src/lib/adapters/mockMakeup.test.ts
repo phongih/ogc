@@ -29,7 +29,7 @@ describe("make-up ledger — derived, never forgotten", () => {
       "Huy D.|B1 — Unit 1",
       "Huy D.|B1 — Unit 2",
     ]);
-    expect(b.counts).toEqual({ open: 3, booked: 0, done: 0, overdue: 0 });
+    expect(b.counts).toEqual({ open: 3, booked: 0, toConfirm: 0, done: 0, overdue: 0 });
     const an = b.items.find((i) => i.learnerId === LEARNER_AN)!;
     expect(Date.parse(an.dueAt) - Date.parse(an.missedAt)).toBe(14 * DAY);
   });
@@ -154,7 +154,7 @@ describe("make-up — a make-up session for everyone missing a unit", () => {
       status: "booked",
       booking: { kind: "makeup", teacherName: "Ben" },
     });
-    const s = sessionStore.get(booked.booking!.sessionId)!;
+    const s = sessionStore.get(booked.booking!.sessionId!)!;
     expect(s).toMatchObject({
       kind: "makeup",
       classId: classes[1].id,
