@@ -1,5 +1,5 @@
 # OGC v2 CI (NON-PRODUCTION). Build/test gates only — no deploy, no secrets, no production.
-# Provided as a design artifact; the repository is local-only under the current authorization.
+# Runs on every push and PR to phongih/ogc; a PR merges only when this job passes.
 name: ci
 on:
   push:
