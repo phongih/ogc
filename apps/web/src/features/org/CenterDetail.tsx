@@ -1,11 +1,21 @@
 import { useParams } from "react-router-dom";
 import { Breadcrumbs, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { useCenter, useOrganization } from "./queries";
+import { useQuery } from "@tanstack/react-query";
+import { centerSetup } from "../../lib/api";
+import { useSession } from "../../app/session";
 
 export function CenterDetail() {
   const { centerId = "" } = useParams();
   const q = useCenter(centerId);
   const org = useOrganization(q.data?.orgId ?? "");
+  const { session } = useSession();
+  const viewer = session?.personaId ?? "";
+  const fees = useQuery({
+    queryKey: ["center-fees", viewer, centerId],
+    queryFn: () => centerSetup.getFees(viewer, centerId),
+    enabled: !!viewer && !!centerId,
+  });
 
   if (q.isLoading) return <Spinner label="Loading center" />;
   if (q.isError) return <ErrorState message="Could not load center." onRetry={() => q.refetch()} />;
@@ -38,6 +48,18 @@ export function CenterDetail() {
           </div>
         </dl>
       </Card>
+      {fees.data && fees.data.length > 0 ? (
+        <Card>
+          <h2 className="mb-2 font-medium">Fee schedule (mock — nothing is charged)</h2>
+          <ul className="text-sm">
+            {fees.data.map((f) => (
+              <li key={f.courseId}>
+                {f.courseCode} · {f.amountVnd.toLocaleString("en-US")} VND / {f.per}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
     </section>
   );
 }

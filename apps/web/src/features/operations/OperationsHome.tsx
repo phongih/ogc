@@ -5,6 +5,7 @@
  * All times are CENTER time (Asia/Ho_Chi_Minh), whatever the staff member's device says.
  */
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ClassSchedule, ScheduleResult, ScheduledSession, TeacherRef } from "@ogc/contracts";
 import { schedule } from "../../lib/api";
@@ -54,6 +55,12 @@ export function OperationsHome() {
         title="Center operations"
         subtitle="Schedule and teacher assignment · center time · synthetic demo"
       />
+      <Link
+        to="/app/operations/centers/new"
+        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+      >
+        + Set up a new center
+      </Link>
       <MakeupBoard viewer={viewer} teachers={q.data.teachers} />
       {q.data.classes.map((c) => (
         <ClassCard key={c.classId} viewer={viewer} cls={c} teachers={q.data!.teachers} />

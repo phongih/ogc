@@ -88,3 +88,6 @@ export const schedule: SchedulePort = mockSchedule;
 import type { MakeupPort } from "@ogc/contracts";
 import { mockMakeup } from "../adapters/mockMakeup";
 export const makeup: MakeupPort = mockMakeup;
+import type { CenterSetupPort } from "@ogc/contracts";
+import { mockCenterSetup } from "../adapters/mockCenterSetup";
+export const centerSetup: CenterSetupPort = mockCenterSetup;
