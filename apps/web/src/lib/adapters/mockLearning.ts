@@ -14,6 +14,17 @@ import { learnerById } from "../../fixtures/learners";
 import { enrollmentStore, learningStore } from "./store";
 import { withFault } from "./faults";
 import { speakingFor } from "../../fixtures/speaking";
+import { prerequisitesBlocking } from "./mockProfile";
+
+// Hard prerequisite gate: a persona cannot complete an activity its own path still blocks.
+function isLocked(personaId: string, activityId: string): boolean {
+  const p = personaMap[personaId];
+  if (!p?.learnerId) return false; // non-learners are refused by the store anyway
+  // Checked after enrollment so the more basic refusal (not_enrolled, …) still wins.
+  const activity = activities.find((a) => a.id === activityId);
+  if (!activity || !enrollmentStore.get(personaId, activity.courseId)) return false;
+  return (prerequisitesBlocking(p.learnerId, p.orgId, activityId)?.length ?? 0) > 0;
+}
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -86,7 +97,9 @@ export const mockLearning: LearningPort = {
       // never via a self-declared "Mark complete".
       speakingFor(activityId)
         ? latency({ completed: false, reason: "speaking_requires_review" })
-        : latency(learningStore.complete(personaId, activityId)),
+        : isLocked(personaId, activityId)
+          ? latency({ completed: false, reason: "prerequisite_required" })
+          : latency(learningStore.complete(personaId, activityId)),
     ),
 
   getEvidence: (personaId, activityId) => {

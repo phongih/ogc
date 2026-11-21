@@ -3,7 +3,14 @@ import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, Spinner 
 import { useSession } from "../../app/session";
 import { speakingFor } from "../../fixtures/speaking";
 import { useCourse } from "../catalog/queries";
-import { useActivities, useActivityAttempts, useCompleteActivity, useCourseProgress } from "./queries";
+import { useLearningPath } from "../learner/queries";
+import { activities as allActivities } from "../../fixtures/activities";
+import {
+  useActivities,
+  useActivityAttempts,
+  useCompleteActivity,
+  useCourseProgress,
+} from "./queries";
 
 export function CourseLearning() {
   const { session } = useSession();
@@ -12,11 +19,24 @@ export function CourseLearning() {
   const course = useCourse(session?.orgId ?? "", courseId);
   const acts = useActivities(personaId, courseId);
   const progress = useCourseProgress(personaId, courseId);
-  const attempts = useActivityAttempts(personaId, (acts.data ?? []).map((a) => a.id));
+  const attempts = useActivityAttempts(
+    personaId,
+    (acts.data ?? []).map((a) => a.id),
+  );
   const complete = useCompleteActivity(personaId, courseId);
+  // Hard prerequisite gate: blocked steps of the learner's own path cannot be started here.
+  const path = useLearningPath(personaId);
+  const blockedBy = new Map(
+    (path.data?.steps ?? [])
+      .filter((s) => s.state === "blocked")
+      .map((s) => [s.activityId, s.blockedBy]),
+  );
+  const titleOf = (id: string) =>
+    allActivities.find((x) => x.id === id)?.title ?? "an earlier activity";
 
   if (course.isLoading || acts.isLoading) return <Spinner label="Loading course" />;
-  if (course.isError) return <ErrorState message="Could not load the course." onRetry={() => course.refetch()} />;
+  if (course.isError)
+    return <ErrorState message="Could not load the course." onRetry={() => course.refetch()} />;
   if (!course.data) return <EmptyState title="Course not found" />;
 
   const list = acts.data ?? [];
@@ -68,6 +88,15 @@ export function CourseLearning() {
                   ) : pendingId === a.id ? (
                     <span className="text-sm text-muted" aria-live="polite">
                       Completing…
+                    </span>
+                  ) : blockedBy.has(a.id) ? (
+                    <span className="text-sm text-muted" data-testid={`locked-${a.id}`}>
+                      <span aria-hidden="true">🔒 </span>
+                      Finish{" "}
+                      {(blockedBy.get(a.id) ?? [])
+                        .map((id) => `“${titleOf(id)}”`)
+                        .join(" and ")}{" "}
+                      first
                     </span>
                   ) : speakingFor(a.id) ? (
                     <Link to={`/app/learning/speaking/${a.id}`} className="inline-block">

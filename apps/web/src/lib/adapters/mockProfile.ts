@@ -252,6 +252,16 @@ function learnerPathView(learnerId: string, orgId: string): LearningPathView | n
   return { learnerId, orgId, steps: plan.steps, nextStep: plan.nextStep, graph: plan.graph };
 }
 
+// Hard prerequisite gate (owner decision 21/11): the activity ids that still block `activityId`
+// for this learner, [] when it is open, or null when it is not in the learner's path at all.
+// Single source of truth = the same LI-3 path the learner and the teacher already see.
+export function prerequisitesBlocking(learnerId: string, orgId: string, activityId: string): string[] | null {
+  const path = learnerPathView(learnerId, orgId);
+  const step = path?.steps.find((s) => s.activityId === activityId);
+  if (!step) return null;
+  return step.state === "blocked" ? [...(step.blockedBy ?? [])] : [];
+}
+
 // Fail-closed teacher→learner authorization: the viewer must be a teacher who OWNS a class
 // whose roster contains the learner, AND share the learner's tenant. Returns null otherwise
 // (guardians, learners, staff and cross-org/unrelated teachers are all denied).

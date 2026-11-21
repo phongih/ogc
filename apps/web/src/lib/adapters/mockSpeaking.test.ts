@@ -19,6 +19,38 @@ const ALL_NATURAL = [
 const speakingLevel = async (persona: string) =>
   (await mockProfile.getProfile(persona))!.skills.speaking.level;
 
+describe("Hard prerequisite gate (before the quiz)", () => {
+  it("speaking is locked until its prerequisite quiz is done: no studio, no rehearsal, no completion", async () => {
+    expect(await sp.getStudio(L, A)).toBeNull();
+    expect(
+      (await sp.submitRehearsal(L, A, { attemptId: "EARLY", responses: ALL_NATURAL })).reason,
+    ).toBe("prerequisite_required");
+    // A blocked NON-speaking activity is refused too (Minh: ACT-A2-3 needs ACT-A2-2).
+    const { mockLearning } = await import("./mockLearning");
+    expect((await mockLearning.completeActivity("demo-learner-2", "ACT-A2-3")).reason).toBe(
+      "not_enrolled",
+    );
+    enrollmentStore.enroll("demo-learner-2", activities.find((a) => a.id === "ACT-A2-3")!.courseId);
+    expect(await mockLearning.completeActivity("demo-learner-2", "ACT-A2-3")).toEqual({
+      completed: false,
+      reason: "prerequisite_required",
+    });
+    expect(await sp.listPendingReviews(T)).toEqual([]);
+  });
+
+  it("finishing the prerequisite opens it", async () => {
+    expect(
+      (
+        await mockPractice.submitPractice(L, "ACT-A2-3", {
+          attemptId: "QUIZ-1",
+          responses: [{ itemId: "A2-3-Q1", optionId: "a" }],
+        })
+      ).ok,
+    ).toBe(true);
+    expect(await sp.getStudio(L, A)).not.toBeNull();
+  });
+});
+
 describe("Speaking studio — learner side", () => {
   it("studio view is answer-free and only for the learner's own enrolled activity", async () => {
     const v = await sp.getStudio(L, A);
@@ -121,6 +153,7 @@ describe("Speaking studio — teacher review", () => {
   it("learners are isolated: another learner's rehearsal is a separate review", async () => {
     const course = activities.find((a) => a.id === A)!.courseId;
     enrollmentStore.enroll("demo-learner-2", course);
+    learningStore.complete("demo-learner-2", "ACT-A2-3"); // satisfy the prerequisite (store shortcut)
     const r = await sp.submitRehearsal("demo-learner-2", A, {
       attemptId: "M-1",
       responses: ALL_NATURAL,

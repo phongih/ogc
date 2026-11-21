@@ -8,8 +8,9 @@ import { activities } from "../../fixtures/activities";
 import { practiceFor } from "../../fixtures/practice";
 import { personaMap } from "../../fixtures/personas";
 import { learnerById } from "../../fixtures/learners";
-import { learningStore } from "./store";
+import { enrollmentStore, learningStore } from "./store";
 import { withFault } from "./faults";
+import { prerequisitesBlocking } from "./mockProfile";
 
 /*
  * OGC-AUTH-030 — Practice mock adapter. Self-scoped (persona → its own learnerId), org-scoped,
@@ -32,10 +33,27 @@ export function scopeFor(personaId: string, activityId: string): { learnerId: st
   return { learnerId: learner.id };
 }
 
+// Hard prerequisite gate (owner decision 21/11): true while the learner's path blocks it.
+export function lockedFor(learnerId: string, orgId: string, activityId: string): boolean {
+  return (prerequisitesBlocking(learnerId, orgId, activityId)?.length ?? 0) > 0;
+}
+
+// Same gate for a submission, checked AFTER scope + enrollment so the more basic refusal
+// (not_enrolled, cross_org_denied, …) still wins — the store reports those.
+export function submissionLocked(personaId: string, activityId: string): boolean {
+  const scope = scopeFor(personaId, activityId);
+  const activity = activities.find((a) => a.id === activityId);
+  if (!scope || !activity || !enrollmentStore.get(personaId, activity.courseId)) return false;
+  return lockedFor(scope.learnerId, personaMap[personaId]!.orgId, activityId);
+}
+
 export const mockPractice: PracticePort = {
   getPractice: (personaId, activityId) =>
     withFault("practice.getPractice", () => {
-      if (!scopeFor(personaId, activityId)) return latency<PracticeActivityView | null>(null);
+      const scope = scopeFor(personaId, activityId);
+      if (!scope) return latency<PracticeActivityView | null>(null);
+      if (lockedFor(scope.learnerId, personaMap[personaId]!.orgId, activityId))
+        return latency<PracticeActivityView | null>(null);
       const practice = practiceFor(activityId);
       if (!practice) return latency<PracticeActivityView | null>(null);
       // Strip correct answers — the learner-facing view never carries them.
@@ -55,7 +73,9 @@ export const mockPractice: PracticePort = {
     }),
 
   submitPractice: (personaId, activityId, submission: PracticeSubmission) =>
-    withFault("practice.submitPractice", () =>
-      latency<PracticeSubmitResult>(learningStore.submitPractice(personaId, activityId, submission)),
-    ),
+    withFault("practice.submitPractice", () => {
+      if (submissionLocked(personaId, activityId))
+        return latency<PracticeSubmitResult>({ ok: false, reason: "prerequisite_required" });
+      return latency<PracticeSubmitResult>(learningStore.submitPractice(personaId, activityId, submission));
+    }),
 };

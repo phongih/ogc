@@ -11,7 +11,7 @@ import { speakingCoachFor, speakingFor } from "../../fixtures/speaking";
 import { personaMap } from "../../fixtures/personas";
 import { classTeachers, rosters } from "../../fixtures/teaching";
 import { learningStore } from "./store";
-import { scopeFor } from "./mockPractice";
+import { lockedFor, scopeFor, submissionLocked } from "./mockPractice";
 import { teacherOwnsLearner } from "./mockProfile";
 import { withFault } from "./faults";
 
@@ -53,7 +53,10 @@ export const mockSpeaking: SpeakingPort = {
   getStudio: (personaId, activityId) =>
     withFault("speaking.getStudio", () => {
       const script = speakingFor(activityId);
-      if (!script || !scopeFor(personaId, activityId))
+      const scope = scopeFor(personaId, activityId);
+      if (!script || !scope) return latency<PracticeActivityView | null>(null);
+      // Hard prerequisite gate: a locked activity has no studio yet.
+      if (lockedFor(scope.learnerId, personaMap[personaId]!.orgId, activityId))
         return latency<PracticeActivityView | null>(null);
       // Answer-free view: correct replies and coaching are revealed only after submission.
       return latency<PracticeActivityView | null>({
@@ -74,6 +77,8 @@ export const mockSpeaking: SpeakingPort = {
     withFault("speaking.submitRehearsal", () => {
       const scope = scopeFor(personaId, activityId);
       if (!scope) return latency<SpeakingSubmitResult>({ ok: false, reason: "not_in_scope" });
+      if (submissionLocked(personaId, activityId))
+        return latency<SpeakingSubmitResult>({ ok: false, reason: "prerequisite_required" });
       const r = learningStore.submitSpeaking(personaId, activityId, submission);
       if (!r.ok) return latency<SpeakingSubmitResult>({ ok: false, reason: r.reason });
       return latency<SpeakingSubmitResult>({

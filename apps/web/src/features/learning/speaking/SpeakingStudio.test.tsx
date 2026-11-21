@@ -17,6 +17,15 @@ const NATURAL = [
 ];
 
 describe("Speaking studio — learner", () => {
+  it("is locked until the prerequisite quiz is done, and says which one", async () => {
+    renderApp(`/app/learning/speaking/${A}`, "learner");
+    expect(await screen.findByTestId("locked-notice")).toHaveTextContent(
+      "Finish “Quiz: At the market” first",
+    );
+    expect(screen.queryByRole("button", { name: "Start rehearsal" })).toBeNull();
+    learningStore.complete("demo-learner", "ACT-A2-3"); // satisfy it for the rest of this file
+  });
+
   it("rehearses turn by turn, then shows coaching and a pending teacher review", async () => {
     const user = userEvent.setup();
     renderApp(`/app/learning/speaking/${A}`, "learner");

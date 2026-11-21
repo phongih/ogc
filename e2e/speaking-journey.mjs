@@ -74,6 +74,14 @@ async function main() {
     await page.getByRole("heading", { name: "My Learning" }).waitFor();
     const before = await speakingLevel();
 
+    // Hard prerequisite gate: before the quiz, the course page shows speaking as locked.
+    await page.getByRole("link", { name: "Open the course" }).click();
+    await page.getByTestId("locked-ACT-A2-4").waitFor();
+    check("[gate] speaking is locked before its prerequisite quiz", /Finish “Quiz: At the market” first/.test(await page.getByTestId("locked-ACT-A2-4").textContent()));
+    check("[gate] no way into the studio while locked", (await page.getByRole("link", { name: "Open speaking studio" }).count()) === 0);
+    await page.getByRole("link", { name: "My Learning" }).first().click();
+    await page.getByRole("heading", { name: "My Learning" }).waitFor();
+
     // Unlock the speaking activity with the prerequisite quiz.
     await page.getByRole("link", { name: "Practice now" }).click();
     await page.getByRole("heading", { name: "At the market" }).waitFor();
