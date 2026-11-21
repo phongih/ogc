@@ -15,6 +15,7 @@ import { organizations } from "../../fixtures/directory";
  */
 
 const ORG = organizations[0].id;
+const ORG2 = organizations[1].id; // a different tenant root (cross_tenant scenario)
 
 // Synthetic sealed grants, keyed by an opaque presented token. In production these come from the
 // IIOS-signed context; here they are fixtures carrying NO key/mac (OGC never sees verification data).
@@ -42,6 +43,48 @@ const GRANTS: Record<string, IiosContextResolution> = {
       purpose: "learning.read",
       requestId: "req-synth-0002",
       grantRef: "iios-grant-ref-0002",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    },
+  },
+  // AUTH-027 Phase 2 (additive): grants for the remaining demo personas, so every persona reaches
+  // the app through the same IIOS-context gate. Synthetic; no key/mac.
+  "grant-valid-staff": {
+    state: "valid",
+    context: {
+      clientId: "eduos",
+      orgId: ORG,
+      principalId: "iios-principal-staff-1",
+      role: "staff",
+      purpose: "learning.read",
+      requestId: "req-synth-0004",
+      grantRef: "iios-grant-ref-0004",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    },
+  },
+  "grant-valid-guardian": {
+    state: "valid",
+    context: {
+      clientId: "eduos",
+      orgId: ORG,
+      principalId: "iios-principal-guardian-1",
+      role: "guardian",
+      purpose: "learning.read",
+      requestId: "req-synth-0005",
+      grantRef: "iios-grant-ref-0005",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    },
+  },
+  // A grant IIOS scoped to a DIFFERENT tenant root — presented for ORG it resolves to cross_tenant.
+  "grant-valid-org2": {
+    state: "valid",
+    context: {
+      clientId: "eduos",
+      orgId: ORG2,
+      principalId: "iios-principal-staff-org2",
+      role: "staff",
+      purpose: "learning.read",
+      requestId: "req-synth-0006",
+      grantRef: "iios-grant-ref-0006",
       expiresAt: "2099-01-01T00:00:00.000Z",
     },
   },

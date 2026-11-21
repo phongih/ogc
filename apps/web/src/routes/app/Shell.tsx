@@ -5,6 +5,7 @@ import { useSession } from "../../app/session";
 import { sectionLabel, sectionRoute } from "../../app/nav";
 import { KeyboardHelp } from "../../app/KeyboardHelp";
 import { ThemeToggle } from "../../app/ThemeToggle";
+import { RequireIiosContext } from "../../app/iiosGate";
 import { Button } from "../../ui";
 
 export function Shell() {
@@ -148,7 +149,9 @@ export function Shell() {
       ) : null}
 
       <main id="main" className="mx-auto max-w-6xl px-4 py-8">
-        <Outlet />
+        <RequireIiosContext>
+          <Outlet />
+        </RequireIiosContext>
       </main>
 
       <KeyboardHelp />
