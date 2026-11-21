@@ -29,6 +29,7 @@ const REFUSAL: Record<string, string> = {
   not_self_study: "That make-up is not self-study.",
   not_submitted: "Nothing submitted yet.",
   note_required: "Add a short note.",
+  clash: "That teacher is already teaching then:",
 };
 
 export function MakeupBoard({ viewer, teachers }: { viewer: string; teachers: TeacherRef[] }) {
@@ -252,9 +253,16 @@ function MakeupCard({
         </form>
       ) : null}
       {act.data && !act.data.ok ? (
-        <p role="alert" className="text-sm text-danger">
-          {REFUSAL[act.data.reason] ?? "Could not arrange the make-up."}
-        </p>
+        <div role="alert" className="text-sm text-danger">
+          <p>{REFUSAL[act.data.reason] ?? "Could not arrange the make-up."}</p>
+          {act.data.clashes?.length ? (
+            <ul className="list-disc pl-5">
+              {act.data.clashes.map((c) => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
     </Card>
   );

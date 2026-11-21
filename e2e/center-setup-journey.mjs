@@ -73,6 +73,20 @@ async function main() {
     await page.getByRole("button", { name: "+ Add room" }).click();
     await next();
     await page.getByRole("button", { name: "+ Add class" }).click();
+    // First try Tue 18:00 with Ben — he already teaches A2 Evening then: review must refuse.
+    await page.getByRole("group", { name: "Class 1 days" }).getByLabel("Tue").check();
+    await page.getByLabel("Class 1 teacher").selectOption({ label: "Ben" });
+    await page.getByRole("button", { name: "6. Review & open" }).click();
+    const clash = page.getByRole("alert", { name: "Schedule clashes" });
+    await clash.waitFor();
+    check(
+      "[wizard] review names Ben's double-booking and blocks opening",
+      /Ben already teaches A2 Evening — Tue\/Thu/.test(await clash.textContent()) &&
+        (await page.getByRole("button", { name: /^Open / }).isDisabled()),
+    );
+    await shot(page, "00-wizard-clash");
+    await page.getByRole("button", { name: "4. Classes & teachers" }).click();
+    await page.getByRole("group", { name: "Class 1 days" }).getByLabel("Tue").uncheck();
     await page.getByRole("group", { name: "Class 1 days" }).getByLabel("Sat").check();
     await page.getByLabel("Class 1 teacher").selectOption({ label: "Ben" });
     await page.getByLabel("Class 1 name").fill("A2 Weekend");
@@ -83,7 +97,13 @@ async function main() {
     await page.getByLabel("Fee for ENG-A2").fill("4500000");
     await next();
     await shot(page, "02-wizard-review");
-    await page.getByRole("button", { name: "Open Nova English — Binh Thanh" }).click();
+    const openBtn = page.getByRole("button", { name: "Open Nova English — Binh Thanh" });
+    await openBtn.waitFor();
+    await page.waitForFunction(() => {
+      const b = [...document.querySelectorAll("button")].find((x) => x.textContent?.startsWith("Open Nova"));
+      return b && !b.disabled;
+    });
+    await openBtn.click();
     await page.getByText(/Center opened · 1 class · 4 sessions scheduled/).waitFor();
     check("[wizard] center opened with 4 sessions", true);
     await page.getByRole("link", { name: "→ Center operations" }).click();

@@ -26,6 +26,9 @@ const SEED_CENTER_COUNT = centers.length;
 const SEED_ROSTER_KEYS = new Set(Object.keys(rosters));
 const SEED_DETAIL_KEYS = new Set(Object.keys(centerDetails));
 const resetHooks: (() => void)[] = [];
+// P2 · room and length per class (wizard classes have both; seeded classes: no room, 90 min).
+export const DEFAULT_SESSION_MIN = 90;
+const classMeta = new Map<string, { room: string | null; durationMin: number }>();
 const sessions = new Map<string, StoredSession>();
 // P2 · make-up bookings: make-up item id (`${missedSessionId}::${learnerId}`) → session id.
 const bookings = new Map<string, string>();
@@ -62,6 +65,7 @@ function reset(): void {
   centers.length = SEED_CENTER_COUNT;
   for (const k of Object.keys(rosters)) if (!SEED_ROSTER_KEYS.has(k)) delete rosters[k];
   for (const k of Object.keys(centerDetails)) if (!SEED_DETAIL_KEYS.has(k)) delete centerDetails[k];
+  classMeta.clear();
   for (const h of resetHooks) h();
 }
 reset();
@@ -71,6 +75,10 @@ const byTime = (a: StoredSession, b: StoredSession) => Date.parse(a.at) - Date.p
 export const sessionStore = {
   reset,
   onReset: (h: () => void) => void resetHooks.push(h),
+  setClassMeta: (classId: string, meta: { room: string | null; durationMin: number }) =>
+    void classMeta.set(classId, meta),
+  classMeta: (classId: string) =>
+    classMeta.get(classId) ?? { room: null, durationMin: DEFAULT_SESSION_MIN },
   bookings,
   selfStudies,
   get: (id: string) => sessions.get(id),

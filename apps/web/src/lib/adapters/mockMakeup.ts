@@ -13,6 +13,7 @@ import { personaMap, teacherName, teachers } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { sessionStore, type SelfStudyRecord, type StoredSession } from "./sessionStore";
 import { allMarks, makeupItemLive, markOf } from "./mockAttendance";
+import { findClashes } from "./clashes";
 import { withFault } from "./faults";
 
 /*
@@ -232,6 +233,17 @@ export const mockMakeup: MakeupPort = {
           classes.find((c) => c.id === i.classId)?.courseId === course,
       );
       if (group.length === 0) return refuse("nothing_open");
+      const busy = findClashes([
+        {
+          label: `make-up ${item.unitTitle}`,
+          at: new Date(at).toISOString(),
+          durationMin: sessionStore.classMeta(item.classId).durationMin,
+          teacherId,
+          centerId: null,
+          room: null,
+        },
+      ]);
+      if (busy.length) return latency<MakeupResult>({ ok: false, reason: "clash", clashes: busy });
       const s = sessionStore.add({
         classId: item.classId,
         title: item.unitTitle,

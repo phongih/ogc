@@ -12,6 +12,7 @@ import { personaMap, teachers } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { nextWeeklySlot } from "../../fixtures/demoClock";
 import { sessionStore } from "./sessionStore";
+import { findClashes } from "./clashes";
 import { withFault } from "./faults";
 
 /*
@@ -48,6 +49,38 @@ const staffOrg = (viewer: string) => {
 };
 const hexId = (kind: string, n: number) =>
   `00000000-0000-4000-8000-${kind}${n.toString(16).padStart(8, "0")}`;
+// The first FIRST_WEEKS weeks of a class's weekly slot, in center time.
+function plannedAts(c: CenterSetupDraft["classes"][number], from = Date.now()): string[] {
+  const [hh, mm] = c.time.split(":").map(Number);
+  let cursor = from;
+  const ats: string[] = [];
+  for (let k = 0; k < c.weekdays.length * FIRST_WEEKS; k++) {
+    const at = nextWeeklySlot(c.weekdays, hh, mm, cursor);
+    ats.push(at);
+    cursor = Date.parse(at);
+  }
+  return ats;
+}
+
+// Teacher double-bookings against the live schedule, and teacher / room clashes inside the draft.
+function draftClashes(draft: CenterSetupDraft): string[] {
+  const NEW_CENTER = "new-center";
+  return findClashes(
+    draft.classes.flatMap((c) =>
+      c.weekdays.length && /^\d\d:\d\d$/.test(c.time)
+        ? plannedAts(c).map((at) => ({
+            label: `${c.name.trim() || "a new class"} (new)`,
+            at,
+            durationMin: c.durationMin,
+            teacherId: c.teacherId || null,
+            centerId: NEW_CENTER,
+            room: c.room || null,
+          }))
+        : [],
+    ),
+  ).map((m) => m.replace(" at this center", ""));
+}
+
 const takenCodes = (orgId: string) =>
   centers
     .filter((c) => c.orgId === orgId)
@@ -103,6 +136,10 @@ export const mockCenterSetup: CenterSetupPort = {
           failed: badFees.map((f) => f.courseId),
         });
 
+      const clashes = draftClashes(draft);
+      if (clashes.length)
+        return latency<CenterSetupResult>({ ok: false, reason: "clash", failed: clashes });
+
       const n = ++seq;
       const centerId = hexId("ce", n);
       centers.push({
@@ -129,16 +166,8 @@ export const mockCenterSetup: CenterSetupPort = {
       let sessionsCreated = 0;
       draft.classes.forEach((c, i) => {
         const classId = hexId(`c${n.toString(16)}`.padEnd(4, "0"), i + 1);
-        const [hh, mm] = c.time.split(":").map(Number);
         const course = courses.find((x) => x.id === c.courseId)!;
-        // The first FIRST_WEEKS weeks of this class's weekly slot, in center time.
-        let cursor = Date.now();
-        const ats: string[] = [];
-        for (let k = 0; k < c.weekdays.length * FIRST_WEEKS; k++) {
-          const at = nextWeeklySlot(c.weekdays, hh, mm, cursor);
-          ats.push(at);
-          cursor = Date.parse(at);
-        }
+        const ats = plannedAts(c);
         const days = [...c.weekdays]
           .sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
           .map((d) => DAY_LETTERS[d])
@@ -154,6 +183,7 @@ export const mockCenterSetup: CenterSetupPort = {
         });
         classTeachers[classId] = c.teacherId;
         rosters[classId] = [];
+        sessionStore.setClassMeta(classId, { room: c.room, durationMin: c.durationMin });
         ats.forEach((at, k) =>
           sessionStore.add({ classId, title: `${course.code} — Session ${k + 1}`, at }),
         );
@@ -162,6 +192,11 @@ export const mockCenterSetup: CenterSetupPort = {
       });
       return latency<CenterSetupResult>({ ok: true, centerId, classIds, sessionsCreated });
     }),
+
+  previewClashes: (viewer, draft) =>
+    withFault("centerSetup.previewClashes", () =>
+      latency(staffOrg(viewer) ? draftClashes(draft) : []),
+    ),
 
   getFees: (viewer, centerId) =>
     withFault("centerSetup.getFees", () => {
