@@ -14,16 +14,27 @@ import { learnerById } from "../../fixtures/learners";
 import { enrollmentStore, learningStore } from "./store";
 import { withFault } from "./faults";
 import { speakingFor } from "../../fixtures/speaking";
+import { practiceFor } from "../../fixtures/practice";
 import { prerequisitesBlocking } from "./mockProfile";
 
-// Hard prerequisite gate: a persona cannot complete an activity its own path still blocks.
-function isLocked(personaId: string, activityId: string): boolean {
+// Why a learner may NOT self-mark an activity complete, in the order a learner should hear it:
+//   1. basic refusals (not a learner, unknown activity, other org, not enrolled, already done),
+//   2. prerequisite still open (hard gate, owner decision 21/11),
+//   3. speaking → only via teacher-approved Speaking studio,
+//   4. interactive practice set → only by practising it (score from the learner's answers).
+// null = a plain activity the learner may mark complete.
+function completionRefusal(personaId: string, activityId: string): string | null {
   const p = personaMap[personaId];
-  if (!p?.learnerId) return false; // non-learners are refused by the store anyway
-  // Checked after enrollment so the more basic refusal (not_enrolled, …) still wins.
+  if (!p?.learnerId) return "not_a_learner";
   const activity = activities.find((a) => a.id === activityId);
-  if (!activity || !enrollmentStore.get(personaId, activity.courseId)) return false;
-  return (prerequisitesBlocking(p.learnerId, p.orgId, activityId)?.length ?? 0) > 0;
+  if (!activity) return "unknown_activity";
+  if (activity.orgId !== p.orgId) return "cross_org_denied";
+  if (!enrollmentStore.get(personaId, activity.courseId)) return "not_enrolled";
+  if (learningStore.getAttempt(p.learnerId, activityId)?.state === "completed") return "already_completed";
+  if ((prerequisitesBlocking(p.learnerId, p.orgId, activityId)?.length ?? 0) > 0) return "prerequisite_required";
+  if (speakingFor(activityId)) return "speaking_requires_review";
+  if (practiceFor(activityId)) return "practice_required";
+  return null;
 }
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
@@ -92,15 +103,12 @@ export const mockLearning: LearningPort = {
   },
 
   completeActivity: (personaId, activityId) =>
-    withFault("learning.completeActivity", () =>
-      // P1 speaking: an activity with a Speaking studio counts ONLY via teacher-approved review,
-      // never via a self-declared "Mark complete".
-      speakingFor(activityId)
-        ? latency({ completed: false, reason: "speaking_requires_review" })
-        : isLocked(personaId, activityId)
-          ? latency({ completed: false, reason: "prerequisite_required" })
-          : latency(learningStore.complete(personaId, activityId)),
-    ),
+    withFault("learning.completeActivity", () => {
+      const reason = completionRefusal(personaId, activityId);
+      return reason
+        ? latency({ completed: false, reason })
+        : latency(learningStore.complete(personaId, activityId));
+    }),
 
   getEvidence: (personaId, activityId) => {
     const learnerId = personaMap[personaId]?.learnerId;

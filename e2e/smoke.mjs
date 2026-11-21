@@ -118,13 +118,15 @@ async function main() {
     await page.getByRole("heading", { name: "My Learning" }).waitFor();
     await page.getByRole("link", { name: "Resume learning" }).first().click();
     await page.getByRole("progressbar").first().waitFor(); // course-progress panel
-    const complete = page.getByRole("button", { name: /Complete .*Quiz: At the market/ });
-    await complete.waitFor();
-    await complete.click();
-    await page.waitForFunction(
-      () => !document.querySelector('button[aria-label*="Quiz: At the market"]'),
-    );
-    check("[learner] completes an activity (progress updates)", true);
+    // A quiz with a practice set is completed by PRACTISING it (no self-declared "Mark complete").
+    check("[learner] quiz offers no 'Mark complete'", (await page.getByRole("button", { name: /Complete .*Quiz: At the market/ }).count()) === 0);
+    await page.getByRole("link", { name: "Practice now" }).first().click();
+    await page.getByRole("heading", { name: "At the market" }).waitFor();
+    for (const t of ["How much are the apples?", "No thanks, I'm fine.", "Can I have half a kilo of tomatoes, please?", "Can I pay by card?"])
+      await page.getByText(t).click();
+    await page.getByRole("button", { name: "Submit answers" }).click();
+    await page.getByText(/You scored 100%/).waitFor();
+    check("[learner] completes an activity by practising it (scored from answers)", true);
     // Empty-state: a brand-new tutor conversation shows the start prompt.
     await page.getByRole("link", { name: "AI Tutor" }).click();
     await page.getByRole("button", { name: /New conversation/ }).click();
