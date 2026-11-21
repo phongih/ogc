@@ -1,3 +1,5 @@
+import type { SupportPort } from "@ogc/contracts";
+import { mockSupport } from "../adapters/mockProfile";
 import type { SpeakingPort } from "@ogc/contracts";
 import { mockSpeaking } from "../adapters/mockSpeaking";
 // Single seam selecting adapters for each contract port. Swap for governed backend later.
@@ -75,4 +77,5 @@ export const appliedRecommendation: AppliedRecommendationPort = mockAppliedRecom
 export const learnerNextAction: LearnerNextActionPort = mockLearnerNextAction;
 export const practice: PracticePort = mockPractice;
 export const speaking: SpeakingPort = mockSpeaking;
+export const support: SupportPort = mockSupport;
 export { directory } from "./directory";

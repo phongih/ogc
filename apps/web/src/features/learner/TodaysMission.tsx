@@ -85,7 +85,10 @@ function Mission({ action }: { action: LearnerNextAction }) {
             {action.friendlyReason}
           </p>
 
-          {fromTeacher && action.teacherNote ? (
+          {/* The friendly reason may already quote the note (AUTH-026) — never show it twice. */}
+          {fromTeacher &&
+          action.teacherNote &&
+          !action.friendlyReason.includes(action.teacherNote) ? (
             <blockquote
               className="border-l-2 border-brand pl-3 text-sm"
               data-testid="mission-teacher-note"
