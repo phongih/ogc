@@ -12,7 +12,7 @@ import {
 import { relativeDay } from "../../lib/time";
 import { ALL_SKILLS, skillLabel } from "../learning/intelligence/skills";
 import { confidenceWord, masteryWord } from "../learning/intelligence/friendly";
-import { practiceFor } from "../../fixtures/practice";
+import { TodaysMission } from "./TodaysMission";
 
 export function LearnerHome() {
   const { session } = useSession();
@@ -39,6 +39,9 @@ export function LearnerHome() {
     <section className="space-y-8">
       <PageHeader title="My Learning" subtitle={`${d.learnerName} · synthetic demo`} />
 
+      {/* P1 · one next best action first (design principle 01). Everything else is context below. */}
+      {liProfile.data && !next.isLoading ? <TodaysMission action={next.data} /> : null}
+
       {d.enrolled.length > 0 ? (
         <Card className="flex items-center gap-5">
           <ProgressRing pct={overallPct} label="Overall learning progress" />
@@ -64,41 +67,6 @@ export function LearnerHome() {
         <div>
           <h2 className="mb-3 text-lg font-medium">Learning intelligence</h2>
           <Card className="space-y-4" aria-label="Learning intelligence">
-            {next.data ? (
-              <div
-                className="rounded-ogc border border-brand/40 bg-brand/5 p-3"
-                data-source={next.data.source}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs uppercase tracking-wide text-muted">Your next step</p>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-xs ${
-                      next.data.source === "teacher"
-                        ? "border-brand bg-brand text-brand-fg"
-                        : "border-border bg-surface"
-                    }`}
-                  >
-                    {next.data.source === "teacher" ? "Teacher recommended" : "Suggested for you"}
-                  </span>
-                </div>
-                <p className="mt-1 text-sm" data-testid="li-recommendation-reason">
-                  {next.data.friendlyReason}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {practiceFor(next.data.activityId) ? (
-                    <Link to={`/app/learning/practice/${next.data.activityId}`} className="inline-block">
-                      <Button variant="ghost">Practice now</Button>
-                    </Link>
-                  ) : null}
-                  <Link to={`/app/learning/courses/${next.data.courseId}`} className="inline-block">
-                    <Button variant="ghost">Start now</Button>
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted">You&apos;re all caught up — nice work.</p>
-            )}
-
             <div>
               <p className="mb-2 text-sm font-medium">
                 Skill mastery <span className="text-muted">· CEFR {liProfile.data.cefrBand}</span>

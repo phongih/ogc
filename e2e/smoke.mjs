@@ -232,9 +232,12 @@ async function main() {
     check("[li3] path has a completed step", (await pathList.locator('[data-state="completed"]').count()) >= 1);
     check("[li3] path has an available step", (await pathList.locator('[data-state="available"]').count()) >= 1);
     check("[li3] path has a prerequisite-blocked step", (await pathList.locator('[data-state="blocked"]').count()) >= 1);
-    await page.getByRole("link", { name: "Start now" }).first().click();
+    // P1 Today's mission: the recommended activity is practice-enabled, so the ONE primary action is
+    // "Practice now"; the recommended course stays one quiet link away ("Open the course").
+    check("[p1] today's mission shows exactly one primary action", (await page.getByRole("link", { name: "Practice now" }).count()) === 1);
+    await page.getByRole("link", { name: "Open the course" }).first().click();
     await page.waitForURL("**/app/learning/courses/**");
-    check("[li] 'Start now' deep-links to the recommended course", page.url().includes("/app/learning/courses/"));
+    check("[li] mission deep-links to the recommended course", page.url().includes("/app/learning/courses/"));
 
     // ── Scenario H — Teacher oversight + APPLIED recommendation reaching the learner (LI-4 + AUTH-026) ──
     await signIn(page, /Tara \(Teacher\)/); // fresh reload → seeded baseline, applied-state cleared
