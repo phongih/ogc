@@ -34,3 +34,28 @@ export function nextWeeklySlot(
 // The two synthetic classes' weekly slots, in center time, matching their names.
 export const A2_MORNING_NEXT = nextWeeklySlot([1, 3], 9); // Mon/Wed 09:00
 export const B1_EVENING_NEXT = nextWeeklySlot([2, 4], 18); // Tue/Thu 18:00
+
+/**
+ * The last `count` occurrences of the weekly slot that have STARTED by `nowMs` (at ≤ now),
+ * oldest first, in the same fixed-offset local time. Used for synthetic session history.
+ */
+export function recentWeeklySlots(
+  weekdays: readonly number[],
+  hh: number,
+  count: number,
+  nowMs: number = Date.now(),
+  mm = 0,
+  offsetMin: number = CENTER_UTC_OFFSET_MIN,
+): string[] {
+  if (weekdays.length === 0) throw new Error("recentWeeklySlots: no weekday given");
+  const off = offsetMin * 60_000;
+  const localToday = Math.floor((nowMs + off) / DAY_MS) * DAY_MS;
+  const out: string[] = [];
+  for (let back = 0; out.length < count && back <= count * 7 + 7; back++) {
+    const d = new Date(localToday - back * DAY_MS);
+    if (!weekdays.includes(d.getUTCDay())) continue;
+    const at = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), hh, mm) - off;
+    if (at <= nowMs) out.push(new Date(at).toISOString());
+  }
+  return out.reverse();
+}

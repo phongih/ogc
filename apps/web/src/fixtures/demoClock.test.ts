@@ -1,7 +1,7 @@
 // Demo clock: upcoming sessions are the NEXT real occurrence of each class's weekly slot,
 // in CENTER time (Asia/Ho_Chi_Minh, UTC+7) — not UTC, not the viewer's timezone.
 import { describe, expect, it } from "vitest";
-import { A2_MORNING_NEXT, B1_EVENING_NEXT, nextWeeklySlot } from "./demoClock";
+import { A2_MORNING_NEXT, B1_EVENING_NEXT, nextWeeklySlot, recentWeeklySlots } from "./demoClock";
 import { lessons } from "./learning";
 import { classes, upcomingSessions } from "./teaching";
 import { formatCenterDateTime } from "../lib/centerTime";
@@ -50,5 +50,22 @@ describe("synthetic schedule is always upcoming and matches the class names", ()
     expect(formatCenterDateTime(B1_EVENING_NEXT)).toMatch(
       /^(Tue|Thu), \d{2}\/\d{2}\/\d{4}, 18:00$/,
     );
+  });
+});
+
+describe("recentWeeklySlots (center time, started only)", () => {
+  it("last 4 Mon/Wed 09:00 sessions before Sat 21/11 18:00 Vietnam, oldest first", () => {
+    expect(recentWeeklySlots([1, 3], 9, 4, SAT_21_NOV_1800_ICT)).toEqual([
+      "2026-11-09T02:00:00.000Z",
+      "2026-11-11T02:00:00.000Z",
+      "2026-11-16T02:00:00.000Z",
+      "2026-11-18T02:00:00.000Z",
+    ]);
+  });
+  it("a session that started today counts; one later today does not", () => {
+    const mon1000ict = Date.parse("2026-11-23T03:00:00.000Z");
+    expect(recentWeeklySlots([1, 3], 9, 1, mon1000ict)).toEqual(["2026-11-23T02:00:00.000Z"]);
+    const mon0800ict = Date.parse("2026-11-23T01:00:00.000Z");
+    expect(recentWeeklySlots([1, 3], 9, 1, mon0800ict)).toEqual(["2026-11-18T02:00:00.000Z"]);
   });
 });

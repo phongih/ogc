@@ -79,3 +79,6 @@ export const practice: PracticePort = mockPractice;
 export const speaking: SpeakingPort = mockSpeaking;
 export const support: SupportPort = mockSupport;
 export { directory } from "./directory";
+import type { AttendancePort } from "@ogc/contracts";
+import { mockAttendance } from "../adapters/mockAttendance";
+export const attendance: AttendancePort = mockAttendance;

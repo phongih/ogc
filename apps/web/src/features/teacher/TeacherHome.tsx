@@ -3,6 +3,7 @@ import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } f
 import { SpeakingReviewQueue } from "./SpeakingReviewQueue";
 import { formatCenterDate, formatCenterDateTime } from "../../lib/centerTime";
 import { NeedsSupportQueue } from "./NeedsSupportQueue";
+import { SessionsToMark } from "./SessionsToMark";
 import { useSession } from "../../app/session";
 import { useTeacherDashboard } from "./queries";
 
@@ -28,6 +29,8 @@ export function TeacherHome() {
           hint="across your classes"
         />
       </div>
+
+      <SessionsToMark />
 
       <SpeakingReviewQueue />
 

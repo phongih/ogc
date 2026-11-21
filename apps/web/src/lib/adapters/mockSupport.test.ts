@@ -7,11 +7,20 @@ import { LEARNER_LINH } from "../../fixtures/personas";
 const T = "demo-teacher";
 
 describe("needs-support queue", () => {
-  it("baseline: placement-only flags, clearly labelled; nobody is evidence-backed yet", async () => {
+  it("baseline: placement-only flags, clearly labelled; only Huy rests on a record (attendance)", async () => {
     const q = await mockSupport.listNeedsSupport(T);
-    expect(q.map((i) => i.learnerName).sort()).toEqual(["An P.", "Linh N.", "Minh T."]);
-    expect(q.every((i) => !i.evidenceBacked)).toBe(true);
-    expect(q.every((i) => i.signals.every((s) => s.source === "placement"))).toBe(true);
+    expect(q.map((i) => i.learnerName).sort()).toEqual(["An P.", "Huy D.", "Linh N.", "Minh T."]);
+    const placementOnly = q.filter((i) => i.learnerName !== "Huy D.");
+    expect(placementOnly.every((i) => !i.evidenceBacked)).toBe(true);
+    expect(placementOnly.every((i) => i.signals.every((s) => s.source === "placement"))).toBe(true);
+    // P2 attendance-v1: Huy was absent from both marked B1 sessions — flagged by attendance alone,
+    // no skill, so nothing to assign; evidence-backed, so listed first.
+    const huy = q.find((i) => i.learnerName === "Huy D.")!;
+    expect(huy.signals).toEqual([{ kind: "absences", source: "attendance", sessions: 2 }]);
+    expect(huy.evidenceBacked).toBe(true);
+    expect(huy.focusSkill).toBeNull();
+    expect(huy.suggestedActivityId).toBeNull();
+    expect(q[0].learnerName).toBe("Huy D.");
     const linh = q.find((i) => i.learnerName === "Linh N.")!;
     expect(linh.signals).toEqual([
       { kind: "low_skill", source: "placement", skill: "speaking", level: 55, evidenceCount: 0 },
