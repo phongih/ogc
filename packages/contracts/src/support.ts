@@ -41,6 +41,9 @@ export const SupportItem = z.object({
   focusSkill: Skill.nullable(),
   suggestedActivityId: z.string().nullable(), // an AVAILABLE activity on the focus skill
   suggestedTitle: z.string().nullable(),
+  // When the focus skill's own activity is still LOCKED, the suggestion is the nearest open
+  // prerequisite on its chain; this names the locked activity it unlocks. null otherwise.
+  suggestionUnlocksTitle: z.string().nullable(),
   activeAssignmentTitle: z.string().nullable(), // AUTH-026 applied recommendation, if any
 });
 export type SupportItem = z.infer<typeof SupportItem>;

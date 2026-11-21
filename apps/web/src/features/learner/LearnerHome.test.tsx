@@ -54,4 +54,11 @@ describe("LearnerHome progress visualization", () => {
     expect(links.length).toBeGreaterThanOrEqual(1);
     links.forEach((a) => expect(a.getAttribute("href")).toMatch(/^\/app\/learning\/courses\//));
   });
+
+  it("upcoming lessons are really upcoming (never 'days ago')", async () => {
+    renderApp("/app/learning", "learner");
+    const list = await screen.findByRole("list", { name: "Upcoming lessons" });
+    expect(list.textContent).not.toMatch(/days ago|Yesterday/);
+    expect(list.textContent).toMatch(/Today|Tomorrow|In \d+ days/);
+  });
 });

@@ -14,6 +14,9 @@ describe("Learners needing support (teacher home)", () => {
     const list = screen.getByRole("list", { name: "Learners needing support" });
     expect(within(list).getAllByText("Placement only")).toHaveLength(3);
     expect(within(list).getByText(/Speaking is 55 \(below 60\)/)).toBeInTheDocument();
+    expect(screen.getByTestId("unlock-00000000-0000-4000-8000-00000000L001")).toHaveTextContent(
+      "Speaking is locked behind “Quiz: At the market” — assign that first",
+    );
   });
 
   it("practice evidence moves a learner to the top; the teacher assigns the suggested activity", async () => {

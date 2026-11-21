@@ -528,8 +528,30 @@ export const mockSupport: SupportPort = {
           const signals = supportSignals(seedProfile(placement), evidenceFor(row.learnerId, scoped), returned);
           if (signals.length === 0) continue;
           const focus = focusSkill(signals);
-          const suggestion =
+          let suggestion =
             path.steps.find((st) => st.state === "available" && st.skill === focus) ?? null;
+          let unlocks: string | null = null;
+          if (!suggestion && focus) {
+            // The focus skill's activity is locked: walk its prerequisite chain (breadth-first)
+            // to the nearest AVAILABLE step — that is what the teacher can actually assign.
+            const byId = new Map(path.steps.map((st) => [st.activityId, st]));
+            for (const locked of path.steps.filter((st) => st.state === "blocked" && st.skill === focus)) {
+              const queue = [...locked.blockedBy];
+              const seenIds = new Set<string>();
+              while (queue.length > 0 && !suggestion) {
+                const id = queue.shift()!;
+                if (seenIds.has(id)) continue;
+                seenIds.add(id);
+                const st = byId.get(id);
+                if (st?.state === "available") suggestion = st;
+                else if (st?.state === "blocked") queue.push(...st.blockedBy);
+              }
+              if (suggestion) {
+                unlocks = activityTitle(locked.activityId);
+                break;
+              }
+            }
+          }
           const active = activeAppliedFor(row.learnerId, path);
           items.push({
             learnerId: row.learnerId,
@@ -540,6 +562,7 @@ export const mockSupport: SupportPort = {
             focusSkill: focus,
             suggestedActivityId: suggestion?.activityId ?? null,
             suggestedTitle: suggestion ? activityTitle(suggestion.activityId) : null,
+            suggestionUnlocksTitle: unlocks,
             activeAssignmentTitle: active ? activityTitle(active.activityId) : null,
           });
         }

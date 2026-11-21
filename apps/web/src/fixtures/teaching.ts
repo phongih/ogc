@@ -2,6 +2,7 @@ import type { ClassSummary, LearnerRow, Session } from "@ogc/contracts";
 import { organizations, brands, centers } from "./directory";
 import { courses } from "./catalog";
 import { TEACHER_TARA } from "./personas";
+import { A2_MORNING_NEXT, B1_EVENING_NEXT } from "./demoClock";
 
 const ORG = organizations[0].id;
 void brands;
@@ -14,7 +15,7 @@ export const classes: ClassSummary[] = [
     courseId: courses[0].id,
     name: "A2 Morning — Mon/Wed",
     learnerCount: 12,
-    nextSessionAt: "2026-11-02T09:00:00.000Z",
+    nextSessionAt: A2_MORNING_NEXT,
   },
   {
     id: "00000000-0000-4000-8000-0000000000k2",
@@ -23,7 +24,7 @@ export const classes: ClassSummary[] = [
     courseId: courses[1].id,
     name: "B1 Evening — Tue/Thu",
     learnerCount: 9,
-    nextSessionAt: "2026-11-03T18:00:00.000Z",
+    nextSessionAt: B1_EVENING_NEXT,
   },
 ];
 
@@ -34,8 +35,8 @@ export const classTeachers: Record<string, string> = {
 };
 
 export const upcomingSessions: Session[] = [
-  { id: "SES-001", classId: classes[0].id, title: "A2 — Unit 7", at: "2026-11-02T09:00:00.000Z" },
-  { id: "SES-002", classId: classes[1].id, title: "B1 — Unit 3", at: "2026-11-03T18:00:00.000Z" },
+  { id: "SES-001", classId: classes[0].id, title: "A2 — Unit 7", at: A2_MORNING_NEXT },
+  { id: "SES-002", classId: classes[1].id, title: "B1 — Unit 3", at: B1_EVENING_NEXT },
 ];
 
 export const rosters: Record<string, LearnerRow[]> = {
