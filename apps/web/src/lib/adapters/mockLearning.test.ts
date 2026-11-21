@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { mockLearning } from "./mockLearning";
 import { courses } from "../../fixtures/catalog";
+import { practiceFor } from "../../fixtures/practice";
+import { mockPractice } from "./mockPractice";
+import { enrollmentStore } from "./store";
 
 const LINH = "demo-learner"; // enrolled in courses[0] & [1]; ACT-A2-1/2 pre-completed
 const MINH = "demo-learner-2"; // enrolled in nothing initially
@@ -23,22 +26,34 @@ describe("mock learning — activities, completion, progress", () => {
     expect(snap!.progressPct).toBe(33);
   });
 
-  it("completing an assessed activity records a score; completion and score are distinct", async () => {
+  it("a quiz with a practice set cannot be self-marked complete — it must be practised", async () => {
+    expect(await mockLearning.completeActivity(LINH, "ACT-A2-3")).toEqual({
+      completed: false,
+      reason: "practice_required",
+    });
+    expect(await mockLearning.getAttempt(LINH, "ACT-A2-3")).toBeNull();
+  });
+
+  it("practising the quiz records a score from the learner's answers; completion and score are distinct", async () => {
     const before = await mockLearning.getProgress(LINH, A2);
-    const res = await mockLearning.completeActivity(LINH, "ACT-A2-3"); // assessed quiz
-    expect(res.completed).toBe(true);
+    const quiz = practiceFor("ACT-A2-3")!;
+    const res = await mockPractice.submitPractice(LINH, "ACT-A2-3", {
+      attemptId: "ATT-ML-1",
+      responses: quiz.items.map((i) => ({ itemId: i.id, optionId: i.correctOptionId })),
+    });
+    expect(res.ok).toBe(true);
 
     const attempt = await mockLearning.getAttempt(LINH, "ACT-A2-3");
     expect(attempt!.state).toBe("completed");
-    expect(attempt!.score).not.toBeNull(); // assessed → score present
+    expect(attempt!.score).toBe(100); // from the answers, not a hash
 
     const after = await mockLearning.getProgress(LINH, A2);
     expect(after!.completedActivities).toBe(before!.completedActivities + 1);
     expect(after!.assessedCount).toBe(1);
 
-    // AI feedback is EVIDENCE, not the score.
+    // The structured practice result is EVIDENCE, separate from the score.
     const evidence = await mockLearning.getEvidence(LINH, "ACT-A2-3");
-    expect(evidence.some((e) => e.kind === "ai_feedback")).toBe(true);
+    expect(evidence.some((e) => e.kind === "practice_result")).toBe(true);
   });
 
   it("a completed non-assessed activity has no score", async () => {
@@ -85,5 +100,12 @@ describe("mock learning — activities, completion, progress", () => {
     const res = await mockLearning.completeActivity(LINH, "ACT-DOES-NOT-EXIST");
     expect(res.completed).toBe(false);
     expect(res.reason).toBe("unknown_activity");
+  });
+
+  it("an activity WITHOUT a practice set can still be marked complete (no score if not assessed)", async () => {
+    enrollmentStore.enroll(MINH, A2);
+    const res = await mockLearning.completeActivity(MINH, "ACT-A2-2"); // exercise; prereq ACT-A2-1 seeded
+    expect(res).toEqual({ completed: true });
+    expect((await mockLearning.getAttempt(MINH, "ACT-A2-2"))!.score).toBeNull();
   });
 });

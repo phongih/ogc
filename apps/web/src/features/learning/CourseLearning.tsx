@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
 import { speakingFor } from "../../fixtures/speaking";
+import { practiceFor } from "../../fixtures/practice";
 import { useCourse } from "../catalog/queries";
 import { useLearningPath } from "../learner/queries";
 import { activities as allActivities } from "../../fixtures/activities";
@@ -98,6 +99,10 @@ export function CourseLearning() {
                         .join(" and ")}{" "}
                       first
                     </span>
+                  ) : practiceFor(a.id) ? (
+                    <Link to={`/app/learning/practice/${a.id}`} className="inline-block">
+                      <Button variant="ghost">Practice now</Button>
+                    </Link>
                   ) : speakingFor(a.id) ? (
                     <Link to={`/app/learning/speaking/${a.id}`} className="inline-block">
                       <Button variant="ghost">Open speaking studio</Button>
