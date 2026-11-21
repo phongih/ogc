@@ -28,7 +28,9 @@ export const classes: ClassSummary[] = [
   },
 ];
 
-// Which synthetic teacher owns which class. Lesson-plan editing is scoped to this.
+// Which synthetic teacher owns which class. Lesson-plan editing, rosters, attendance and the
+// support queue are scoped to this. P2: LIVE in-memory assignment — center staff can reassign a
+// class (mockSchedule); `sessionStore.reset()` restores this seed.
 export const classTeachers: Record<string, string> = {
   [classes[0].id]: TEACHER_TARA,
   [classes[1].id]: TEACHER_TARA,

@@ -22,6 +22,7 @@ const REASON_TEXT: Record<string, string> = {
   not_started: "This session has not started yet.",
   incomplete: "Mark every learner before saving.",
   not_on_roster: "A learner is not on this class roster.",
+  cancelled: "This session was cancelled.",
 };
 
 export function SessionAttendancePage() {
@@ -65,6 +66,21 @@ export function SessionAttendancePage() {
 
   const { session: s, rows, className } = q.data;
   const upcoming = s.status === "upcoming";
+  if (s.status === "cancelled")
+    return (
+      <section className="space-y-4">
+        <PageHeader
+          title={`Attendance · ${s.title}`}
+          subtitle={`${className} · ${formatCenterDateTime(s.at)}`}
+        />
+        <Card>
+          <p className="text-sm">
+            This session was cancelled and moved — mark the replacement session instead.
+          </p>
+        </Card>
+        {back}
+      </section>
+    );
   const complete = rows.length > 0 && rows.every((r) => draft[r.learnerId]);
 
   return (

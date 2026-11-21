@@ -9,6 +9,7 @@ const ORG = "00000000-0000-4000-8000-000000000001";
 const personas: MockPersona[] = [
   { personaId: "demo-staff", displayName: "Sam (Org Staff)", role: "staff", orgId: ORG },
   { personaId: "demo-teacher", displayName: "Tara (Teacher)", role: "teacher", orgId: ORG },
+  { personaId: "demo-teacher-2", displayName: "Ben (Teacher)", role: "teacher", orgId: ORG },
   { personaId: "demo-learner", displayName: "Linh (Learner)", role: "learner", orgId: ORG },
   { personaId: "demo-guardian", displayName: "Mai (Guardian)", role: "guardian", orgId: ORG },
 ];

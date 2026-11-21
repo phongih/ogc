@@ -34,3 +34,20 @@ export function formatCenterDateTime(iso: string): string {
 export function formatCenterDate(iso: string): string {
   return dateFmt.format(new Date(iso));
 }
+
+/**
+ * A `<input type="datetime-local">` value ("2026-11-25T09:00") read as CENTER time → ISO instant.
+ * Null if malformed. Staff schedule in the center's clock, whatever their own device says.
+ */
+export function centerLocalToIso(local: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
+  if (!m) return null;
+  const [, y, mo, d, h, mi] = m.map(Number);
+  const ms = Date.UTC(y, mo - 1, d, h, mi) - CENTER_UTC_OFFSET_MIN * 60_000;
+  return Number.isNaN(ms) ? null : new Date(ms).toISOString();
+}
+
+/** ISO instant → "2026-11-25T09:00" in center time (for a datetime-local input). */
+export function isoToCenterLocal(iso: string): string {
+  return new Date(Date.parse(iso) + CENTER_UTC_OFFSET_MIN * 60_000).toISOString().slice(0, 16);
+}

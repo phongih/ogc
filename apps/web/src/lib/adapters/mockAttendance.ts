@@ -8,18 +8,16 @@ import type {
 } from "@ogc/contracts";
 import { personaMap } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
-import {
-  ABSENCE_STREAK_THRESHOLD,
-  seedSessions,
-  type SeedSession,
-} from "../../fixtures/attendance";
+import { ABSENCE_STREAK_THRESHOLD, seedSessions } from "../../fixtures/attendance";
+import { sessionStore, type StoredSession } from "./sessionStore";
 import { withFault } from "./faults";
 
 /*
  * P2 · Session attendance — MOCK adapter. NON-PRODUCTION, synthetic, in browser memory
  * (a reload restores the seeded history). Fail-closed: only the teacher who OWNS the class, in
- * the class's own tenant, can read or mark it. A session can be marked only once it has
- * started; a later save replaces the earlier marks for that session.
+ * the class's own tenant, can read or mark it — or, for a single session, the substitute center
+ * staff assigned to it. A session can be marked only once it has started and is not cancelled;
+ * a later save replaces the earlier marks for that session. Sessions come from sessionStore.
  */
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
@@ -28,6 +26,7 @@ const latency = <T>(v: T, ms = 60): Promise<T> =>
 // sessionId → learnerId → mark. Seeded once from fixtures.
 const marks = new Map<string, Map<string, AttendanceMark>>();
 function resetAttendance(): void {
+  sessionStore.reset();
   marks.clear();
   for (const s of seedSessions)
     if (s.seededMarks) marks.set(s.id, new Map(Object.entries(s.seededMarks)));
@@ -46,14 +45,31 @@ function ownsClass(viewerPersonaId: string, classId: string): boolean {
   );
 }
 
-const started = (s: SeedSession, nowMs: number) => Date.parse(s.at) <= nowMs;
+// The owner of the class, or this session's substitute — same tenant either way.
+function canMarkSession(viewerPersonaId: string, s: StoredSession): boolean {
+  if (ownsClass(viewerPersonaId, s.classId)) return true;
+  const viewer = personaMap[viewerPersonaId];
+  const cls = classes.find((c) => c.id === s.classId);
+  return !!viewer?.teacherId && s.substituteId === viewer.teacherId && cls?.orgId === viewer.orgId;
+}
 
-function toSession(s: SeedSession, nowMs = Date.now()): ClassSession {
-  const status = !started(s, nowMs) ? "upcoming" : marks.has(s.id) ? "marked" : "to_mark";
+export const isMarked = (sessionId: string) => marks.has(sessionId);
+
+const started = (s: StoredSession, nowMs: number) => Date.parse(s.at) <= nowMs;
+
+function toSession(s: StoredSession, nowMs = Date.now()): ClassSession {
+  const status =
+    s.state === "cancelled"
+      ? "cancelled"
+      : !started(s, nowMs)
+        ? "upcoming"
+        : marks.has(s.id)
+          ? "marked"
+          : "to_mark";
   return { id: s.id, classId: s.classId, title: s.title, at: s.at, status };
 }
 
-function sessionView(s: SeedSession): SessionAttendance {
+function sessionView(s: StoredSession): SessionAttendance {
   const m = marks.get(s.id);
   return {
     session: toSession(s),
@@ -68,9 +84,8 @@ function sessionView(s: SeedSession): SessionAttendance {
 
 // Chronological marks for one learner in one class (marked sessions only).
 function historyFor(classId: string, learnerId: string): AttendanceMark[] {
-  return seedSessions
-    .filter((s) => s.classId === classId)
-    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+  return sessionStore
+    .forClass(classId)
     .map((s) => marks.get(s.id)?.get(learnerId))
     .filter((x): x is AttendanceMark => !!x);
 }
@@ -96,17 +111,17 @@ export const mockAttendance: AttendancePort = {
       if (!ownsClass(viewer, classId)) return latency<ClassSession[] | null>(null);
       const now = Date.now();
       return latency(
-        seedSessions
-          .filter((s) => s.classId === classId)
-          .sort((a, b) => Date.parse(b.at) - Date.parse(a.at)) // newest first
+        sessionStore
+          .forClass(classId)
+          .reverse() // newest first
           .map((s) => toSession(s, now)),
       );
     }),
 
   getSessionAttendance: (viewer, sessionId) =>
     withFault("attendance.getSessionAttendance", () => {
-      const s = seedSessions.find((x) => x.id === sessionId);
-      if (!s || !ownsClass(viewer, s.classId)) return latency<SessionAttendance | null>(null);
+      const s = sessionStore.get(sessionId);
+      if (!s || !canMarkSession(viewer, s)) return latency<SessionAttendance | null>(null);
       return latency(sessionView(s));
     }),
 
@@ -114,8 +129,9 @@ export const mockAttendance: AttendancePort = {
     withFault("attendance.recordAttendance", () => {
       const fail = (reason: Extract<RecordAttendanceResult, { ok: false }>["reason"]) =>
         latency<RecordAttendanceResult>({ ok: false, reason });
-      const s = seedSessions.find((x) => x.id === sessionId);
-      if (!s || !ownsClass(viewer, s.classId)) return fail("not_found");
+      const s = sessionStore.get(sessionId);
+      if (!s || !canMarkSession(viewer, s)) return fail("not_found");
+      if (s.state === "cancelled") return fail("cancelled");
       if (!started(s, Date.now())) return fail("not_started");
       const roster = new Set((rosters[s.classId] ?? []).map((r) => r.learnerId));
       const next = new Map<string, AttendanceMark>();
@@ -155,9 +171,15 @@ export const mockAttendance: AttendancePort = {
     withFault("attendance.listToMark", () => {
       const now = Date.now();
       return latency(
-        seedSessions
-          .filter((s) => ownsClass(viewer, s.classId) && started(s, now) && !marks.has(s.id))
-          .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+        sessionStore
+          .all()
+          .filter(
+            (s) =>
+              s.state === "scheduled" &&
+              canMarkSession(viewer, s) &&
+              started(s, now) &&
+              !marks.has(s.id),
+          )
           .map((s) => toSession(s, now)),
       );
     }),

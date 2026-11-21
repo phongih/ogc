@@ -82,3 +82,6 @@ export { directory } from "./directory";
 import type { AttendancePort } from "@ogc/contracts";
 import { mockAttendance } from "../adapters/mockAttendance";
 export const attendance: AttendancePort = mockAttendance;
+import type { SchedulePort } from "@ogc/contracts";
+import { mockSchedule } from "../adapters/mockSchedule";
+export const schedule: SchedulePort = mockSchedule;

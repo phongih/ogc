@@ -15,7 +15,14 @@ export const NON_PRODUCTION = true as const;
 export type MockRole = "staff" | "teacher" | "guardian" | "learner";
 
 /** UI navigation sections (not permissions). */
-export type Section = "directory" | "learning" | "teaching" | "catalog" | "tutor" | "guardian";
+export type Section =
+  | "directory"
+  | "operations"
+  | "learning"
+  | "teaching"
+  | "catalog"
+  | "tutor"
+  | "guardian";
 
 export interface MockSession {
   readonly nonProduction: true;
@@ -37,7 +44,7 @@ export function createMockSession(persona: MockPersona): MockSession {
 }
 
 const SECTIONS_BY_ROLE: Record<MockRole, Section[]> = {
-  staff: ["directory", "catalog", "tutor", "teaching", "learning", "guardian"],
+  staff: ["directory", "operations", "catalog", "tutor", "teaching", "learning", "guardian"],
   teacher: ["teaching", "catalog", "tutor"],
   guardian: ["guardian", "catalog", "tutor"],
   learner: ["learning", "catalog", "tutor"],

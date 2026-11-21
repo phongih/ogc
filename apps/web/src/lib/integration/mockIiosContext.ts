@@ -61,6 +61,20 @@ const GRANTS: Record<string, IiosContextResolution> = {
       expiresAt: "2099-01-01T00:00:00.000Z",
     },
   },
+  // P2 (additive): the second demo teacher (substitute / reassignment). Synthetic; no key/mac.
+  "grant-valid-teacher-2": {
+    state: "valid",
+    context: {
+      clientId: "eduos",
+      orgId: ORG,
+      principalId: "iios-principal-teacher-2",
+      role: "teacher",
+      purpose: "learning.read",
+      requestId: "req-synth-0007",
+      grantRef: "iios-grant-ref-0007",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    },
+  },
   "grant-valid-guardian": {
     state: "valid",
     context: {

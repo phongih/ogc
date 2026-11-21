@@ -33,6 +33,7 @@ export type IiosScenario = (typeof IIOS_SCENARIOS)[number];
 const VALID_GRANT_BY_PERSONA: Record<string, string> = {
   "demo-staff": "grant-valid-staff",
   "demo-teacher": "grant-valid-teacher",
+  "demo-teacher-2": "grant-valid-teacher-2",
   "demo-learner": "grant-valid-learner",
   "demo-guardian": "grant-valid-guardian",
 };
