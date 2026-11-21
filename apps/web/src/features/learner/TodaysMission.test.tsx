@@ -90,6 +90,21 @@ describe("P1 · Today's mission", () => {
     );
   });
 
+  it("does not repeat the teacher note when the reason already quotes it", () => {
+    renderUI(
+      <TodaysMission
+        action={{
+          ...base,
+          source: "teacher",
+          teacherNote: "Targeted practice for Use of English",
+          friendlyReason: 'Your teacher suggests "Quiz" — Targeted practice for Use of English',
+        }}
+      />,
+    );
+    expect(screen.queryByTestId("mission-teacher-note")).toBeNull();
+    expect(screen.getAllByText(/Targeted practice for Use of English/)).toHaveLength(1);
+  });
+
   it("system mission never shows a teacher note", () => {
     renderUI(<TodaysMission action={{ ...base, teacherNote: "should not render" }} />);
     expect(screen.getByText("Suggested for you")).toBeInTheDocument();

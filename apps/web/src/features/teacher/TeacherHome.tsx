@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } from "../../ui";
 import { SpeakingReviewQueue } from "./SpeakingReviewQueue";
+import { NeedsSupportQueue } from "./NeedsSupportQueue";
 import { useSession } from "../../app/session";
 import { useTeacherDashboard } from "./queries";
 
@@ -28,6 +29,8 @@ export function TeacherHome() {
       </div>
 
       <SpeakingReviewQueue />
+
+      <NeedsSupportQueue />
 
       <div>
         <h2 className="mb-3 text-lg font-medium">Assigned classes</h2>

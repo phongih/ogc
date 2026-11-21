@@ -28,13 +28,15 @@ import type {
   Skill,
   SkillConfidence,
   SkillEvidence,
+  SupportItem,
+  SupportPort,
 } from "@ogc/contracts";
 import { activities } from "../../fixtures/activities";
 import { personaMap } from "../../fixtures/personas";
 import { learnerById } from "../../fixtures/learners";
 import { placementByLearner } from "../../fixtures/placement";
 import { prerequisiteEdges } from "../../fixtures/prerequisites";
-import { classTeachers, rosters } from "../../fixtures/teaching";
+import { classes, classTeachers, rosters } from "../../fixtures/teaching";
 import { learningStore } from "./store";
 import { withFault } from "./faults";
 import { ALL_SKILLS, assessmentTypeForKind, skillForKind } from "../../features/learning/intelligence/skills";
@@ -44,6 +46,7 @@ import { computeConfidence } from "../../features/learning/intelligence/confiden
 import { justify } from "../../features/learning/intelligence/justify";
 import { buildLearningPath } from "../../features/learning/intelligence/pathplan";
 import { friendlyNextReason } from "../../features/learning/intelligence/friendly";
+import { focusSkill, supportSignals } from "../../features/learning/intelligence/support";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -496,5 +499,54 @@ export const mockRecommendation: RecommendationPort = {
       if (!profile) return latency<PathStep[]>([]);
       const scoped = scopedActivities(s.learnerId, s.orgId);
       return latency(buildPath(profile, scoped, completedIds(s.learnerId, scoped)));
+    }),
+};
+
+// ── P1 · Learners needing support (owning teacher) ───────────────────────────────────────────
+// Evidence first (owner decision 21/11): every flag states its source. Reuses the LI-1 fold, the
+// LI-3 path (only an AVAILABLE activity is suggested) and AUTH-026 (current assignment).
+export const mockSupport: SupportPort = {
+  listNeedsSupport: (viewerPersonaId) =>
+    withFault("support.listNeedsSupport", () => {
+      const teacherId = personaMap[viewerPersonaId]?.teacherId;
+      if (!teacherId) return latency<SupportItem[]>([]);
+      const items: SupportItem[] = [];
+      const seen = new Set<string>();
+      for (const [classId, owner] of Object.entries(classTeachers)) {
+        if (owner !== teacherId) continue;
+        const className = classes.find((c) => c.id === classId)?.name ?? "Class";
+        for (const row of rosters[classId] ?? []) {
+          if (seen.has(row.learnerId)) continue;
+          seen.add(row.learnerId);
+          const auth = teacherOwnsLearner(viewerPersonaId, row.learnerId);
+          if (!auth) continue; // same-tenant guard
+          const placement = placementFor(row.learnerId, auth.orgId);
+          const path = learnerPathView(row.learnerId, auth.orgId);
+          if (!placement || !path) continue;
+          const scoped = scopedActivities(row.learnerId, auth.orgId);
+          const returned = learningStore.listSpeaking([row.learnerId], "returned").length;
+          const signals = supportSignals(seedProfile(placement), evidenceFor(row.learnerId, scoped), returned);
+          if (signals.length === 0) continue;
+          const focus = focusSkill(signals);
+          const suggestion =
+            path.steps.find((st) => st.state === "available" && st.skill === focus) ?? null;
+          const active = activeAppliedFor(row.learnerId, path);
+          items.push({
+            learnerId: row.learnerId,
+            learnerName: row.displayName,
+            className,
+            signals,
+            evidenceBacked: signals.some((x) => x.source !== "placement"),
+            focusSkill: focus,
+            suggestedActivityId: suggestion?.activityId ?? null,
+            suggestedTitle: suggestion ? activityTitle(suggestion.activityId) : null,
+            activeAssignmentTitle: active ? activityTitle(active.activityId) : null,
+          });
+        }
+      }
+      // Evidence-backed first; then the lowest flagged level.
+      const minLevel = (i: SupportItem) => Math.min(...i.signals.map((x) => x.level ?? 100));
+      items.sort((a, b) => Number(b.evidenceBacked) - Number(a.evidenceBacked) || minLevel(a) - minLevel(b));
+      return latency(items);
     }),
 };

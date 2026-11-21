@@ -125,6 +125,8 @@ async function main() {
     await signOut();
     await persona(/Tara \(Teacher\)/);
     await page.getByRole("heading", { name: "Speaking to review (1)" }).waitFor();
+    await page.getByRole("heading", { name: /^Learners needing support/ }).waitFor();
+    check("[support] teacher home shows the needs-support queue with evidence labels", (await page.getByText(/^(Placement only|Evidence from practice)$/).count()) > 0);
     check("[spk] teacher sees the rehearsal in the review queue", true);
     check("[spk] teacher sees the slipped turn with the natural model line", (await page.getByText(/natural: We swam in the morning/).count()) === 1);
     await shot(page, "spk-4-teacher");
