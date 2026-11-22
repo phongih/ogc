@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BillingResult, GrowthResult, ReferralLead, ReferralProgram } from "@ogc/contracts";
-import { billing, growth } from "../../lib/api";
+import { growth } from "../../lib/api";
 import { useViewer } from "../../app/iiosGate";
 import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDate } from "../../lib/centerTime";
@@ -216,7 +216,6 @@ function LeadCard({ lead: l }: { lead: ReferralLead }) {
   const act = useGrowthAction();
   const me = useMyAccess();
   const can = me.data?.allowed["growth:manage"] ?? true;
-  const canBill = me.data?.allowed["billing:manage"] ?? true;
   const [why, setWhy] = useState("");
   const label = l.learnerName;
   return (
@@ -242,13 +241,15 @@ function LeadCard({ lead: l }: { lead: ReferralLead }) {
             Anti-fraud: {l.flags.map((f) => FLAG_LABEL[f]).join(" · ")}
           </p>
         ) : null}
-        {l.status === "placed" && l.invoiceNo ? (
+        {l.status === "lead" || l.status === "placed" ? (
           <p className="text-sm">
-            First invoice {l.invoiceNo} — waiting for payment. Record it in{" "}
-            <Link className="text-accent underline" to="/app/operations/billing">
-              Billing
+            Admissions stage: <span className="font-medium">{l.stage}</span>
+            {l.invoiceNo ? ` · first invoice ${l.invoiceNo} waiting for payment (Billing)` : ""}.
+            Placement and the first invoice are handled in{" "}
+            <Link className="text-brand underline" to="/app/operations/admissions">
+              Admissions
             </Link>
-            ; the lead moves on when it is paid in full.
+            ; the reward is decided here once the first invoice is paid in full.
           </p>
         ) : null}
         {l.status === "enrolled" ? (
@@ -268,23 +269,6 @@ function LeadCard({ lead: l }: { lead: ReferralLead }) {
         ) : null}
         {can && l.status !== "confirmed" && l.status !== "rejected" ? (
           <div className="flex flex-wrap items-end gap-2 text-sm">
-            {l.status === "lead" ? (
-              <Button
-                variant="ghost"
-                onClick={() => act.mutate(() => growth.markPlaced(viewer, l.id))}
-              >
-                Placement done · {label}
-              </Button>
-            ) : null}
-            {l.status === "placed" && !l.invoiceNo ? (
-              <Button
-                variant="ghost"
-                disabled={!canBill}
-                onClick={() => act.mutate(() => billing.issueFirstInvoice(viewer, l.id))}
-              >
-                Issue first invoice · {label}
-              </Button>
-            ) : null}
             {l.status === "enrolled" ? (
               <Button onClick={() => act.mutate(() => growth.confirm(viewer, l.id))}>
                 Confirm reward · {label}

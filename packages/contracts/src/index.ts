@@ -33,3 +33,4 @@ export * from "./authorize.js";
 export * from "./gamification.js";
 export * from "./growth.js";
 export * from "./billing.js";
+export * from "./admissions.js";

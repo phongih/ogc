@@ -33,14 +33,8 @@ import { refill, registerPersistent } from "./persist";
 import { sessionStore } from "./sessionStore";
 import { allows, centerScope, inScope } from "./accessPolicy";
 import { displayNameOf, ogcAccountOf, staffOrgOf } from "./viewer";
-import {
-  attachFirstInvoice,
-  consumeCredit,
-  leadForBilling,
-  markLeadPaid,
-  refundCredit,
-  walletBalanceOf,
-} from "./mockGrowth";
+import { consumeCredit, refundCredit, walletBalanceOf } from "./mockGrowth";
+import { attachFirstInvoice, leadForBilling, markLeadPaid } from "./mockAdmissions";
 import { withFault } from "./faults";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
@@ -667,11 +661,12 @@ export const mockBilling: BillingPort = {
       if (!org) return refuse("not_staff");
       const lead = leadForBilling(leadId);
       if (!lead || lead.orgId !== org) return refuse("not_found");
-      const center = centers.find((c) => c.orgId === org && c.name === lead.centerName);
+      const center = centers.find((c) => c.orgId === org && c.id === lead.centerId);
       if (!center) return refuse("not_found");
       if (!allows(viewer, "billing:manage", { centerId: center.id }))
         return refuse("access_policy");
-      if (lead.status !== "placed") return refuse("invalid_step", "place the learner first");
+      if (lead.stage !== "placement")
+        return refuse("invalid_step", "record the placement test in Admissions first");
       if (lead.invoiceNo) return refuse("invalid_step", `already invoiced: ${lead.invoiceNo}`);
       // The period running today, else the next one to start; a running period that ends within
       // FIRST_INVOICE_MIN_DAYS_LEFT days is skipped when a later one exists.
@@ -710,7 +705,7 @@ export const mockBilling: BillingPort = {
           leadId: lead.id,
         },
       )!;
-      attachFirstInvoice(lead.id, inv.no);
+      attachFirstInvoice(lead.id, inv.no, displayNameOf(viewer));
       return latency<BillingResult<{ invoiceNo: string }>>({ ok: true, invoiceNo: inv.no });
     }),
 
@@ -738,7 +733,7 @@ export const mockBilling: BillingPort = {
       const p = paymentOf(inv, amountVnd, method, displayNameOf(viewer));
       inv.payments.push(p);
       if (inv.billTo.kind === "lead" && statusOf(inv) === "paid")
-        markLeadPaid(inv.billTo.leadId, totalOf(inv));
+        markLeadPaid(inv.billTo.leadId, totalOf(inv), displayNameOf(viewer));
       return latency<BillingResult<{ receiptNo: string }>>({ ok: true, receiptNo: p.receiptNo });
     }),
 
@@ -752,7 +747,8 @@ export const mockBilling: BillingPort = {
       inv.voided = { reason: reason.trim(), at: new Date().toISOString() };
       if (inv.payerPrincipalId && inv.creditAppliedVnd > 0)
         refundCredit(inv.payerPrincipalId, inv.creditAppliedVnd, `Returned from void ${inv.no}`);
-      if (inv.billTo.kind === "lead") attachFirstInvoice(inv.billTo.leadId, null);
+      if (inv.billTo.kind === "lead")
+        attachFirstInvoice(inv.billTo.leadId, null, displayNameOf(viewer));
       return latency<BillingResult>({ ok: true });
     }),
 

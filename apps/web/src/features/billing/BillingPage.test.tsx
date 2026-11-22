@@ -6,9 +6,11 @@ import userEvent from "@testing-library/user-event";
 import { renderApp } from "../../test/harness";
 import { __resetBillingForTests } from "../../lib/adapters/mockBilling";
 import { __resetGrowthForTests } from "../../lib/adapters/mockGrowth";
+import { __resetAdmissionsForTests } from "../../lib/adapters/mockAdmissions";
 
 beforeEach(() => {
   __resetGrowthForTests();
+  __resetAdmissionsForTests();
   __resetBillingForTests();
   window.localStorage.clear();
 });
