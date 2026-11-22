@@ -90,13 +90,17 @@ function seedPolicies(): StoredPolicy[] {
         { action: "makeup:manage", criteria: { centerId: [D1] } },
         { action: "billing:manage", criteria: { centerId: [D1] } },
         { action: "admissions:manage", criteria: { centerId: [D1] } },
+        { action: "students:view", criteria: { centerId: [D1] } },
       ],
     ),
     mk(
       "policy-own-classes",
       "Teacher — own classes only",
-      "Marks attendance for their own classes only, not as a substitute.",
-      [{ action: "attendance:mark", criteria: { sessionRole: ["owner"] } }],
+      "Marks attendance for their own classes only, not as a substitute; sees their own learners' care.",
+      [
+        { action: "attendance:mark", criteria: { sessionRole: ["owner"] } },
+        { action: "students:view" },
+      ],
     ),
   ];
 }

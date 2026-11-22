@@ -13,6 +13,7 @@ import { AccessHome } from "../features/access/AccessHome";
 import { RewardsSettingsPage } from "../features/engine/RewardsSettingsPage";
 import { GrowthAdminPage } from "../features/growth/GrowthAdminPage";
 import { ReferralsPage } from "../features/growth/ReferralsPage";
+import { StudentsPage } from "../features/students/StudentsPage";
 import { AdmissionsPage } from "../features/admissions/AdmissionsPage";
 import { BillingPage } from "../features/billing/BillingPage";
 import { TuitionPage } from "../features/billing/TuitionPage";
@@ -44,6 +45,8 @@ export const routes = [
       { path: "orgs/:orgId", element: <RequireSection section="directory"><OrgDetail /></RequireSection> },
       { path: "centers/:centerId", element: <RequireSection section="directory"><CenterDetail /></RequireSection> },
       { path: "operations/growth", element: <RequireSection section="operations"><GrowthAdminPage /></RequireSection> },
+      { path: "operations/students", element: <RequireSection section="operations"><StudentsPage back={{ to: "/app/operations", label: "Center operations" }} /></RequireSection> },
+      { path: "teaching/students", element: <RequireSection section="teaching"><StudentsPage back={{ to: "/app/teaching", label: "Teaching" }} /></RequireSection> },
       { path: "operations/admissions", element: <RequireSection section="operations"><AdmissionsPage /></RequireSection> },
       { path: "operations/billing", element: <RequireSection section="operations"><BillingPage /></RequireSection> },
       { path: "tuition", element: <RequireSection section="tuition"><TuitionPage /></RequireSection> },

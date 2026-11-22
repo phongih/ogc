@@ -80,6 +80,12 @@ export function OperationsHome() {
         Admissions
       </Link>{" "}
       <Link
+        to="/app/operations/students"
+        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+      >
+        Current students
+      </Link>{" "}
+      <Link
         to="/app/operations/engine"
         className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
       >

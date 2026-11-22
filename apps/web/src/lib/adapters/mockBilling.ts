@@ -444,6 +444,23 @@ function draftIssues(orgId: string, d: FeeLineDraft): string | null {
     : null;
 }
 
+/** Current Students (staff with billing access): a learner's invoices, void excluded. */
+export function listInvoicesOfLearner(
+  orgId: string,
+  learnerId: string,
+  now = Date.now(),
+): Invoice[] {
+  return [...invoices.values()]
+    .filter(
+      (i) =>
+        i.orgId === orgId &&
+        !i.voided &&
+        i.billTo.kind === "learner" &&
+        i.billTo.learnerId === learnerId,
+    )
+    .map((i) => view(i, now));
+}
+
 /** Decision Engine: open invoices of an org overdue by at least `days` (center time). */
 export function overdueInvoicesOf(orgId: string, days: number, now = Date.now()): Invoice[] {
   return [...invoices.values()]
