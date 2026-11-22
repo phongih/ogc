@@ -16,6 +16,7 @@ import { centerLocalToIso, formatCenterDateTime, isoToCenterLocal } from "../../
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { MakeupBoard } from "./MakeupBoard";
 import { EngineNotifications } from "../engine/EngineNotifications";
+import { LoadHint } from "../workforce/LoadHint";
 import { AccessBanner } from "../access/AccessBanner";
 import { useMyAccess } from "../access/useMyAccess";
 
@@ -84,6 +85,12 @@ export function OperationsHome() {
         className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
       >
         Current students
+      </Link>{" "}
+      <Link
+        to="/app/operations/workforce"
+        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+      >
+        Workforce
       </Link>{" "}
       <Link
         to="/app/operations/engine"
@@ -191,6 +198,9 @@ function ClassCard({
           </select>
           <span className="text-xs text-muted">· {cls.learnerCount} learners</span>
         </label>
+        {!lockedTeacher ? (
+          <LoadHint target={{ classId: cls.classId }} label={cls.className} />
+        ) : null}
 
         <ul className="divide-y divide-border" aria-label={`Sessions of ${cls.className}`}>
           {shown.map((s) => (
@@ -317,6 +327,9 @@ function SessionRow({
                   ))}
               </select>
             </label>
+          ) : null}
+          {canSub && !lockedSub && future ? (
+            <LoadHint target={{ sessionId: s.id }} label={s.title} />
           ) : null}
           {future ? (
             <>

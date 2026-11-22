@@ -20,6 +20,8 @@ export const LEARNER_MINH = "00000000-0000-4000-8000-00000000L002";
 export const TEACHER_TARA = "00000000-0000-4000-8000-00000000t001";
 // P2: a second teacher in the same center — a substitute / reassignment target.
 export const TEACHER_BEN = "00000000-0000-4000-8000-00000000t002";
+export const TEACHER_MIA = "00000000-0000-4000-8000-00000000t003";
+export const TEACHER_KHANG = "00000000-0000-4000-8000-00000000t004";
 export const GUARDIAN_MAI = "00000000-0000-4000-8000-00000000g001";
 // A learner belonging to a DIFFERENT tenant root — for cross-org isolation tests.
 export const LEARNER_ORG2 = "00000000-0000-4000-8000-0000000Lo201";
@@ -41,6 +43,9 @@ export const personaMap: Record<string, PersonaMapping> = {
 export const teachers: { id: string; name: string; orgId: string }[] = [
   { id: TEACHER_TARA, name: "Tara", orgId: ORG },
   { id: TEACHER_BEN, name: "Ben", orgId: ORG },
+  // Workforce (22/11): two more synthetic teachers of the center's records — no OGC sign-in.
+  { id: TEACHER_MIA, name: "Mia", orgId: ORG },
+  { id: TEACHER_KHANG, name: "Khang", orgId: ORG },
 ];
 export const teacherName = (id: string | undefined): string | null =>
   teachers.find((t) => t.id === id)?.name ?? null;

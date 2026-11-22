@@ -23,7 +23,7 @@ const a2Marked = () => seedSessions.filter((s) => s.classId === A2 && s.seededMa
 beforeEach(() => __resetAttendanceForTests());
 
 describe("mockSchedule — access", () => {
-  it("staff of the tenant see every class and both teachers; nobody else does", async () => {
+  it("staff of the tenant see every class and all of its teachers; nobody else does", async () => {
     const o = (await mockSchedule.getOverview(as(S)))!;
     expect(o.classes.map((c) => c.className)).toEqual([
       "A2 Morning — Mon/Wed",
@@ -31,7 +31,7 @@ describe("mockSchedule — access", () => {
       "A2 Evening — Tue/Thu",
     ]);
     expect(o.classes[2].teacher?.name).toBe("Ben");
-    expect(o.teachers.map((t) => t.name)).toEqual(["Tara", "Ben"]);
+    expect(o.teachers.map((t) => t.name)).toEqual(["Tara", "Ben", "Mia", "Khang"]);
     expect(o.classes[0].teacher?.name).toBe("Tara");
     for (const other of ["demo-teacher", "demo-teacher-2", "demo-learner", "demo-guardian"])
       expect(await mockSchedule.getOverview(as(other))).toBeNull();

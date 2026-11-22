@@ -31,6 +31,7 @@ const AccessHome = page(() => import("../features/access/AccessHome"), "AccessHo
 const RewardsSettingsPage = page(() => import("../features/engine/RewardsSettingsPage"), "RewardsSettingsPage");
 const GrowthAdminPage = page(() => import("../features/growth/GrowthAdminPage"), "GrowthAdminPage");
 const ReferralsPage = page(() => import("../features/growth/ReferralsPage"), "ReferralsPage");
+const WorkforcePage = page(() => import("../features/workforce/WorkforcePage"), "WorkforcePage");
 const StudentsPage = page(() => import("../features/students/StudentsPage"), "StudentsPage");
 const AdmissionsPage = page(() => import("../features/admissions/AdmissionsPage"), "AdmissionsPage");
 const BillingPage = page(() => import("../features/billing/BillingPage"), "BillingPage");
@@ -62,6 +63,7 @@ export const routes = [
       { path: "orgs/:orgId", element: <RequireSection section="directory"><Lazy><OrgDetail /></Lazy></RequireSection> },
       { path: "centers/:centerId", element: <RequireSection section="directory"><Lazy><CenterDetail /></Lazy></RequireSection> },
       { path: "operations/growth", element: <RequireSection section="operations"><Lazy><GrowthAdminPage /></Lazy></RequireSection> },
+      { path: "operations/workforce", element: <RequireSection section="operations"><Lazy><WorkforcePage /></Lazy></RequireSection> },
       { path: "operations/students", element: <RequireSection section="operations"><Lazy><StudentsPage back={{ to: "/app/operations", label: "Center operations" }} /></Lazy></RequireSection> },
       { path: "teaching/students", element: <RequireSection section="teaching"><Lazy><StudentsPage back={{ to: "/app/teaching", label: "Teaching" }} /></Lazy></RequireSection> },
       { path: "operations/admissions", element: <RequireSection section="operations"><Lazy><AdmissionsPage /></Lazy></RequireSection> },

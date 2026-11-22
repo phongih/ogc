@@ -236,7 +236,9 @@ function Dashboard() {
                 .map((s) => (
                   <tr key={s.source} className="border-t border-border first:border-0">
                     <td className="py-1">{SOURCE_LABEL[s.source]}</td>
-                    <td className="text-right">{s.leads} leads</td>
+                    <td className="text-right">
+                      {s.leads} {s.leads === 1 ? "lead" : "leads"}
+                    </td>
                     <td className="text-right">
                       {s.reached} enrolled · {pctText(s)}
                     </td>

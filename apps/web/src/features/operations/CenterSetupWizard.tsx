@@ -4,6 +4,7 @@
  * EduOS campus wizard: steps on the left, the required checklist on the right, a draft kept in
  * this browser, a review step. Opening the center creates its classes and first sessions.
  */
+import { LoadHint } from "../workforce/LoadHint";
 import type { IiosGrantedContext } from "@ogc/contracts";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -530,6 +531,12 @@ function ClassesStep({ draft, set, ctx }: StepProps) {
                 </label>
               ))}
             </div>
+            {c.weekdays.length ? (
+              <LoadHint
+                target={{ weeklyMinutes: c.weekdays.length * (c.durationMin || 0) }}
+                label={`Class ${i + 1}`}
+              />
+            ) : null}
             {issues.length ? (
               <p className="text-xs text-danger">This class {issues.join(", ")}.</p>
             ) : null}

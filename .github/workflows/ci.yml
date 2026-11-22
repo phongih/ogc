@@ -51,3 +51,4 @@ jobs:
           node e2e/billing-journey.mjs || echo "billing journey E2E skipped/soft-failed (non-blocking)"
           node e2e/admissions-journey.mjs || echo "admissions journey E2E skipped/soft-failed (non-blocking)"
           node e2e/students-journey.mjs || echo "students journey E2E skipped/soft-failed (non-blocking)"
+          node e2e/workforce-journey.mjs || echo "workforce journey E2E skipped/soft-failed (non-blocking)"
