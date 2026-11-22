@@ -23,7 +23,8 @@ export type Section =
   | "teaching"
   | "catalog"
   | "tutor"
-  | "guardian";
+  | "guardian"
+  | "referrals";
 
 export interface MockSession {
   readonly nonProduction: true;
@@ -58,8 +59,9 @@ const SECTIONS_BY_ROLE: Record<MockRole, Section[]> = {
   ],
   staff: ["directory", "operations", "catalog", "tutor", "teaching", "learning", "guardian"],
   teacher: ["teaching", "catalog", "tutor"],
-  guardian: ["guardian", "catalog", "tutor"],
-  learner: ["learning", "catalog", "tutor"],
+  // Referrals: the page itself decides (guardians and ADULT learners only; minors see a note).
+  guardian: ["guardian", "referrals", "catalog", "tutor"],
+  learner: ["learning", "referrals", "catalog", "tutor"],
 };
 
 /**

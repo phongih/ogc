@@ -11,6 +11,7 @@ export interface PersonaMapping {
   guardianId?: string;
   linkedLearnerIds?: string[];
   staff?: true; // P2: center staff — manages schedule and teacher assignment in its own tenant
+  adult?: true; // an adult learner (18+) — may refer others; minors are referred by their guardian
   admin?: true; // Org Admin — staff access + manages access policies (never their own)
 }
 
@@ -29,7 +30,7 @@ export const personaMap: Record<string, PersonaMapping> = {
   "demo-teacher": { orgId: ORG, teacherId: TEACHER_TARA },
   "demo-teacher-2": { orgId: ORG, teacherId: TEACHER_BEN },
   "demo-learner": { orgId: ORG, learnerId: LEARNER_LINH },
-  "demo-learner-2": { orgId: ORG, learnerId: LEARNER_MINH },
+  "demo-learner-2": { orgId: ORG, learnerId: LEARNER_MINH, adult: true },
   "demo-guardian": { orgId: ORG, guardianId: GUARDIAN_MAI, linkedLearnerIds: [LEARNER_LINH] },
   // A different tenant root — exists only to exercise cross-org isolation in tests.
   "demo-staff-org2": { orgId: ORG2, staff: true },

@@ -50,6 +50,7 @@ if node -e "require('module').createRequire('/opt/npm-tools/node_modules/').reso
   node e2e/engine-journey.mjs
   node e2e/access-journey.mjs
   node e2e/gamification-journey.mjs
+  node e2e/growth-journey.mjs
 else
   echo "== e2e: NOT RUN — Playwright unavailable (core gates unaffected) =="
 fi

@@ -12,6 +12,7 @@ const personas: MockPersona[] = [
   { personaId: "demo-teacher", displayName: "Tara (Teacher)", role: "teacher", orgId: ORG },
   { personaId: "demo-teacher-2", displayName: "Ben (Teacher)", role: "teacher", orgId: ORG },
   { personaId: "demo-learner", displayName: "Linh (Learner)", role: "learner", orgId: ORG },
+  { personaId: "demo-learner-2", displayName: "Minh (Adult learner)", role: "learner", orgId: ORG },
   { personaId: "demo-guardian", displayName: "Mai (Guardian)", role: "guardian", orgId: ORG },
 ];
 

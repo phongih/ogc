@@ -84,6 +84,12 @@ export function OperationsHome() {
         className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
       >
         Rewards
+      </Link>{" "}
+      <Link
+        to="/app/operations/growth"
+        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+      >
+        Growth Engine
       </Link>
       <EngineNotifications />
       <MakeupBoard viewer={viewer} teachers={q.data.teachers} />

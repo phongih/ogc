@@ -107,3 +107,8 @@ export const iiosPolicyAdmin: IiosPolicyAdminPort = mockIiosPolicyAdmin;
 import type { GamificationPort } from "@ogc/contracts";
 import { mockGamification } from "../adapters/mockGamification";
 export const gamification: GamificationPort = mockGamification;
+
+// Growth Engine · referrals (owner 22/11). Mock, synthetic — no money moves.
+import type { GrowthPort } from "@ogc/contracts";
+import { mockGrowth } from "../adapters/mockGrowth";
+export const growth: GrowthPort = mockGrowth;
