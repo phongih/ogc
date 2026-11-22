@@ -10,6 +10,7 @@ import { CenterDetail } from "../features/org/CenterDetail";
 import { OperationsHome } from "../features/operations/OperationsHome";
 import { CenterSetupWizard } from "../features/operations/CenterSetupWizard";
 import { AccessHome } from "../features/access/AccessHome";
+import { RewardsSettingsPage } from "../features/engine/RewardsSettingsPage";
 import { DecisionEnginePage } from "../features/engine/DecisionEnginePage";
 import { LearnerHome } from "../features/learner/LearnerHome";
 import { TeacherHome } from "../features/teacher/TeacherHome";
@@ -35,6 +36,7 @@ export const routes = [
       { path: "orgs", element: <RequireSection section="directory"><OrgList /></RequireSection> },
       { path: "orgs/:orgId", element: <RequireSection section="directory"><OrgDetail /></RequireSection> },
       { path: "centers/:centerId", element: <RequireSection section="directory"><CenterDetail /></RequireSection> },
+      { path: "operations/rewards", element: <RequireSection section="operations"><RewardsSettingsPage /></RequireSection> },
       { path: "operations/engine", element: <RequireSection section="operations"><DecisionEnginePage /></RequireSection> },
       { path: "operations/centers/new", element: <RequireSection section="operations"><CenterSetupWizard /></RequireSection> },
       { path: "access", element: <RequireSection section="access"><AccessHome /></RequireSection> },

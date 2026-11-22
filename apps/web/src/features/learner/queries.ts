@@ -9,17 +9,9 @@ import {
   learningPath,
   learnerNextAction,
 } from "../../lib/api";
-import { getAchievements } from "./achievements";
 
 export const useLearnerDashboard = (viewer: IiosGrantedContext) =>
   useQuery({ queryKey: ["learner", viewer], queryFn: () => learner.getDashboard(viewer) });
-
-export const useAchievements = (viewer: IiosGrantedContext) =>
-  useQuery({
-    queryKey: ["achievements", viewer],
-    queryFn: async () => getAchievements(viewer),
-    enabled: !!viewer,
-  });
 
 // LI-1 — learner intelligence: mastery profile + evidence-driven next step.
 export const useLearnerProfile = (viewer: IiosGrantedContext) =>

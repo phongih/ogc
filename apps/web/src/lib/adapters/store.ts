@@ -89,6 +89,12 @@ const attempts = new Map<string, Map<string, LearningAttempt>>();
 const evidence = new Map<string, Map<string, LearningEvidence[]>>();
 let attemptSeq = 0;
 let evidenceSeq = 0;
+// Gamification: the REAL time each completion was recorded (`${learnerId}::${activityId}`).
+// completedAt stays deterministic for progress; rewards and streaks need the wall clock.
+// Seeded completions have no entry (they fall back to their deterministic completedAt).
+const recordedAt = new Map<string, string>();
+const markRecorded = (learnerId: string, activityId: string) =>
+  recordedAt.set(`${learnerId}::${activityId}`, new Date().toISOString());
 
 // Last deterministic practice result per (learnerId, activityId) — for idempotent replay and
 // to surface the structured result to the learner UI. Synthetic, in-memory only.
@@ -199,6 +205,18 @@ export const learningStore = {
   getAttempt: (learnerId: string, activityId: string): LearningAttempt | null =>
     attemptsFor(learnerId).get(activityId) ?? null,
 
+  /** Gamification: every completed attempt of a learner, with when it was recorded. */
+  completionsOf: (learnerId: string): (LearningAttempt & { recordedAt: string })[] =>
+    [...attemptsFor(learnerId).values()]
+      .filter((a) => a.state === "completed")
+      .map((a) => ({
+        ...a,
+        recordedAt:
+          recordedAt.get(`${learnerId}::${a.activityId}`) ??
+          a.completedAt ??
+          new Date(LEARNING_EPOCH).toISOString(),
+      })),
+
   /** Latest evidence time for a learner (any activity), or null. Decision Engine "no practice". */
   lastEvidenceAt: (learnerId: string): string | null => {
     let last: string | null = null;
@@ -243,6 +261,7 @@ export const learningStore = {
       score,
     });
 
+    markRecorded(learnerId, activityId);
     // AI-generated feedback is recorded as EVIDENCE, separate from the score.
     const ev = evidenceFor(learnerId);
     const list = ev.get(activityId) ?? [];
@@ -316,6 +335,7 @@ export const learningStore = {
       score: result.score,
     });
 
+    markRecorded(learnerId, activityId);
     // Structured practice evidence (separate from the score; summary only, no answer leakage).
     const ev = evidenceFor(learnerId);
     const list = ev.get(activityId) ?? [];
@@ -431,6 +451,7 @@ export const learningStore = {
       completedAt,
       score: result.score,
     });
+    markRecorded(learnerId, activityId);
     const ev = evidenceFor(learnerId);
     const list = ev.get(activityId) ?? [];
     list.push({
@@ -549,6 +570,7 @@ registerPersistent("learning", {
     speakingSeq,
     convByPersona,
     convSeq,
+    recordedAt,
   }),
   load: (raw) => {
     const d = raw as Record<string, unknown>;
@@ -560,6 +582,7 @@ registerPersistent("learning", {
     refill(speakingReviews, d.speakingReviews);
     refill(speakingResults, d.speakingResults);
     refill(convByPersona, d.convByPersona);
+    refill(recordedAt, d.recordedAt);
     planSeq = Number(d.planSeq) || 0;
     attemptSeq = Number(d.attemptSeq) || 0;
     evidenceSeq = Number(d.evidenceSeq) || 0;

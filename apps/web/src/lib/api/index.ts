@@ -102,3 +102,8 @@ import { mockMyAccess } from "../adapters/accessPolicy";
 import { mockIiosPolicyAdmin } from "../integration/mockIiosPolicy";
 export const accessPolicy: MyAccessPort = mockMyAccess;
 export const iiosPolicyAdmin: IiosPolicyAdminPort = mockIiosPolicyAdmin;
+
+// Gamification — derived from learning evidence only (owner 22/11). Mock, synthetic.
+import type { GamificationPort } from "@ogc/contracts";
+import { mockGamification } from "../adapters/mockGamification";
+export const gamification: GamificationPort = mockGamification;

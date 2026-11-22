@@ -2,7 +2,6 @@ import { useViewer } from "../../app/iiosGate";
 import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner, StatTile } from "../../ui";
 import {
-  useAchievements,
   useLearnerDashboard,
   useLearnerProfile,
   useMasteryConfidence,
@@ -15,11 +14,11 @@ import { ALL_SKILLS, skillLabel } from "../learning/intelligence/skills";
 import { confidenceWord, masteryWord } from "../learning/intelligence/friendly";
 import { TodaysMission } from "./TodaysMission";
 import { MyMakeups } from "./MyMakeups";
+import { MyRewards } from "./MyRewards";
 
 export function LearnerHome() {
   const viewer = useViewer();
   const q = useLearnerDashboard(viewer);
-  const achievements = useAchievements(viewer);
   const liProfile = useLearnerProfile(viewer);
   const path = useLearningPath(viewer);
   const next = useNextAction(viewer);
@@ -137,30 +136,7 @@ export function LearnerHome() {
         </div>
       ) : null}
 
-      {achievements.data ? (
-        <div>
-          <h2 className="mb-3 text-lg font-medium">Streak &amp; achievements</h2>
-          <Card className="space-y-3">
-            <p className="text-sm">
-              <span aria-hidden="true">🔥</span> <strong>{achievements.data.streakDays}-day</strong> learning streak
-            </p>
-            <ul className="flex flex-wrap gap-2">
-              {achievements.data.badges.map((b) => (
-                <li key={b.id}>
-                  <span
-                    aria-label={`${b.title} ${b.earned ? "(earned)" : "(locked)"}`}
-                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs ${
-                      b.earned ? "border-border bg-surface" : "border-border/50 text-muted opacity-60"
-                    }`}
-                  >
-                    <span aria-hidden="true">{b.icon}</span> {b.title}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </div>
-      ) : null}
+      <MyRewards />
 
       <div>
         <h2 className="mb-3 text-lg font-medium">Enrolled courses</h2>
