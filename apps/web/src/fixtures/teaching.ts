@@ -68,3 +68,10 @@ export const rosters: Record<string, LearnerRow[]> = {
     { learnerId: "00000000-0000-4000-8000-00000000L007", displayName: "Vy H.", progressPct: 35 },
   ],
 };
+
+/**
+ * How many learners a class has — counted from its live roster. The `learnerCount` on each class
+ * above is a seed placeholder and is NOT shown anywhere (22/11: Teaching showed 9 for a class with
+ * fewer learners on its roster).
+ */
+export const learnerCountOf = (classId: string): number => rosters[classId]?.length ?? 0;

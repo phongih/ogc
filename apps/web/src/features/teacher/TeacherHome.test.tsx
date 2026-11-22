@@ -29,12 +29,13 @@ describe("TeacherHome", () => {
     renderApp("/app/teaching", "teacher");
     await waitFor(() => expect(screen.getByText("Classes")).toBeInTheDocument());
 
-    // 2 synthetic classes with 12 + 9 = 21 learners.
+    // 2 synthetic classes; learners counted from their rosters: 3 + 2 = 5 (22/11 — was the seed
+    // placeholder 12 + 9).
     expect(
       within(screen.getByText("Classes").closest("div") as HTMLElement).getByText("2"),
     ).toBeInTheDocument();
     expect(
-      within(screen.getByText("Learners").closest("div") as HTMLElement).getByText("21"),
+      within(screen.getByText("Learners").closest("div") as HTMLElement).getByText("5"),
     ).toBeInTheDocument();
   });
 
