@@ -36,7 +36,10 @@ const OWN_CLASSES = "policy-own-classes";
 const D1 = centers[0].id;
 const A2 = classes[0].id; // District 1
 const DAY = 86_400_000;
-const inDays = (n: number) => new Date(Date.now() + n * DAY).toISOString();
+// n days from now at 13:00 center time (06:00Z): no seeded session starts within 90 minutes of
+// that, so a move / extra session there never clashes, whatever time the suite runs (22/11).
+const inDays = (n: number) =>
+  `${new Date(Date.now() + n * DAY).toISOString().slice(0, 10)}T06:00:00.000Z`;
 const a2ToMark = () =>
   seedSessions.filter(
     (s) => s.classId === A2 && !s.seededMarks && Date.parse(s.at) <= Date.now(),
