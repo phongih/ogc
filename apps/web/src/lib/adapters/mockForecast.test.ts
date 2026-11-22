@@ -1,9 +1,21 @@
 // Business Forecast (owner 22/11): 3 / 6 / 9 / 12 months vs the same months last year, plain
 // statistics on a SYNTHETIC two-year history anchored to live data. Reads only. SYNTHETIC.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { figureFor, type ForecastMetric, type ForecastOverview } from "@ogc/contracts";
+import {
+  figureFor,
+  planScenario,
+  type ForecastMetric,
+  type ForecastOverview,
+} from "@ogc/contracts";
 import { as } from "../../test/grants";
-import { MAX_GROWTH_PCT, MIN_ERROR_PCT, forecastSeries, mockForecast as F } from "./mockForecast";
+import {
+  DEFAULT_FORECAST_SETTINGS as DEF,
+  MAX_GROWTH_PCT,
+  MIN_ERROR_PCT,
+  __resetForecastForTests,
+  forecastSeries,
+  mockForecast as F,
+} from "./mockForecast";
 import { __resetAttendanceForTests } from "./mockAttendance";
 import { __resetWorkforceForTests } from "./mockWorkforce";
 import { __attachForTests } from "../integration/mockIiosPolicy";
@@ -17,6 +29,7 @@ const metric = (o: ForecastOverview, m: ForecastMetric) => o.metrics.find((x) =>
 beforeEach(() => {
   __resetAttendanceForTests();
   __resetWorkforceForTests();
+  __resetForecastForTests();
 });
 afterEach(() => __attachForTests(SAM_P, null));
 
@@ -157,5 +170,110 @@ describe("forecast — the model", () => {
       1,
     );
     expect(p.expectedEnrolments).toBeLessThan(p.openLeads);
+  });
+});
+
+describe("forecast slice 2 — scenarios, costs, break-even", () => {
+  const plan = async () => {
+    const o = (await F.getOverview(as(S)))!;
+    const st = o.planning!.settings;
+    return {
+      o,
+      st,
+      run: (k: "conservative" | "base" | "optimistic", p = st.scenarios[k]) =>
+        planScenario(o.metrics, st.costs, k, p)!,
+    };
+  };
+
+  it("whole organization + money: synthetic defaults; staff may save (forecast:manage)", async () => {
+    const { o, st } = await plan();
+    expect(st).toEqual(DEF);
+    expect(o.planning!.canManage).toBe(true);
+  });
+
+  it("the base scenario IS the base forecast; scenarios start equal and spread out", async () => {
+    const { o, run } = await plan();
+    const base = run("base");
+    const active = o.metrics.find((m) => m.metric === "active")!;
+    const collected = o.metrics.find((m) => m.metric === "collected")!;
+    base.months.forEach((m, k) => {
+      expect(m.students).toBeCloseTo(active.months[k].forecast, 1);
+      expect(m.revenueVnd).toBe(Math.round(collected.months[k].forecast / 1000) * 1000);
+    });
+    const [c, b, op] = (["conservative", "base", "optimistic"] as const).map((k) => run(k));
+    expect(c.months[0].students).toBe(b.months[0].students);
+    expect(c.months[11].cumulativeVnd).toBeLessThan(b.months[11].cumulativeVnd);
+    expect(op.months[11].cumulativeVnd).toBeGreaterThan(b.months[11].cumulativeVnd);
+  });
+
+  it("costs add up: fixed + variable % of revenue + teacher pay per hour", async () => {
+    const { run } = await plan();
+    const m = run("base").months[0];
+    expect(m.fixedCostVnd).toBe(10_000_000);
+    expect(m.variableCostVnd).toBeCloseTo(m.revenueVnd * 0.1, -4);
+    expect(m.teacherCostVnd).toBeCloseTo(m.hoursPerWeek * (52 / 12) * 150_000, -4);
+    expect(m.netVnd).toBeCloseTo(
+      m.revenueVnd - m.fixedCostVnd - m.variableCostVnd - m.teacherCostVnd,
+      -4,
+    );
+  });
+
+  it("break-even: students needed = fixed ÷ contribution per student; unreachable when negative", async () => {
+    const { o, st, run } = await plan();
+    const b = run("base").breakEven;
+    expect(b.studentsNeeded).toBeGreaterThan(0);
+    expect(b.revenueNeededVnd).toBeGreaterThan(0);
+    const pricey = planScenario(
+      o.metrics,
+      { ...st.costs, teacherHourlyVnd: 10_000_000 },
+      "base",
+      st.scenarios.base,
+    )!;
+    expect(pricey.breakEven.studentsNeeded).toBeNull();
+  });
+
+  it("conversion changes enrolments and the extra learners stay as students", async () => {
+    const { st, run } = await plan();
+    const b = run("base");
+    const more = run("base", { ...st.scenarios.base, conversionAdjPct: 50 });
+    expect(more.enrolments12).toBeCloseTo(b.enrolments12 * 1.5, 0);
+    expect(more.months[0].students).toBe(b.months[0].students);
+    expect(more.months[11].students).toBeGreaterThan(b.months[11].students);
+  });
+
+  it("saving: forecast:manage only, validated, persisted per organization", async () => {
+    const next = structuredClone(DEF);
+    next.costs.fixedMonthlyVnd = 12_000_000;
+    next.scenarios.optimistic.tuitionAdjPct = 8;
+    expect(await F.updateSettings(as("demo-teacher"), next)).toMatchObject({ reason: "not_staff" });
+    const bad = structuredClone(DEF);
+    bad.costs.variablePct = 95;
+    expect(await F.updateSettings(as(S), bad)).toMatchObject({ ok: false, reason: "invalid" });
+    expect(await F.updateSettings(as(S), next)).toEqual({ ok: true });
+    const o = (await F.getOverview(as(S)))!;
+    expect(o.planning!.settings.costs.fixedMonthlyVnd).toBe(12_000_000);
+    expect(o.planning!.settings.scenarios.optimistic.tuitionAdjPct).toBe(8);
+  });
+
+  it("D1 front desk: no scenarios (fixed costs are organization-wide), cannot save", async () => {
+    __attachForTests(SAM_P, "policy-front-desk-d1");
+    expect((await F.getOverview(as(S)))!.planning).toBeNull();
+    expect(await F.updateSettings(as(S), DEF)).toMatchObject({ reason: "access_policy" });
+  });
+
+  it("view without manage: may try on screen, cannot save", async () => {
+    const viewOnly = {
+      ...as(S),
+      narrowing: {
+        state: "policy" as const,
+        policyRef: "test",
+        version: 1,
+        name: "Forecast + billing, no manage",
+        rules: [{ action: "forecast:view" as const }, { action: "billing:manage" as const }],
+      },
+    };
+    const o = (await F.getOverview(viewOnly))!;
+    expect(o.planning).toMatchObject({ canManage: false });
+    expect(await F.updateSettings(viewOnly, DEF)).toMatchObject({ reason: "access_policy" });
   });
 });

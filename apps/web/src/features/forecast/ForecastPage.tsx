@@ -2,7 +2,7 @@
  * Business Forecast (owner decisions 22/11). Four horizons — 3 / 6 / 9 / 12 months — next to the
  * same months last year, from plain statistics (trend × seasonal index) on a SYNTHETIC two-year
  * history anchored to live data. Every assumption is shown; nothing here acts. Editable
- * parameters, scenarios, costs and break-even come in slice 2.
+ * parameters, scenarios, costs and break-even: slice 2 (Scenarios.tsx).
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -22,6 +22,7 @@ import { AccessBanner } from "../access/AccessBanner";
 import { useMyAccess } from "../access/useMyAccess";
 import { STAGE_LABEL } from "../admissions/AdmissionsPage";
 import { vnd } from "../growth/format";
+import { Scenarios } from "./Scenarios";
 
 const LABEL: Record<ForecastMetric, string> = {
   leads: "New leads",
@@ -109,6 +110,7 @@ export function ForecastPage() {
           <Capacity o={o} horizon={horizon} />
           <Pipeline o={o} />
           <Money o={o} />
+          <Scenarios o={o} />
           <Assumptions o={o} />
         </>
       )}
@@ -365,8 +367,8 @@ function Money({ o }: { o: ForecastOverview }) {
         <p className="text-sm" data-testid="receivables">
           Open invoices today: {vnd(o.receivables.openVnd)}, of which overdue{" "}
           {vnd(o.receivables.overdueVnd)} (Billing, live). Tuition is collected mostly in each
-          term&apos;s due month (Sep, Dec, Mar, Jun). Costs and break-even come with scenarios (next
-          slice).
+          term&apos;s due month (Sep, Dec, Mar, Jun). Costs, cash flow and break-even: see the
+          scenarios below.
         </p>
       ) : (
         <p className="text-sm text-muted" data-testid="no-money">
@@ -436,7 +438,7 @@ function Assumptions({ o }: { o: ForecastOverview }) {
       </div>
       <p className="mt-2 text-xs text-muted">
         Seasonal index: 1.00 is an average month. The yearly trend is capped at ±{o.maxGrowthPct}%.
-        Editing these and comparing scenarios comes in the next slice.
+        Scenarios adjust the trend, enrolments and tuition on top of these.
       </p>
     </Card>
   );

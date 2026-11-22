@@ -99,7 +99,7 @@ export function historyOf(
     series.active.push(active);
     series.leads.push(Math.round(base * 1.2 * SEASON.leads[c] * (1 + noise(`${k}:l`, 0.15))));
     series.enrolments.push(
-      Math.round(base * 0.4 * SEASON.enrolments[c] * (1 + noise(`${k}:e`, 0.2))),
+      Math.round(base * 0.25 * SEASON.enrolments[c] * (1 + noise(`${k}:e`, 0.2))),
     );
     series.hours.push(
       Math.round(
