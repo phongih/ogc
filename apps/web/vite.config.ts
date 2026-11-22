@@ -25,6 +25,23 @@ function buildId(): string {
 export default defineConfig({
   plugins: [react()],
   define: { __OGC_BUILD__: JSON.stringify(buildId()) },
+  // 22/11: one 704 kB bundle → pages are split per route (router.tsx); libraries and the mock
+  // adapters + synthetic fixtures get their own long-lived chunks. The build id stays in index-*.js.
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "react";
+          if (/node_modules\/(react-router|react-router-dom|@remix-run)\//.test(id))
+            return "router";
+          if (/node_modules\/@tanstack\//.test(id)) return "query";
+          if (/node_modules\/zod\//.test(id)) return "zod";
+          if (/\/src\/(lib\/adapters|lib\/integration|fixtures)\//.test(id)) return "demo-data";
+          return undefined;
+        },
+      },
+    },
+  },
   server: { host: "127.0.0.1", port: 5180 }, // container localhost only
   test: {
     globals: true,
