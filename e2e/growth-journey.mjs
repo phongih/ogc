@@ -48,7 +48,8 @@ async function main() {
   const shots = process.env.SHOTS_DIR;
   const shot = async (page, name) => shots && page.screenshot({ path: `${shots}/${name}.png`, fullPage: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
+    const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+    const page = await ctx.newPage();
     const persona = async (name) => {
       await page.getByText("Choose a demo persona").waitFor();
       await page.getByRole("button", { name }).click();
@@ -100,6 +101,31 @@ async function main() {
     await page.getByRole("link", { name: "Refer a friend" }).first().click();
     await page.getByText("Referrals are for guardians and adult learners").waitFor();
     check("[linh] a minor has no referral link", true);
+    await signOut();
+
+    // Two tabs of one browser (owner 22/11): Sam's Funnel is already open when a friend sends an
+    // enquiry from /join in another tab — it must show up without a reload, and survive one.
+    const samTab = await ctx.newPage();
+    await samTab.goto(`${base}/login`, { waitUntil: "networkidle" });
+    const samFunnel = async () => {
+      await samTab.getByRole("button", { name: /Sam \(Org Staff\)/ }).click();
+      await samTab.waitForURL("**/app**");
+      await samTab.getByRole("link", { name: "Center operations" }).first().click();
+      await samTab.getByRole("link", { name: "Growth Engine" }).click();
+      await samTab.getByRole("tab", { name: "Funnel" }).click();
+    };
+    await samFunnel();
+    await page.goto(`${base}/join?ref=${code}`, { waitUntil: "networkidle" });
+    await page.getByLabel("Learner name").fill("Cuong V.");
+    await page.getByRole("button", { name: "Send enquiry" }).click();
+    await page.getByText(/the center will be in touch/).waitFor();
+    await samTab.getByRole("button", { name: "Placement done · Cuong V." }).waitFor({ timeout: 5000 });
+    check("[sam, other tab] the new lead appears without a reload", true);
+    await page.close();
+    await samTab.goto(`${base}/login`, { waitUntil: "networkidle" }); // sign-in is per tab load
+    await samFunnel();
+    await samTab.getByText("Cuong V.").first().waitFor({ timeout: 5000 }).catch(() => {});
+    check("[sam, other tab] still there after the friend's tab closed and a reload", (await samTab.getByText("Cuong V.").count()) > 0);
   } catch (e) {
     check(`unexpected: ${e.message.split("\n")[0]}`, false);
   } finally {
