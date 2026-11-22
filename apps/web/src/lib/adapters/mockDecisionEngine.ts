@@ -246,7 +246,7 @@ function detect(orgId: string, now: number): Detection[] {
         rule: studio,
         key: `${x.classId}|${x.learnerId}`,
         subject: { type: "learner", id: x.learnerId, label: x.name },
-        evidence: `No Learning Studio activity since ${formatCenterDateTime(x.since)} in "${x.course}" (${x.className})`,
+        evidence: `No class course activity since ${formatCenterDateTime(x.since)} in "${x.course}" (${x.className})`,
         teacherIds: classTeachers[x.classId] ? [classTeachers[x.classId]] : [],
       });
   if (noTeacher)

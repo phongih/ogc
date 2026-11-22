@@ -37,6 +37,7 @@ export const PolicyAction = z.enum([
   "forecast:manage",
   "partners:manage",
   "courses:link",
+  "courses:author",
 ]);
 export type PolicyAction = z.infer<typeof PolicyAction>;
 
@@ -160,9 +161,17 @@ export const POLICY_CATALOG: CatalogEntry[] = [
   {
     action: "courses:link",
     description:
-      "Learning Studio: link a course to a class (or reject a teacher's proposal), unlink, set weekly prep hours",
+      "Class courses: link a course to a class (or reject a teacher's proposal), unlink, set weekly prep hours",
     roles: ["staff"],
     criteria: ["centerId"],
+    readonlyFields: [],
+  },
+  {
+    action: "courses:author",
+    description:
+      "Course Studio: write courses (a teacher their own, staff every course of the org); staff also approve another person's course for publication",
+    roles: ["staff", "teacher"],
+    criteria: [],
     readonlyFields: [],
   },
   {

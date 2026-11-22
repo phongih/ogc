@@ -42,6 +42,7 @@ import { placementByLearner } from "../../fixtures/placement";
 import { prerequisiteEdges } from "../../fixtures/prerequisites";
 import { classes, classTeachers, rosters } from "../../fixtures/teaching";
 import { learningStore } from "./store";
+import { courseQuizEvidenceOf } from "./courseProgress";
 import { absenceStreakFor } from "./mockAttendance";
 import { withFault } from "./faults";
 import {
@@ -100,6 +101,9 @@ function evidenceFor(learnerId: string, scoped: LearningActivity[]): SkillEviden
       at: att.completedAt,
     });
   }
+  // Course Studio (22/11): a completed class-course lesson with a quiz is assessed evidence too.
+  const org = learnerById[learnerId]?.orgId;
+  if (org) out.push(...courseQuizEvidenceOf(learnerId, org));
   return out;
 }
 

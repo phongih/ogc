@@ -59,7 +59,7 @@ export const RULE_PARAMS: Record<
   class_without_teacher: {},
   no_practice: { days: { label: "days without practice", min: 1, max: 60 } },
   invoice_overdue: { days: { label: "days overdue, at least", min: 1, max: 120 } },
-  studio_inactive: { days: { label: "days without Learning Studio activity", min: 3, max: 60 } },
+  studio_inactive: { days: { label: "days without class course activity", min: 3, max: 60 } },
 };
 
 // Only learner cases can go to the support queue.

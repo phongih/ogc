@@ -40,6 +40,8 @@ describe("demo persistence", () => {
       "attendance",
       "billing",
       "centerSetup",
+      "courseProgress",
+      "courseStudio",
       "engine",
       "engineRules",
       "growth",
