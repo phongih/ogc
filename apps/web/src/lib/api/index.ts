@@ -131,3 +131,8 @@ export const workforce: WorkforcePort = mockWorkforce;
 import type { ForecastPort } from "@ogc/contracts";
 import { mockForecast } from "../adapters/mockForecast";
 export const forecast: ForecastPort = mockForecast;
+
+// Partner Commissions (owner 22/11). Mock, synthetic — a mock receivable, no money moves.
+import type { PartnersPort } from "@ogc/contracts";
+import { mockPartners } from "../adapters/mockPartners";
+export const partners: PartnersPort = mockPartners;
