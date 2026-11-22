@@ -90,6 +90,12 @@ const takenCodes = (orgId: string) =>
     .map((c) => codes[c.id])
     .filter((x): x is string => !!x);
 
+/** Growth Engine: every mock list price of an organization's centers (for the LTV proxy). */
+export const listPricesOfOrg = (orgId: string): number[] =>
+  [...fees.entries()]
+    .filter(([centerId]) => centers.find((c) => c.id === centerId)?.orgId === orgId)
+    .flatMap(([, list]) => list.map((f) => f.amountVnd));
+
 export const mockCenterSetup: CenterSetupPort = {
   getSetupContext: (viewer) =>
     withFault("centerSetup.getSetupContext", () => {

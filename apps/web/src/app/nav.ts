@@ -9,6 +9,7 @@ export const sectionRoute: Record<Section, string> = {
   catalog: "/app/catalog",
   tutor: "/app/tutor",
   guardian: "/app/guardian",
+  referrals: "/app/referrals",
 };
 
 export const sectionLabel: Record<Section, string> = {
@@ -20,4 +21,5 @@ export const sectionLabel: Record<Section, string> = {
   catalog: "Catalog",
   tutor: "AI Tutor",
   guardian: "Guardian",
+  referrals: "Refer a friend",
 };

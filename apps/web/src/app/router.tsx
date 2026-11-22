@@ -11,6 +11,9 @@ import { OperationsHome } from "../features/operations/OperationsHome";
 import { CenterSetupWizard } from "../features/operations/CenterSetupWizard";
 import { AccessHome } from "../features/access/AccessHome";
 import { RewardsSettingsPage } from "../features/engine/RewardsSettingsPage";
+import { GrowthAdminPage } from "../features/growth/GrowthAdminPage";
+import { ReferralsPage } from "../features/growth/ReferralsPage";
+import { JoinPage } from "../routes/public/JoinPage";
 import { DecisionEnginePage } from "../features/engine/DecisionEnginePage";
 import { LearnerHome } from "../features/learner/LearnerHome";
 import { TeacherHome } from "../features/teacher/TeacherHome";
@@ -28,6 +31,7 @@ import { SpeakingStudio } from "../features/learning/speaking/SpeakingStudio";
 export const routes = [
   { path: "/", element: <Landing /> },
   { path: "/login", element: <MockLogin /> },
+  { path: "/join", element: <JoinPage /> },
   {
     path: "/app",
     element: <Shell />,
@@ -36,6 +40,8 @@ export const routes = [
       { path: "orgs", element: <RequireSection section="directory"><OrgList /></RequireSection> },
       { path: "orgs/:orgId", element: <RequireSection section="directory"><OrgDetail /></RequireSection> },
       { path: "centers/:centerId", element: <RequireSection section="directory"><CenterDetail /></RequireSection> },
+      { path: "operations/growth", element: <RequireSection section="operations"><GrowthAdminPage /></RequireSection> },
+      { path: "referrals", element: <RequireSection section="referrals"><ReferralsPage /></RequireSection> },
       { path: "operations/rewards", element: <RequireSection section="operations"><RewardsSettingsPage /></RequireSection> },
       { path: "operations/engine", element: <RequireSection section="operations"><DecisionEnginePage /></RequireSection> },
       { path: "operations/centers/new", element: <RequireSection section="operations"><CenterSetupWizard /></RequireSection> },
