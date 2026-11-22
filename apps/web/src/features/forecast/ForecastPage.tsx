@@ -19,6 +19,7 @@ import { forecast } from "../../lib/api";
 import { useViewer } from "../../app/iiosGate";
 import { Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { AccessBanner } from "../access/AccessBanner";
+import { useMyAccess } from "../access/useMyAccess";
 import { STAGE_LABEL } from "../admissions/AdmissionsPage";
 import { vnd } from "../growth/format";
 
@@ -47,12 +48,24 @@ export function ForecastPage() {
     queryKey: ["forecast", viewer],
     queryFn: () => forecast.getOverview(viewer),
   });
+  const me = useMyAccess();
   const [horizon, setHorizon] = useState<Horizon>(3);
   const [metric, setMetric] = useState<ForecastMetric>("enrolments");
   if (q.isLoading) return <Spinner label="Loading forecast" />;
   if (q.isError)
     return <ErrorState message="Could not load the forecast." onRetry={() => q.refetch()} />;
-  if (!q.data) return <EmptyState title="The forecast is for center staff" />;
+  if (!q.data)
+    return me.data?.policyName && me.data.allowed["forecast:view"] === false ? (
+      <section className="space-y-4">
+        <AccessBanner />
+        <EmptyState
+          title="Your access policy does not include the forecast"
+          hint={`"${me.data.policyName}" has no forecast rule. An Org Admin can add one on the Access page.`}
+        />
+      </section>
+    ) : (
+      <EmptyState title="The forecast is for center staff" />
+    );
   const o = q.data;
   const selected = o.metrics.find((m) => m.metric === metric) ?? o.metrics[0];
   return (
