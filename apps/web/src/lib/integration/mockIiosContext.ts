@@ -134,24 +134,43 @@ const GRANTS: Record<string, IiosContextResolution> = {
   },
 };
 
+// The opaque token each demo persona presents when its grant is valid. Synthetic fixtures only.
+const VALID_GRANT_BY_PERSONA: Record<string, string> = {
+  "demo-admin": "grant-valid-admin",
+  "demo-staff": "grant-valid-staff",
+  "demo-teacher": "grant-valid-teacher",
+  "demo-teacher-2": "grant-valid-teacher-2",
+  "demo-learner": "grant-valid-learner",
+  "demo-guardian": "grant-valid-guardian",
+};
+export const validGrantTokenFor = (personaId: string): string =>
+  VALID_GRANT_BY_PERSONA[personaId] ?? "";
+
+/** The boundary's decision, synchronously (the mock has no I/O). */
+export function resolveGrantSync(
+  presentedGrant: string,
+  intendedOrgId: string,
+): IiosContextResolution {
+  if (!presentedGrant || presentedGrant.trim().length === 0) return { state: "missing" };
+  const resolution = GRANTS[presentedGrant];
+  if (!resolution) return { state: "missing" }; // unknown token → no sealed context
+  if (resolution.state !== "valid" || !resolution.context) return { state: resolution.state };
+  // Deny-by-default tenant match (not a grant — a refusal of a mismatch at the boundary).
+  if (resolution.context.orgId !== intendedOrgId) return { state: "cross_tenant" };
+  // OGC-ADR-039 step 2: IIOS also decides the org-admin attribute and the narrowing for this
+  // principal at resolve time (re-consulted on every navigation, never cached by OGC).
+  const c = resolution.context;
+  return {
+    state: "valid",
+    context: {
+      ...c,
+      orgAdmin: isOrgAdmin(c.principalId, c.orgId),
+      narrowing: narrowingFor(c.principalId, c.orgId),
+    } as IiosGrantedContext,
+  };
+}
+
 export const mockIiosContext: IiosContextPort = {
-  resolveContext: async (presentedGrant, intendedOrgId): Promise<IiosContextResolution> => {
-    if (!presentedGrant || presentedGrant.trim().length === 0) return { state: "missing" };
-    const resolution = GRANTS[presentedGrant];
-    if (!resolution) return { state: "missing" }; // unknown token → no sealed context
-    if (resolution.state !== "valid" || !resolution.context) return { state: resolution.state };
-    // Deny-by-default tenant match (not a grant — a refusal of a mismatch at the boundary).
-    if (resolution.context.orgId !== intendedOrgId) return { state: "cross_tenant" };
-    // OGC-ADR-039 step 2: IIOS also decides the org-admin attribute and the narrowing for this
-    // principal at resolve time (re-consulted on every navigation, never cached by OGC).
-    const c = resolution.context;
-    return {
-      state: "valid",
-      context: {
-        ...c,
-        orgAdmin: isOrgAdmin(c.principalId, c.orgId),
-        narrowing: narrowingFor(c.principalId, c.orgId),
-      } as IiosGrantedContext,
-    };
-  },
+  resolveContext: async (presentedGrant, intendedOrgId): Promise<IiosContextResolution> =>
+    resolveGrantSync(presentedGrant, intendedOrgId),
 };

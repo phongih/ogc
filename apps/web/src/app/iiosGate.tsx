@@ -21,23 +21,14 @@ import type {
   IiosGrantedContext,
 } from "@ogc/contracts";
 import { requireValidContext } from "@ogc/contracts";
-import { mockIiosContext } from "../lib/integration/mockIiosContext";
+import { mockIiosContext, validGrantTokenFor } from "../lib/integration/mockIiosContext";
+import { setCurrentGrant } from "../lib/integration/currentGrant";
 import { useSession } from "./session";
 import { Button, EmptyState, PageHeader, Spinner } from "../ui";
 
 /** Demo scenarios: which decision the mock IIOS boundary will return for this session. */
 export const IIOS_SCENARIOS = ["valid", "expired", "revoked", "missing", "cross_tenant"] as const;
 export type IiosScenario = (typeof IIOS_SCENARIOS)[number];
-
-// The opaque token each demo persona presents when its grant is valid. Synthetic fixtures only.
-const VALID_GRANT_BY_PERSONA: Record<string, string> = {
-  "demo-admin": "grant-valid-admin",
-  "demo-staff": "grant-valid-staff",
-  "demo-teacher": "grant-valid-teacher",
-  "demo-teacher-2": "grant-valid-teacher-2",
-  "demo-learner": "grant-valid-learner",
-  "demo-guardian": "grant-valid-guardian",
-};
 
 // Non-valid scenarios present a token the boundary decides against. OGC does not compute these.
 const SCENARIO_GRANT: Record<Exclude<IiosScenario, "valid">, string> = {
@@ -50,7 +41,7 @@ const SCENARIO_GRANT: Record<Exclude<IiosScenario, "valid">, string> = {
 /** The opaque grant a persona presents under a scenario. Unknown persona → nothing presented. */
 export function presentedGrantFor(personaId: string, scenario: IiosScenario): string {
   if (scenario !== "valid") return SCENARIO_GRANT[scenario];
-  return VALID_GRANT_BY_PERSONA[personaId] ?? "";
+  return validGrantTokenFor(personaId);
 }
 
 interface IiosCtx {
@@ -131,9 +122,21 @@ export function RequireIiosContext({ children }: { children: ReactNode }) {
     setGate({ phase: "pending" }); // fail-closed while the decision is outstanding
     port
       .resolveContext(presentedGrantFor(personaId, scenario), orgId)
-      .then((resolution) => live && setGate({ phase: "decided", resolution }))
+      .then((resolution) => {
+        if (!live) return;
+        // OGC-ADR-039 step 3: the adapters enforce with THIS grant (null = denied → nothing allowed).
+        setCurrentGrant(
+          personaId,
+          resolution.state === "valid" && resolution.context ? resolution.context : null,
+        );
+        setGate({ phase: "decided", resolution });
+      })
       // A boundary failure is not a grant: treat as missing (deny).
-      .catch(() => live && setGate({ phase: "decided", resolution: { state: "missing" } }));
+      .catch(() => {
+        if (!live) return;
+        setCurrentGrant(personaId, null);
+        setGate({ phase: "decided", resolution: { state: "missing" } });
+      });
     return () => {
       live = false;
     };
