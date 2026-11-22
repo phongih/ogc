@@ -29,3 +29,4 @@ export * from "./makeup.js";
 export * from "./centerSetup.js";
 export * from "./decision.js";
 export * from "./accessPolicy.js";
+export * from "./authorize.js";

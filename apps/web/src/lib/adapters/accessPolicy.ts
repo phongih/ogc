@@ -7,6 +7,7 @@
  */
 import {
   POLICY_CATALOG,
+  evaluateRules,
   PolicyRule,
   type AccessAdminView,
   type AccessPolicy,
@@ -156,18 +157,6 @@ function policyOf(personaId: string): StoredPolicy | null | undefined {
   return p;
 }
 
-function ruleMatches(rule: PolicyRule, facts: Facts): boolean {
-  const c = rule.criteria ?? {};
-  for (const key of Object.keys(c) as CriterionKey[]) {
-    const allowed = c[key] as string[] | undefined;
-    if (!allowed) continue;
-    const fact = facts[key];
-    // A condition that needs a fact the operation does not have does NOT match (fail-closed).
-    if (fact === undefined || !allowed.includes(fact)) return false;
-  }
-  return true;
-}
-
 /**
  * Role ∩ policy. With several matching rules the read-only fields are the INTERSECTION (the widest
  * path wins), as in HealthcareOS.
@@ -177,14 +166,9 @@ export function decide(personaId: string, action: PolicyAction, facts: Facts = {
   const policy = policyOf(personaId);
   if (policy === undefined) return { ok: true, readonly: [] };
   if (policy === null) return { ok: false };
-  const matching = policy.rules.filter((r) => r.action === action && ruleMatches(r, facts));
-  if (matching.length === 0) return { ok: false };
-  let ro: ReadonlyField[] | null = null;
-  for (const r of matching) {
-    const f = r.readonlyFields ?? [];
-    ro = ro === null ? [...f] : ro.filter((x) => f.includes(x));
-  }
-  return { ok: true, readonly: ro ?? [] };
+  // Same evaluator as the contract's authorize() (OGC-ADR-039) — one rule semantics.
+  const v = evaluateRules(policy.rules, action, facts);
+  return v.allow ? { ok: true, readonly: v.readonly } : { ok: false };
 }
 
 export const allows = (personaId: string, action: PolicyAction, facts: Facts = {}): boolean =>
