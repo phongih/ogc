@@ -4,13 +4,14 @@
  * existing "Learners needing support" queue; staff enable / pause rules and tune thresholds,
  * priority, cooldown and actions; no free-form rules yet.
  */
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Rule, RuleAction, RuleCategory, RuleUpdate } from "@ogc/contracts";
 import { QUEUE_KINDS, RULE_PARAMS } from "@ogc/contracts";
 import { decisionEngine } from "../../lib/api";
-import { useSession } from "../../app/session";
+import { useViewer } from "../../app/iiosGate";
 import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDateTime } from "../../lib/centerTime";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
@@ -33,8 +34,7 @@ const ACTION: Record<RuleAction, string> = {
 };
 
 export function DecisionEnginePage() {
-  const { session } = useSession();
-  const viewer = session?.personaId ?? "";
+  const viewer = useViewer();
   const [tab, setTab] = useState<Tab>("Rules");
   const rules = useQuery({
     queryKey: ["engine-rules", viewer],
@@ -86,7 +86,7 @@ export function DecisionEnginePage() {
   );
 }
 
-function RulesTab({ viewer, rules }: { viewer: string; rules: Rule[] }) {
+function RulesTab({ viewer, rules }: { viewer: IiosGrantedContext; rules: Rule[] }) {
   const me = useMyAccess();
   const canManage = me.data?.allowed["engine:manage"] ?? true;
   const actionsLocked = !!me.data?.readonly["engine:manage"]?.includes("actions");
@@ -122,7 +122,7 @@ function RuleCard({
   canManage,
   actionsLocked,
 }: {
-  viewer: string;
+  viewer: IiosGrantedContext;
   rule: Rule;
   canManage: boolean;
   actionsLocked: boolean;
@@ -271,7 +271,7 @@ function RuleCard({
   );
 }
 
-function EventsTab({ viewer }: { viewer: string }) {
+function EventsTab({ viewer }: { viewer: IiosGrantedContext }) {
   const q = useQuery({
     queryKey: ["engine-events", viewer],
     queryFn: () => decisionEngine.listEvents(viewer),
@@ -298,7 +298,7 @@ function EventsTab({ viewer }: { viewer: string }) {
   );
 }
 
-function ActionsTab({ viewer }: { viewer: string }) {
+function ActionsTab({ viewer }: { viewer: IiosGrantedContext }) {
   const q = useQuery({
     queryKey: ["engine-actions", viewer],
     queryFn: () => decisionEngine.listActions(viewer),
@@ -331,7 +331,7 @@ function ActionsTab({ viewer }: { viewer: string }) {
   );
 }
 
-function JobTab({ viewer }: { viewer: string }) {
+function JobTab({ viewer }: { viewer: IiosGrantedContext }) {
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["engine-job", viewer],

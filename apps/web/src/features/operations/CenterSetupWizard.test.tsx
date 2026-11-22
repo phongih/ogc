@@ -43,7 +43,7 @@ describe("Set up a new center", () => {
       await screen.findByText(/Center opened · 1 class · 4 sessions scheduled/),
     ).toBeInTheDocument();
     expect(classes.some((c) => c.name === "Class 1 — Sat")).toBe(true);
-    expect(window.localStorage.getItem("ogc.centerSetup.draft.demo-staff")).toBeNull(); // draft cleared
+    expect(window.localStorage.getItem("ogc.centerSetup.draft.iios-principal-staff-1")).toBeNull(); // draft cleared
   });
 
   it("review lists a teacher double-booking and will not open the center", async () => {
@@ -72,7 +72,7 @@ describe("Set up a new center", () => {
       ],
       fees: [],
     };
-    window.localStorage.setItem("ogc.centerSetup.draft.demo-staff", JSON.stringify(draft));
+    window.localStorage.setItem("ogc.centerSetup.draft.iios-principal-staff-1", JSON.stringify(draft));
     const user = userEvent.setup();
     renderApp("/app/operations/centers/new", "staff");
     await user.click(await screen.findByRole("button", { name: "6. Review & open" }));
@@ -85,7 +85,7 @@ describe("Set up a new center", () => {
 
   it("keeps the draft in this browser and offers to discard it", async () => {
     window.localStorage.setItem(
-      "ogc.centerSetup.draft.demo-staff",
+      "ogc.centerSetup.draft.iios-principal-staff-1",
       JSON.stringify({ name: "Half done" }),
     );
     const user = userEvent.setup();

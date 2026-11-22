@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 
 /*
  * Decision Engine — Observe → Detect → Decide → Act. ADDITIVE, SYNTHETIC, mock only.
@@ -149,13 +150,17 @@ export type RuleUpdateResult = z.infer<typeof RuleUpdateResult>;
 
 export interface DecisionEnginePort {
   // Staff of the organization (fail-closed: null / [] / not_staff).
-  listRules(viewerPersonaId: string): Promise<Rule[] | null>;
-  updateRule(viewerPersonaId: string, ruleId: string, patch: RuleUpdate): Promise<RuleUpdateResult>;
-  runNow(viewerPersonaId: string): Promise<JobStatus | null>;
-  listEvents(viewerPersonaId: string): Promise<EngineEvent[]>;
-  listActions(viewerPersonaId: string): Promise<ActionLogEntry[]>;
-  getJobStatus(viewerPersonaId: string): Promise<JobStatus | null>;
+  listRules(viewer: IiosGrantedContext): Promise<Rule[] | null>;
+  updateRule(
+    viewer: IiosGrantedContext,
+    ruleId: string,
+    patch: RuleUpdate,
+  ): Promise<RuleUpdateResult>;
+  runNow(viewer: IiosGrantedContext): Promise<JobStatus | null>;
+  listEvents(viewer: IiosGrantedContext): Promise<EngineEvent[]>;
+  listActions(viewer: IiosGrantedContext): Promise<ActionLogEntry[]>;
+  getJobStatus(viewer: IiosGrantedContext): Promise<JobStatus | null>;
   // Teacher or staff: their own in-app notifications.
-  listNotifications(viewerPersonaId: string): Promise<EngineNotification[]>;
-  markRead(viewerPersonaId: string, notificationId: string | "all"): Promise<void>;
+  listNotifications(viewer: IiosGrantedContext): Promise<EngineNotification[]>;
+  markRead(viewer: IiosGrantedContext, notificationId: string | "all"): Promise<void>;
 }

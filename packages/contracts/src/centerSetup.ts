@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 
 /*
  * P2 · Center setup wizard — ADDITIVE, SYNTHETIC, mock adapter only.
@@ -163,12 +164,12 @@ export type CenterSetupResult = z.infer<typeof CenterSetupResult>;
 
 export interface CenterSetupPort {
   // Staff only, own organization only (fail-closed: null / not_staff).
-  getSetupContext(viewerPersonaId: string): Promise<SetupContext | null>;
-  createCenter(viewerPersonaId: string, draft: CenterSetupDraft): Promise<CenterSetupResult>;
+  getSetupContext(viewer: IiosGrantedContext): Promise<SetupContext | null>;
+  createCenter(viewer: IiosGrantedContext, draft: CenterSetupDraft): Promise<CenterSetupResult>;
   // Teacher / room double-bookings the draft's first weeks would create (plain-word messages).
-  previewClashes(viewerPersonaId: string, draft: CenterSetupDraft): Promise<string[]>;
+  previewClashes(viewer: IiosGrantedContext, draft: CenterSetupDraft): Promise<string[]>;
   getFees(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     centerId: string,
   ): Promise<(SetupFee & { courseCode: string })[] | null>;
 }

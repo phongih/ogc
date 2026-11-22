@@ -3,14 +3,12 @@
  * One link per session to the take-attendance page.
  */
 import { Link } from "react-router-dom";
-import { useSession } from "../../app/session";
 import { Card, ErrorState, Spinner } from "../../ui";
 import { formatCenterDateTime } from "../../lib/centerTime";
 import { useSessionsToMark } from "./queries";
 
 export function SessionsToMark() {
-  const { session } = useSession();
-  const q = useSessionsToMark(session?.personaId ?? "");
+  const q = useSessionsToMark();
 
   return (
     <section aria-label="Attendance to take">

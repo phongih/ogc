@@ -3,14 +3,13 @@ import { Breadcrumbs, Card, EmptyState, ErrorState, PageHeader, Spinner } from "
 import { useCenter, useOrganization } from "./queries";
 import { useQuery } from "@tanstack/react-query";
 import { centerSetup } from "../../lib/api";
-import { useSession } from "../../app/session";
+import { useViewer } from "../../app/iiosGate";
 
 export function CenterDetail() {
   const { centerId = "" } = useParams();
   const q = useCenter(centerId);
   const org = useOrganization(q.data?.orgId ?? "");
-  const { session } = useSession();
-  const viewer = session?.personaId ?? "";
+  const viewer = useViewer();
   const fees = useQuery({
     queryKey: ["center-fees", viewer, centerId],
     queryFn: () => centerSetup.getFees(viewer, centerId),

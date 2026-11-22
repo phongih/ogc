@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { refill, registerPersistent } from "./persist";
 import type {
   AttendanceMark,
@@ -7,11 +8,11 @@ import type {
   RecordAttendanceResult,
   SessionAttendance,
 } from "@ogc/contracts";
-import { personaMap } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { ABSENCE_STREAK_THRESHOLD, seedSessions } from "../../fixtures/attendance";
 import { sessionStore, type StoredSession } from "./sessionStore";
 import { withFault } from "./faults";
+import { teacherIdOf } from "./viewer";
 import { allows } from "./accessPolicy";
 
 /*
@@ -36,29 +37,24 @@ function resetAttendance(): void {
 resetAttendance();
 export const __resetAttendanceForTests = resetAttendance;
 
-function ownsClass(viewerPersonaId: string, classId: string): boolean {
-  const viewer = personaMap[viewerPersonaId];
+function ownsClass(viewer: IiosGrantedContext, classId: string): boolean {
+  const teacherId = teacherIdOf(viewer);
   const cls = classes.find((c) => c.id === classId);
-  return (
-    !!viewer?.teacherId &&
-    !!cls &&
-    classTeachers[classId] === viewer.teacherId &&
-    cls.orgId === viewer.orgId
-  );
+  return !!teacherId && !!cls && classTeachers[classId] === teacherId && cls.orgId === viewer.orgId;
 }
 
 // The owner of the class, or this session's substitute — same tenant either way.
 // An access policy can narrow this further (e.g. own classes only, not as a substitute).
-function canMarkSession(viewerPersonaId: string, s: StoredSession): boolean {
-  if (ownsClass(viewerPersonaId, s.classId))
-    return allows(viewerPersonaId, "attendance:mark", { sessionRole: "owner" });
-  const viewer = personaMap[viewerPersonaId];
+function canMarkSession(viewer: IiosGrantedContext, s: StoredSession): boolean {
+  if (ownsClass(viewer, s.classId))
+    return allows(viewer, "attendance:mark", { sessionRole: "owner" });
+  const teacherId = teacherIdOf(viewer);
   const cls = classes.find((c) => c.id === s.classId);
   return (
-    !!viewer?.teacherId &&
-    s.substituteId === viewer.teacherId &&
+    !!teacherId &&
+    s.substituteId === teacherId &&
     cls?.orgId === viewer.orgId &&
-    allows(viewerPersonaId, "attendance:mark", { sessionRole: "substitute" })
+    allows(viewer, "attendance:mark", { sessionRole: "substitute" })
   );
 }
 

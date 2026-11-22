@@ -129,3 +129,10 @@ export interface IiosPolicyAdminPort {
     policyRef: string | null,
   ): Promise<PolicyResult>;
 }
+
+/*
+ * OGC-ADR-039 step 3b — every operations port (schedule, make-up, center setup, Decision Engine,
+ * attendance, my-access) takes the CALLER'S IIOS-GRANTED CONTEXT as its first argument, never a
+ * persona id from the frontend. Tenant, role and narrowing come from it; OGC-only relations (which
+ * OGC teacher / learner record a principal is) are looked up from the principal, as OGC data.
+ */

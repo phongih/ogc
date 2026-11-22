@@ -16,8 +16,8 @@ export function ClassDetail() {
     session?.personaId ?? "",
     (q.data ?? []).map((r) => r.learnerId),
   );
-  const attendance = useClassAttendance(session?.personaId ?? "", classId);
-  const sessions = useClassSessions(session?.personaId ?? "", classId);
+  const attendance = useClassAttendance(classId);
+  const sessions = useClassSessions(classId);
 
   // Class-level overall = equal-weight mean across the learners the viewer is authorized to
   // see (fail-closed entries resolve to null and are excluded, not counted as zero).

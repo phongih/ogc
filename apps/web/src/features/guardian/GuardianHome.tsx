@@ -51,7 +51,7 @@ function LinkedLearnerCard({
         {link.nextSessionAt ? formatCenterDateTime(link.nextSessionAt) : "None scheduled"}
       </p>
 
-      <MyMakeups viewer={viewerPersonaId} learnerId={link.learnerId} readOnly />
+      <MyMakeups learnerId={link.learnerId} readOnly />
 
       <div>
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">By course</h3>

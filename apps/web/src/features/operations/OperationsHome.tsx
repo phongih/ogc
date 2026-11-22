@@ -4,12 +4,13 @@
  * learner loses the lesson. Started or marked sessions are history: no move, no cancel.
  * All times are CENTER time (Asia/Ho_Chi_Minh), whatever the staff member's device says.
  */
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ClassSchedule, ScheduleResult, ScheduledSession, TeacherRef } from "@ogc/contracts";
 import { schedule } from "../../lib/api";
-import { useSession } from "../../app/session";
+import { useViewer } from "../../app/iiosGate";
 import { refreshLearningState } from "../../lib/invalidate";
 import { centerLocalToIso, formatCenterDateTime, isoToCenterLocal } from "../../lib/centerTime";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
@@ -41,14 +42,13 @@ function useOpsAction() {
 }
 
 export function OperationsHome() {
-  const { session } = useSession();
-  const viewer = session?.personaId ?? "";
+  const viewer = useViewer();
   const me = useMyAccess();
   const canSetUp = me.data?.allowed["center:setup"] ?? false;
   const q = useQuery({
     queryKey: ["ops-overview", viewer],
     queryFn: () => schedule.getOverview(viewer),
-    enabled: viewer.length > 0,
+    enabled: !!viewer,
   });
 
   if (q.isLoading) return <Spinner label="Loading center operations" />;
@@ -116,7 +116,7 @@ function ClassCard({
   cls,
   teachers,
 }: {
-  viewer: string;
+  viewer: IiosGrantedContext;
   cls: ClassSchedule;
   teachers: TeacherRef[];
 }) {
@@ -221,7 +221,7 @@ function SessionRow({
   teachers,
   now,
 }: {
-  viewer: string;
+  viewer: IiosGrantedContext;
   s: ScheduledSession;
   cls: ClassSchedule;
   teachers: TeacherRef[];

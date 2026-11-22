@@ -1,3 +1,4 @@
+import { as } from "../../test/grants";
 import { nextWeeklySlot } from "../../fixtures/demoClock";
 // P2 · slice 4 — self-study confirmed by the class teacher; learner / guardian see their make-ups;
 // learner / guardian lesson times follow the live schedule; teacher dashboard labels make-ups.
@@ -20,8 +21,8 @@ const unit6 = () => seedSessions.find((s) => s.classId === A2 && s.title === "A2
 const linhItem = () => `${unit6()}::${LEARNER_LINH}`;
 
 async function linhAbsentAtUnit6() {
-  const view = (await mockAttendance.getSessionAttendance(T, unit6()))!;
-  await mockAttendance.recordAttendance(T, unit6(), {
+  const view = (await mockAttendance.getSessionAttendance(as(T), unit6()))!;
+  await mockAttendance.recordAttendance(as(T), unit6(), {
     marks: view.rows.map((r) => ({
       learnerId: r.learnerId,
       mark: r.learnerId === LEARNER_LINH ? ("absent" as const) : ("present" as const),
@@ -34,8 +35,8 @@ beforeEach(() => __resetAttendanceForTests());
 describe("self-study make-up — counts only when the class teacher confirms", () => {
   it("assign → learner submits → teacher sends back → resubmits → teacher confirms", async () => {
     await linhAbsentAtUnit6();
-    expect((await mockMakeup.assignSelfStudy(S, linhItem())).ok).toBe(true);
-    const mine = await mockMakeup.listMine("demo-learner");
+    expect((await mockMakeup.assignSelfStudy(as(S), linhItem())).ok).toBe(true);
+    const mine = await mockMakeup.listMine(as("demo-learner"));
     expect(mine).toEqual([
       expect.objectContaining({
         id: linhItem(),
@@ -44,47 +45,47 @@ describe("self-study make-up — counts only when the class teacher confirms", (
       }),
     ]);
 
-    expect(await mockMakeup.submitSelfStudy("demo-learner", linhItem(), "too short")).toEqual({
+    expect(await mockMakeup.submitSelfStudy(as("demo-learner"), linhItem(), "too short")).toEqual({
       ok: false,
       reason: "note_required",
     });
-    expect(await mockMakeup.confirmSelfStudy(T, linhItem())).toEqual({
+    expect(await mockMakeup.confirmSelfStudy(as(T), linhItem())).toEqual({
       ok: false,
       reason: "not_submitted",
     });
     expect(
       (
         await mockMakeup.submitSelfStudy(
-          "demo-learner",
+          as("demo-learner"),
           linhItem(),
           "Read Unit 6 and did the exercises",
         )
       ).ok,
     ).toBe(true);
-    expect((await mockMakeup.listToConfirm(T)).map((i) => i.id)).toEqual([linhItem()]);
+    expect((await mockMakeup.listToConfirm(as(T))).map((i) => i.id)).toEqual([linhItem()]);
     // Not Ben (not Linh's class teacher), not the guardian, not staff, not another learner.
-    expect(await mockMakeup.listToConfirm("demo-teacher-2")).toEqual([]);
-    expect(await mockMakeup.confirmSelfStudy("demo-teacher-2", linhItem())).toEqual({
+    expect(await mockMakeup.listToConfirm(as("demo-teacher-2"))).toEqual([]);
+    expect(await mockMakeup.confirmSelfStudy(as("demo-teacher-2"), linhItem())).toEqual({
       ok: false,
       reason: "not_found",
     });
     expect(
       await mockMakeup.submitSelfStudy(
-        "demo-guardian",
+        as("demo-guardian"),
         linhItem(),
         "Read Unit 6 and did the exercises",
       ),
     ).toEqual({ ok: false, reason: "not_found" });
     expect(
       await mockMakeup.submitSelfStudy(
-        "demo-learner-2",
+        as("demo-learner-2"),
         linhItem(),
         "Read Unit 6 and did the exercises",
       ),
     ).toEqual({ ok: false, reason: "not_found" });
 
     const back = await mockMakeup.returnSelfStudy(
-      T,
+      as(T),
       linhItem(),
       "Please also do the listening task",
     );
@@ -94,11 +95,15 @@ describe("self-study make-up — counts only when the class teacher confirms", (
         selfStudy: { returnedNote: "Please also do the listening task", submittedAt: null },
       },
     });
-    await mockMakeup.submitSelfStudy("demo-learner", linhItem(), "Did the listening task as well");
-    const done = await mockMakeup.confirmSelfStudy(T, linhItem());
+    await mockMakeup.submitSelfStudy(
+      as("demo-learner"),
+      linhItem(),
+      "Did the listening task as well",
+    );
+    const done = await mockMakeup.confirmSelfStudy(as(T), linhItem());
     expect(done.ok && done.item.status).toBe("done");
-    expect((await mockMakeup.getBoard(S))!.counts.done).toBe(1);
-    expect(await mockMakeup.confirmSelfStudy(T, linhItem())).toEqual({
+    expect((await mockMakeup.getBoard(as(S)))!.counts.done).toBe(1);
+    expect(await mockMakeup.confirmSelfStudy(as(T), linhItem())).toEqual({
       ok: false,
       reason: "already_done",
     });
@@ -106,13 +111,13 @@ describe("self-study make-up — counts only when the class teacher confirms", (
 
   it("booking a session replaces self-study (an item is one or the other)", async () => {
     await linhAbsentAtUnit6();
-    await mockMakeup.assignSelfStudy(S, linhItem());
-    expect((await mockMakeup.book(S, linhItem(), "SES-004")).ok).toBe(true); // A2 Evening Unit 6
-    const item = (await mockMakeup.listMine("demo-learner"))[0];
+    await mockMakeup.assignSelfStudy(as(S), linhItem());
+    expect((await mockMakeup.book(as(S), linhItem(), "SES-004")).ok).toBe(true); // A2 Evening Unit 6
+    const item = (await mockMakeup.listMine(as("demo-learner")))[0];
     expect(item.booking).toMatchObject({ kind: "join", sessionId: "SES-004" });
     expect(
       await mockMakeup.submitSelfStudy(
-        "demo-learner",
+        as("demo-learner"),
         linhItem(),
         "Read Unit 6 and did the exercises",
       ),
@@ -124,23 +129,23 @@ describe("self-study make-up — counts only when the class teacher confirms", (
 
   it("the guardian sees the linked learner's make-ups (read-only); others see none of them", async () => {
     await linhAbsentAtUnit6();
-    expect((await mockMakeup.listMine("demo-guardian")).map((i) => i.learnerId)).toEqual([
+    expect((await mockMakeup.listMine(as("demo-guardian"))).map((i) => i.learnerId)).toEqual([
       LEARNER_LINH,
     ]);
-    expect(await mockMakeup.listMine("demo-learner-2")).toEqual([]);
-    expect(await mockMakeup.listMine("demo-staff")).toEqual([]);
-    expect(await mockMakeup.listMine("demo-learner-org2")).toEqual([]);
+    expect(await mockMakeup.listMine(as("demo-learner-2"))).toEqual([]);
+    expect(await mockMakeup.listMine(as("demo-staff"))).toEqual([]);
+    expect(await mockMakeup.listMine(as("demo-learner-org2"))).toEqual([]);
   });
 });
 
 describe("live schedule reaches every role", () => {
   it("learner and guardian lesson times follow a reschedule and a cancel-with-replacement", async () => {
     const moved = new Date(Date.now() + 4 * DAY).toISOString();
-    await mockSchedule.reschedule(S, "SES-001", moved);
+    await mockSchedule.reschedule(as(S), "SES-001", moved);
     let d = (await mockLearner.getDashboard("demo-learner"))!;
     expect(d.upcoming.find((l) => l.id === "LSN-A2-07")!.scheduledAt).toBe(moved);
     const repl = new Date(Date.now() + 6 * DAY).toISOString();
-    await mockSchedule.cancelWithReplacement(S, "SES-001", repl);
+    await mockSchedule.cancelWithReplacement(as(S), "SES-001", repl);
     d = (await mockLearner.getDashboard("demo-learner"))!;
     expect(d.upcoming.find((l) => l.id === "LSN-A2-07")!.scheduledAt).toBe(repl);
     const g = (await mockGuardian.getDashboard("demo-guardian"))!;
@@ -148,9 +153,11 @@ describe("live schedule reaches every role", () => {
   });
 
   it("a make-up session is labelled on the teacher dashboard and is not the class's next session", async () => {
-    const huy1 = (await mockMakeup.getBoard(S))!.items.find((i) => i.unitTitle === "B1 — Unit 1")!;
+    const huy1 = (await mockMakeup.getBoard(as(S)))!.items.find(
+      (i) => i.unitTitle === "B1 — Unit 1",
+    )!;
     const soon = nextWeeklySlot([0, 1, 2, 3, 4, 5, 6], 14); // next 14:00 ICT — no class then
-    await mockMakeup.openMakeupSession(S, huy1.id, soon, TEACHER_BEN);
+    await mockMakeup.openMakeupSession(as(S), huy1.id, soon, TEACHER_BEN);
     const tara = (await mockTeacher.getDashboard(T))!;
     expect(tara.upcoming.find((s) => s.title === "B1 — Unit 1")).toMatchObject({
       makeup: true,

@@ -4,15 +4,14 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { decisionEngine } from "../../lib/api";
-import { useSession } from "../../app/session";
+import { useViewer } from "../../app/iiosGate";
 import { formatCenterDateTime } from "../../lib/centerTime";
 import { Button, Card } from "../../ui";
 
 const SHOWN = 5;
 
 export function EngineNotifications() {
-  const { session } = useSession();
-  const viewer = session?.personaId ?? "";
+  const viewer = useViewer();
   const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["engine-inbox", viewer],

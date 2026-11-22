@@ -22,7 +22,6 @@ import type {
 } from "@ogc/contracts";
 import { requireValidContext } from "@ogc/contracts";
 import { mockIiosContext, validGrantTokenFor } from "../lib/integration/mockIiosContext";
-import { setCurrentGrant } from "../lib/integration/currentGrant";
 import { useSession } from "./session";
 import { Button, EmptyState, PageHeader, Spinner } from "../ui";
 
@@ -83,6 +82,19 @@ export function useGrantedContext(): IiosGrantedContext | null {
   return useContext(GrantedCtx);
 }
 
+/**
+ * OGC-ADR-039 step 3b — the caller every operations port takes. Fail-closed: outside an admitted
+ * route there is no grant, and asking for one is a programming error, not an empty permission set.
+ */
+export function useViewer(): IiosGrantedContext {
+  const ctx = useContext(GrantedCtx);
+  if (!ctx) throw new Error("no IIOS-granted context — render inside RequireIiosContext");
+  return ctx;
+}
+
+/** Tests only: render a subtree as if the gate had admitted `ctx`. */
+export const GrantedContextProvider = GrantedCtx.Provider;
+
 const DENIED_COPY: Record<Exclude<IiosContextState, "valid">, { title: string; hint: string }> = {
   missing: {
     title: "No access grant was presented",
@@ -122,21 +134,9 @@ export function RequireIiosContext({ children }: { children: ReactNode }) {
     setGate({ phase: "pending" }); // fail-closed while the decision is outstanding
     port
       .resolveContext(presentedGrantFor(personaId, scenario), orgId)
-      .then((resolution) => {
-        if (!live) return;
-        // OGC-ADR-039 step 3: the adapters enforce with THIS grant (null = denied → nothing allowed).
-        setCurrentGrant(
-          personaId,
-          resolution.state === "valid" && resolution.context ? resolution.context : null,
-        );
-        setGate({ phase: "decided", resolution });
-      })
+      .then((resolution) => live && setGate({ phase: "decided", resolution }))
       // A boundary failure is not a grant: treat as missing (deny).
-      .catch(() => {
-        if (!live) return;
-        setCurrentGrant(personaId, null);
-        setGate({ phase: "decided", resolution: { state: "missing" } });
-      });
+      .catch(() => live && setGate({ phase: "decided", resolution: { state: "missing" } }));
     return () => {
       live = false;
     };

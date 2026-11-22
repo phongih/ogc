@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 
 /*
@@ -73,18 +74,21 @@ export type RecordAttendanceResult = z.infer<typeof RecordAttendanceResult>;
 // Owning teacher + same tenant (or, for one session, its assigned substitute); everyone else gets
 // null / not_found (fail-closed).
 export interface AttendancePort {
-  listClassSessions(viewerPersonaId: string, classId: string): Promise<ClassSession[] | null>;
+  listClassSessions(viewer: IiosGrantedContext, classId: string): Promise<ClassSession[] | null>;
   getSessionAttendance(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     sessionId: string,
   ): Promise<SessionAttendance | null>;
   recordAttendance(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     sessionId: string,
     input: RecordAttendanceInput,
   ): Promise<RecordAttendanceResult>;
-  getClassSummary(viewerPersonaId: string, classId: string): Promise<AttendanceSummaryRow[] | null>;
+  getClassSummary(
+    viewer: IiosGrantedContext,
+    classId: string,
+  ): Promise<AttendanceSummaryRow[] | null>;
   // Sessions that have started but are not marked yet: the viewer's own classes, plus sessions the
   // viewer substitutes for.
-  listToMark(viewerPersonaId: string): Promise<ClassSession[]>;
+  listToMark(viewer: IiosGrantedContext): Promise<ClassSession[]>;
 }

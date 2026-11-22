@@ -6,7 +6,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { AttendanceMark } from "@ogc/contracts";
-import { useSession } from "../../app/session";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { formatCenterDateTime } from "../../lib/centerTime";
 import { useRecordAttendance, useSessionAttendance } from "./queries";
@@ -27,10 +26,8 @@ const REASON_TEXT: Record<string, string> = {
 
 export function SessionAttendancePage() {
   const { classId = "", sessionId = "" } = useParams();
-  const { session } = useSession();
-  const viewer = session?.personaId ?? "";
-  const q = useSessionAttendance(viewer, sessionId);
-  const save = useRecordAttendance(viewer, sessionId);
+  const q = useSessionAttendance(sessionId);
+  const save = useRecordAttendance(sessionId);
   const [draft, setDraft] = useState<Record<string, AttendanceMark>>({});
   const [saved, setSaved] = useState(false);
 

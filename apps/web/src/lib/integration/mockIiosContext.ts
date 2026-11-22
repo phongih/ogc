@@ -73,6 +73,34 @@ const GRANTS: Record<string, IiosContextResolution> = {
       expiresAt: "2099-01-01T00:00:00.000Z",
     },
   },
+  // ADR-039 step 3b (additive): grants for the remaining synthetic personas, so every adapter call
+  // — tests included — carries an IIOS-decided context. Synthetic; no key/mac.
+  "grant-valid-learner-2": {
+    state: "valid",
+    context: {
+      clientId: "partner-b",
+      orgId: ORG,
+      principalId: "iios-principal-learner-2",
+      role: "learner",
+      purpose: "learning.read",
+      requestId: "req-synth-0009",
+      grantRef: "iios-grant-ref-0009",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    },
+  },
+  "grant-valid-learner-org2": {
+    state: "valid",
+    context: {
+      clientId: "eduos",
+      orgId: ORG2,
+      principalId: "iios-principal-learner-org2",
+      role: "learner",
+      purpose: "learning.read",
+      requestId: "req-synth-0010",
+      grantRef: "iios-grant-ref-0010",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+    },
+  },
   // P2 (additive): the second demo teacher (substitute / reassignment). Synthetic; no key/mac.
   "grant-valid-teacher-2": {
     state: "valid",
@@ -142,6 +170,9 @@ const VALID_GRANT_BY_PERSONA: Record<string, string> = {
   "demo-teacher-2": "grant-valid-teacher-2",
   "demo-learner": "grant-valid-learner",
   "demo-guardian": "grant-valid-guardian",
+  "demo-learner-2": "grant-valid-learner-2",
+  "demo-staff-org2": "grant-valid-org2",
+  "demo-learner-org2": "grant-valid-learner-org2",
 };
 export const validGrantTokenFor = (personaId: string): string =>
   VALID_GRANT_BY_PERSONA[personaId] ?? "";

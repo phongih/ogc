@@ -44,7 +44,7 @@ export function LearnerHome() {
       {/* P1 · one next best action first (design principle 01). Everything else is context below. */}
       {liProfile.data && !next.isLoading ? <TodaysMission action={next.data} /> : null}
 
-      <MyMakeups viewer={session?.personaId ?? ""} />
+      <MyMakeups />
 
       {d.enrolled.length > 0 ? (
         <Card className="flex items-center gap-5">
