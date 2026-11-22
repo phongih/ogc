@@ -34,3 +34,4 @@ export * from "./gamification.js";
 export * from "./growth.js";
 export * from "./billing.js";
 export * from "./admissions.js";
+export * from "./students.js";

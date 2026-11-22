@@ -149,6 +149,9 @@ function historyFor(classId: string, learnerId: string): AttendanceMark[] {
     .filter((x): x is AttendanceMark => !!x);
 }
 
+/** The learner's marks in one class's regular sessions, oldest first (callers authorize). */
+export const attendanceHistoryFor = historyFor;
+
 function trailingAbsences(h: readonly AttendanceMark[]): number {
   let n = 0;
   for (let i = h.length - 1; i >= 0 && h[i] === "absent"; i--) n++;

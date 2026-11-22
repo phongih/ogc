@@ -33,6 +33,12 @@ export function TeacherHome() {
   return (
     <section className="space-y-8">
       <PageHeader title="Teaching" subtitle={`${d.teacherName} · synthetic demo`} />
+      <Link
+        to="/app/teaching/students"
+        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+      >
+        My students · care
+      </Link>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatTile label="Classes" value={d.classes.length} />
