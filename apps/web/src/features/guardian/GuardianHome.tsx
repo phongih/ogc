@@ -15,6 +15,7 @@ import {
 import { useGuardianDashboard } from "./queries";
 import { useLearnerProgress } from "../learning/queries";
 import { MyMakeups } from "../learner/MyMakeups";
+import { MyRewards } from "../learner/MyRewards";
 
 function consentLabel(status: string): string {
   if (status === "active") return "Consent on file";
@@ -53,6 +54,8 @@ function LinkedLearnerCard({
       </p>
 
       <MyMakeups learnerId={link.learnerId} readOnly />
+
+      <MyRewards learnerId={link.learnerId} guardian />
 
       <div>
         <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">By course</h3>

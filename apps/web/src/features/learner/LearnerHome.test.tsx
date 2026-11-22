@@ -30,14 +30,18 @@ describe("LearnerHome progress visualization", () => {
     expect(resumeLinks.length).toBe(bars.length);
   });
 
-  it("shows the learner streak and earned/locked achievements", async () => {
+  // Gamification (22/11): derived from evidence only — the old fixed "5-day streak / Quiz ace"
+  // card is gone. Linh's seeded completions are weeks old, so there is no streak today.
+  it("shows evidence-derived rewards: level, no fake streak, earned / locked badges", async () => {
     renderApp("/app/learning", "learner");
     await waitFor(() =>
-      expect(screen.getByRole("heading", { name: /Streak & achievements/i })).toBeInTheDocument(),
+      expect(screen.getByRole("heading", { name: /Streak & rewards/i })).toBeInTheDocument(),
     );
-    expect(screen.getByText(/5-day/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Quiz ace \(earned\)/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Course complete \(locked\)/)).toBeInTheDocument();
+    expect(screen.getByTestId("level")).toHaveTextContent(/Level \d+/);
+    expect(screen.getByTestId("streak")).toHaveTextContent(/No streak yet/);
+    expect(screen.getByLabelText(/First step \(earned\)/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Heard you \(locked/)).toBeInTheDocument();
+    expect(screen.queryByText(/5-day/)).not.toBeInTheDocument();
   });
 
   it("summarizes learning with stat tiles", async () => {

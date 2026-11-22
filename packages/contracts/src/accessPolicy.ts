@@ -27,6 +27,7 @@ export const PolicyAction = z.enum([
   "center:setup",
   "engine:manage",
   "attendance:mark",
+  "rewards:manage",
 ]);
 export type PolicyAction = z.infer<typeof PolicyAction>;
 
@@ -76,6 +77,13 @@ export const POLICY_CATALOG: CatalogEntry[] = [
     roles: ["staff"],
     criteria: [],
     readonlyFields: ["actions"],
+  },
+  {
+    action: "rewards:manage",
+    description: "Tune gamification: reward XP, badge thresholds, the class leaderboard",
+    roles: ["staff"],
+    criteria: [],
+    readonlyFields: [],
   },
   {
     action: "attendance:mark",
