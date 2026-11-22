@@ -262,6 +262,19 @@ const paidOf = (i: StoredInvoice) => i.payments.reduce((t, p) => t + p.amountVnd
 const totalOf = (i: StoredInvoice) => i.subtotalVnd - i.creditAppliedVnd;
 const fmt = (vnd: number) => `${vnd.toLocaleString("vi-VN")} ₫`;
 
+/** An invoice is never due before MIN_DAYS_TO_PAY days after it is issued (owner 22/11: a
+ *  first invoice issued on 22/11 for Term 1 showed "68 days overdue" at once). */
+export const MIN_DAYS_TO_PAY = 7;
+/** A first invoice skips a period that ends within this many days and bills the next one. */
+export const FIRST_INVOICE_MIN_DAYS_LEFT = 30;
+function dueDateFor(lineDues: string[], issuedAt: string): string {
+  const earliest = new Date(Date.parse(issuedAt) + 7 * 3_600_000 + MIN_DAYS_TO_PAY * DAY)
+    .toISOString()
+    .slice(0, 10);
+  const due = [...lineDues].sort()[0];
+  return due > earliest ? due : earliest;
+}
+
 function createInvoice(
   orgId: string,
   centerId: string,
@@ -286,7 +299,10 @@ function createInvoice(
     subtotalVnd: fee.reduce((t, l) => t + l.amountVnd, 0),
     creditAppliedVnd: 0,
     issuedAt,
-    dueDate: fee.map((l) => l.dueDate).sort()[0],
+    dueDate: dueDateFor(
+      fee.map((l) => l.dueDate),
+      issuedAt,
+    ),
     payments: [],
     voided: null,
   };
@@ -657,7 +673,8 @@ export const mockBilling: BillingPort = {
         return refuse("access_policy");
       if (lead.status !== "placed") return refuse("invalid_step", "place the learner first");
       if (lead.invoiceNo) return refuse("invalid_step", `already invoiced: ${lead.invoiceNo}`);
-      // The period running today, else the next one to start.
+      // The period running today, else the next one to start; a running period that ends within
+      // FIRST_INVOICE_MIN_DAYS_LEFT days is skipped when a later one exists.
       const today = centerToday();
       const tuition = [...lines.values()]
         .filter(
@@ -670,7 +687,9 @@ export const mockBilling: BillingPort = {
             l.to >= today,
         )
         .sort((a, b) => a.from.localeCompare(b.from));
-      const pick = tuition[0];
+      const endsSoon = (l: StoredLine) =>
+        l.from <= today && dayNo(l.to) - dayNo(today) < FIRST_INVOICE_MIN_DAYS_LEFT;
+      const pick = tuition[0] && endsSoon(tuition[0]) && tuition[1] ? tuition[1] : tuition[0];
       const fee = pick
         ? resolveLines(org, lead.courseCode, center.id, pick.year, pick.period)
         : null;
