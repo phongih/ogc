@@ -1,9 +1,6 @@
-import type {
-  IiosContextPort,
-  IiosContextResolution,
-  IiosGrantedContext,
-} from "@ogc/contracts";
+import type { IiosContextPort, IiosContextResolution, IiosGrantedContext } from "@ogc/contracts";
 import { organizations } from "../../fixtures/directory";
+import { isOrgAdmin, narrowingFor } from "./mockIiosPolicy";
 
 /*
  * OGC-AUTH-027 / Phase 1 DESIGN — MOCK IIOS boundary (SYNTHETIC; proves nothing about prod IIOS).
@@ -145,6 +142,16 @@ export const mockIiosContext: IiosContextPort = {
     if (resolution.state !== "valid" || !resolution.context) return { state: resolution.state };
     // Deny-by-default tenant match (not a grant — a refusal of a mismatch at the boundary).
     if (resolution.context.orgId !== intendedOrgId) return { state: "cross_tenant" };
-    return { state: "valid", context: { ...resolution.context } as IiosGrantedContext };
+    // OGC-ADR-039 step 2: IIOS also decides the org-admin attribute and the narrowing for this
+    // principal at resolve time (re-consulted on every navigation, never cached by OGC).
+    const c = resolution.context;
+    return {
+      state: "valid",
+      context: {
+        ...c,
+        orgAdmin: isOrgAdmin(c.principalId, c.orgId),
+        narrowing: narrowingFor(c.principalId, c.orgId),
+      } as IiosGrantedContext,
+    };
   },
 };

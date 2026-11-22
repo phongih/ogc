@@ -95,7 +95,10 @@ import type { DecisionEnginePort } from "@ogc/contracts";
 import { mockDecisionEngine } from "../adapters/mockDecisionEngine";
 export const decisionEngine: DecisionEnginePort = mockDecisionEngine;
 
-// Access policy (Org Admin) — narrows a membership's role; never grants. Mock, synthetic.
-import type { AccessPolicyPort } from "@ogc/contracts";
-import { mockAccessPolicy } from "../adapters/accessPolicy";
-export const accessPolicy: AccessPolicyPort = mockAccessPolicy;
+// Access policy — OGC-ADR-039 step 2: IIOS (mock) stores and decides policies; OGC only calls the
+// admin port and reads its own granted narrowing. Mock, synthetic.
+import type { IiosPolicyAdminPort, MyAccessPort } from "@ogc/contracts";
+import { mockMyAccess } from "../adapters/accessPolicy";
+import { mockIiosPolicyAdmin } from "../integration/mockIiosPolicy";
+export const accessPolicy: MyAccessPort = mockMyAccess;
+export const iiosPolicyAdmin: IiosPolicyAdminPort = mockIiosPolicyAdmin;
