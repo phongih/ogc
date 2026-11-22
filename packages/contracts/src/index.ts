@@ -36,3 +36,4 @@ export * from "./billing.js";
 export * from "./admissions.js";
 export * from "./students.js";
 export * from "./workforce.js";
+export * from "./forecast.js";
