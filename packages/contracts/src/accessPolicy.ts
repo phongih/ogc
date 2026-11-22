@@ -2,6 +2,7 @@ import { z } from "zod";
 
 /*
  * Access policy — ADDITIVE, SYNTHETIC, mock only. Pattern taken from HealthcareOS HCOS-F2.
+ * Since OGC-ADR-039 step 2 the policies live in IIOS (mock); these are the shared shapes.
  *
  * Owner decisions (22/11):
  *  - OGC does NOT create, lock or delete accounts: people and their memberships come from the
@@ -140,7 +141,7 @@ export const MembershipRole = z.enum(["admin", "staff", "teacher", "learner", "g
 export type MembershipRole = z.infer<typeof MembershipRole>;
 
 export const Membership = z.object({
-  personaId: z.string(),
+  principalId: z.string(), // IIOS principal (OGC-ADR-039: members are identified by IIOS)
   displayName: z.string(),
   role: MembershipRole.nullable(), // null: in the organization but no OGC role — can use nothing
   policyId: z.string().nullable(),
@@ -199,30 +200,11 @@ export interface MyAccess {
   readonly: Partial<Record<PolicyAction, ReadonlyField[]>>;
 }
 
-export interface AccessPolicyPort {
-  // Org Admin only (fail-closed: null / not_admin).
-  getAdminView(viewerPersonaId: string): Promise<AccessAdminView | null>;
-  validate(
-    viewerPersonaId: string,
-    rules: PolicyRule[],
-  ): Promise<{ ok: true } | { ok: false; detail: string; path: string }>;
-  createPolicy(viewerPersonaId: string, input: PolicyInput): Promise<PolicyResult>;
-  revisePolicy(
-    viewerPersonaId: string,
-    policyId: string,
-    expectedVersion: number,
-    patch: { description?: string | null; rules?: PolicyRule[] },
-  ): Promise<PolicyResult>;
-  retirePolicy(
-    viewerPersonaId: string,
-    policyId: string,
-    expectedVersion: number,
-  ): Promise<PolicyResult>;
-  setMembershipPolicy(
-    viewerPersonaId: string,
-    memberPersonaId: string,
-    policyId: string | null,
-  ): Promise<PolicyResult>;
-  // Anyone signed in: their own effective access.
+/*
+ * OGC-ADR-039 step 2: policies are stored and decided by IIOS (`IiosPolicyAdminPort` in
+ * iiosContext.ts). OGC keeps only this read: what the signed-in persona's GRANTED narrowing leaves
+ * them, as UI hints. Adapters enforce through `authorize()`.
+ */
+export interface MyAccessPort {
   myAccess(viewerPersonaId: string): Promise<MyAccess>;
 }

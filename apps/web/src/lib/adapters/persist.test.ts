@@ -32,11 +32,11 @@ beforeEach(() => {
 describe("demo persistence", () => {
   it("every mock store is registered", () => {
     expect(registeredKeys().sort()).toEqual([
-      "access",
       "attendance",
       "centerSetup",
       "engine",
       "engineRules",
+      "iiosPolicy",
       "intelligence",
       "learning",
       "schedule",

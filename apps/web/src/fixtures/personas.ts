@@ -52,18 +52,83 @@ export const teacherName = (id: string | undefined): string | null =>
 export type MemberRole = "admin" | "staff" | "teacher" | "learner" | "guardian" | null;
 export const members: {
   personaId: string;
+  principalId: string; // the IIOS principal this membership belongs to (synthetic)
   displayName: string;
   role: MemberRole;
   orgId: string;
 }[] = [
-  { personaId: "demo-admin", displayName: "Olivia (Org Admin)", role: "admin", orgId: ORG },
-  { personaId: "demo-staff", displayName: "Sam (Org Staff)", role: "staff", orgId: ORG },
-  { personaId: "demo-teacher", displayName: "Tara (Teacher)", role: "teacher", orgId: ORG },
-  { personaId: "demo-teacher-2", displayName: "Ben (Teacher)", role: "teacher", orgId: ORG },
-  { personaId: "demo-learner", displayName: "Linh (Learner)", role: "learner", orgId: ORG },
-  { personaId: "demo-learner-2", displayName: "Minh (Learner)", role: "learner", orgId: ORG },
-  { personaId: "demo-guardian", displayName: "Mai (Guardian)", role: "guardian", orgId: ORG },
-  { personaId: "demo-pending", displayName: "Quinn (no role yet)", role: null, orgId: ORG },
-  { personaId: "demo-staff-org2", displayName: "Staff (Lumen)", role: "staff", orgId: ORG2 },
-  { personaId: "demo-learner-org2", displayName: "Learner (Lumen)", role: "learner", orgId: ORG2 },
+  {
+    personaId: "demo-admin",
+    principalId: "iios-principal-admin-1",
+    displayName: "Olivia (Org Admin)",
+    role: "admin",
+    orgId: ORG,
+  },
+  {
+    personaId: "demo-staff",
+    principalId: "iios-principal-staff-1",
+    displayName: "Sam (Org Staff)",
+    role: "staff",
+    orgId: ORG,
+  },
+  {
+    personaId: "demo-teacher",
+    principalId: "iios-principal-teacher-1",
+    displayName: "Tara (Teacher)",
+    role: "teacher",
+    orgId: ORG,
+  },
+  {
+    personaId: "demo-teacher-2",
+    principalId: "iios-principal-teacher-2",
+    displayName: "Ben (Teacher)",
+    role: "teacher",
+    orgId: ORG,
+  },
+  {
+    personaId: "demo-learner",
+    principalId: "iios-principal-learner-1",
+    displayName: "Linh (Learner)",
+    role: "learner",
+    orgId: ORG,
+  },
+  {
+    personaId: "demo-learner-2",
+    principalId: "iios-principal-learner-2",
+    displayName: "Minh (Learner)",
+    role: "learner",
+    orgId: ORG,
+  },
+  {
+    personaId: "demo-guardian",
+    principalId: "iios-principal-guardian-1",
+    displayName: "Mai (Guardian)",
+    role: "guardian",
+    orgId: ORG,
+  },
+  {
+    personaId: "demo-pending",
+    principalId: "iios-principal-pending-1",
+    displayName: "Quinn (no role yet)",
+    role: null,
+    orgId: ORG,
+  },
+  {
+    personaId: "demo-staff-org2",
+    principalId: "iios-principal-staff-org2",
+    displayName: "Staff (Lumen)",
+    role: "staff",
+    orgId: ORG2,
+  },
+  {
+    personaId: "demo-learner-org2",
+    principalId: "iios-principal-learner-org2",
+    displayName: "Learner (Lumen)",
+    role: "learner",
+    orgId: ORG2,
+  },
 ];
+
+/** The IIOS principal behind a demo persona (synthetic). */
+export const principalOf = (personaId: string): string | null =>
+  members.find((m) => m.personaId === personaId)?.principalId ?? null;

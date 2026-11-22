@@ -1,5 +1,7 @@
 /*
- * Access (Org Admin) — pattern from HealthcareOS HCOS-F2. Owner decisions 22/11:
+ * Access (Org Admin) — pattern from HealthcareOS HCOS-F2. OGC-ADR-039 step 2: policies are stored
+ * and decided by IIOS (mock); this page is only the editing UI and calls IiosPolicyAdminPort with
+ * the admin's own granted context. Owner decisions 22/11:
  *  - OGC does not create, lock or delete accounts: memberships come from the organization
  *    (EduOS / IIOS, mock) and are listed read-only here;
  *  - an access policy only NARROWS what a role allows, never grants; a closed catalog of actions;
@@ -13,13 +15,15 @@ import {
   READONLY_LABEL,
   type AccessAdminView,
   type AccessPolicy,
+  type IiosGrantedContext,
   type PolicyAction,
   type PolicyResult,
   type PolicyRule,
   type ReadonlyField,
   type SessionRole,
 } from "@ogc/contracts";
-import { accessPolicy } from "../../lib/api";
+import { iiosPolicyAdmin } from "../../lib/api";
+import { useGrantedContext } from "../../app/iiosGate";
 import { useSession } from "../../app/session";
 import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDateTime } from "../../lib/centerTime";
@@ -69,10 +73,11 @@ function Refusal({ result }: { result: PolicyResult | undefined }) {
 export function AccessHome() {
   const { session } = useSession();
   const viewer = session?.personaId ?? "";
+  const ctx = useGrantedContext();
   const q = useQuery({
     queryKey: ["access-admin", viewer],
-    queryFn: () => accessPolicy.getAdminView(viewer),
-    enabled: !!viewer,
+    queryFn: () => iiosPolicyAdmin.getAdminView(ctx!),
+    enabled: !!viewer && !!ctx,
   });
   const [editing, setEditing] = useState<AccessPolicy | "new" | null>(null);
 
@@ -99,16 +104,16 @@ export function AccessHome() {
         {editing ? (
           <PolicyEditor
             key={editing === "new" ? "new" : `${editing.id}@${editing.version}`}
-            viewer={viewer}
+            ctx={ctx!}
             view={v}
             policy={editing === "new" ? null : editing}
             onDone={() => setEditing(null)}
           />
         ) : null}
-        <PolicyTable viewer={viewer} view={v} onEdit={(p) => setEditing(p)} />
+        <PolicyTable ctx={ctx!} view={v} onEdit={(p) => setEditing(p)} />
       </section>
 
-      <Members viewer={viewer} view={v} />
+      <Members ctx={ctx!} view={v} />
       <Catalog />
     </section>
   );
@@ -150,11 +155,11 @@ function ruleText(r: PolicyRule, centers: { id: string; name: string }[]): strin
 }
 
 function PolicyTable({
-  viewer,
+  ctx,
   view,
   onEdit,
 }: {
-  viewer: string;
+  ctx: IiosGrantedContext;
   view: AccessAdminView;
   onEdit: (p: AccessPolicy) => void;
 }) {
@@ -192,7 +197,7 @@ function PolicyTable({
                       variant="ghost"
                       onClick={() => {
                         setConfirm(null);
-                        act.mutate(() => accessPolicy.retirePolicy(viewer, p.id, p.version));
+                        act.mutate(() => iiosPolicyAdmin.retirePolicy(ctx, p.id, p.version));
                       }}
                     >
                       Yes, retire
@@ -238,12 +243,12 @@ function PolicyTable({
 }
 
 function PolicyEditor({
-  viewer,
+  ctx,
   view,
   policy,
   onDone,
 }: {
-  viewer: string;
+  ctx: IiosGrantedContext;
   view: AccessAdminView;
   policy: AccessPolicy | null;
   onDone: () => void;
@@ -257,8 +262,8 @@ function PolicyEditor({
   const save = useMutation({
     mutationFn: () =>
       policy
-        ? accessPolicy.revisePolicy(viewer, policy.id, policy.version, { description, rules })
-        : accessPolicy.createPolicy(viewer, { name, description, rules }),
+        ? iiosPolicyAdmin.revisePolicy(ctx, policy.id, policy.version, { description, rules })
+        : iiosPolicyAdmin.createPolicy(ctx, { name, description, rules }),
     onSuccess: async (r) => {
       if (!r.ok) return;
       await refreshLearningState(qc);
@@ -444,7 +449,7 @@ function RuleEditor({
   );
 }
 
-function Members({ viewer, view }: { viewer: string; view: AccessAdminView }) {
+function Members({ ctx, view }: { ctx: IiosGrantedContext; view: AccessAdminView }) {
   const act = useAccessAction();
   const active = view.policies.filter((p) => p.status === "active");
   return (
@@ -464,7 +469,7 @@ function Members({ viewer, view }: { viewer: string; view: AccessAdminView }) {
           </thead>
           <tbody>
             {view.memberships.map((m) => (
-              <tr key={m.personaId} className="border-b border-border last:border-0">
+              <tr key={m.principalId} className="border-b border-border last:border-0">
                 <td className="p-2">{m.displayName}</td>
                 <td className="p-2">
                   {m.role ? ROLE_LABEL[m.role] : <span className="text-danger">No role</span>}
@@ -482,7 +487,7 @@ function Members({ viewer, view }: { viewer: string; view: AccessAdminView }) {
                       value={m.policyId ?? ""}
                       onChange={(e) => {
                         const id = e.target.value || null; // read now, before the re-render
-                        act.mutate(() => accessPolicy.setMembershipPolicy(viewer, m.personaId, id));
+                        act.mutate(() => iiosPolicyAdmin.attachPolicy(ctx, m.principalId, id));
                       }}
                     >
                       <option value="">— No restriction —</option>

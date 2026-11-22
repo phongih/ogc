@@ -1,13 +1,19 @@
 // Access policy (HealthcareOS HCOS-F2 pattern): role ∩ policy, narrow-only, fail-closed, Org Admin
 // only and never on their own access. Enforced in the adapters, not just hidden in the UI.
+// OGC-ADR-039 step 2: the policies live in the MOCK IIOS; the admin calls IiosPolicyAdminPort with
+// their granted context, and the narrowing reaches OGC inside each grant.
 import { beforeEach, describe, expect, it } from "vitest";
 import type { PolicyRule } from "@ogc/contracts";
+import type { IiosGrantedContext } from "@ogc/contracts";
+import { allows, mockMyAccess } from "./accessPolicy";
 import {
-  __assignForTests,
+  __attachForTests,
   __policiesForTests,
-  allows,
-  mockAccessPolicy as access,
-} from "./accessPolicy";
+  mockIiosPolicyAdmin as iios,
+} from "../integration/mockIiosPolicy";
+import { mockIiosContext } from "../integration/mockIiosContext";
+import { presentedGrantFor } from "../../app/iiosGate";
+import { organizations } from "../../fixtures/directory";
 import { mockSchedule } from "./mockSchedule";
 import { mockMakeup } from "./mockMakeup";
 import { mockCenterSetup } from "./mockCenterSetup";
@@ -21,6 +27,9 @@ import { seedSessions } from "../../fixtures/attendance";
 const ADMIN = "demo-admin";
 const SAM = "demo-staff";
 const BEN = "demo-teacher-2";
+const SAM_P = "iios-principal-staff-1";
+const BEN_P = "iios-principal-teacher-2";
+const ADMIN_P = "iios-principal-admin-1";
 const FRONT_DESK = "policy-front-desk-d1";
 const OWN_CLASSES = "policy-own-classes";
 const D1 = centers[0].id;
@@ -34,10 +43,36 @@ const a2ToMark = () =>
 
 beforeEach(() => __resetAttendanceForTests()); // resets the schedule, and with it access policies
 
+/** The granted context the mock IIOS issues for a persona right now. */
+async function grantOf(persona: string): Promise<IiosGrantedContext> {
+  const r = await mockIiosContext.resolveContext(
+    presentedGrantFor(persona, "valid"),
+    organizations[0].id,
+  );
+  expect(r.state).toBe("valid");
+  return r.context!;
+}
+const PRINCIPAL: Record<string, string> = { [SAM]: SAM_P, [BEN]: BEN_P, [ADMIN]: ADMIN_P };
 async function attach(member: string, policyId: string | null) {
-  const r = await access.setMembershipPolicy(ADMIN, member, policyId);
+  const r = await iios.attachPolicy(await grantOf(ADMIN), PRINCIPAL[member] ?? member, policyId);
   expect(r.ok).toBe(true);
 }
+const access = {
+  getAdminView: async (p: string) => iios.getAdminView(await grantOf(p)),
+  createPolicy: async (p: string, input: Parameters<typeof iios.createPolicy>[1]) =>
+    iios.createPolicy(await grantOf(p), input),
+  revisePolicy: async (
+    p: string,
+    ref: string,
+    v: number,
+    patch: Parameters<typeof iios.revisePolicy>[3],
+  ) => iios.revisePolicy(await grantOf(p), ref, v, patch),
+  retirePolicy: async (p: string, ref: string, v: number) =>
+    iios.retirePolicy(await grantOf(p), ref, v),
+  setMembershipPolicy: async (p: string, member: string, ref: string | null) =>
+    iios.attachPolicy(await grantOf(p), PRINCIPAL[member] ?? member, ref),
+  myAccess: (p: string) => mockMyAccess.myAccess(p),
+};
 
 describe("access — admin view", () => {
   it("lists the organization's memberships read-only, with the EduOS-style counts", async () => {
@@ -53,9 +88,11 @@ describe("access — admin view", () => {
       "Front desk — District 1 only",
       "Teacher — own classes only",
     ]);
-    expect(v.memberships.find((m) => m.personaId === ADMIN)!.isYou).toBe(true);
-    expect(v.memberships.find((m) => m.personaId === "demo-learner")!.canHavePolicy).toBe(false);
-    expect(v.memberships.some((m) => m.personaId === "demo-staff-org2")).toBe(false);
+    expect(v.memberships.find((m) => m.principalId === ADMIN_P)!.isYou).toBe(true);
+    expect(
+      v.memberships.find((m) => m.principalId === "iios-principal-learner-1")!.canHavePolicy,
+    ).toBe(false);
+    expect(v.memberships.some((m) => m.principalId === "iios-principal-staff-org2")).toBe(false);
   });
 
   it("only the Org Admin manages policies (fail-closed for everyone else)", async () => {
@@ -66,6 +103,32 @@ describe("access — admin view", () => {
         reason: "not_admin",
       });
     }
+  });
+
+  it("IIOS re-checks admin from its own data — a grant claiming orgAdmin is not enough", async () => {
+    const forged = { ...(await grantOf(SAM)), orgAdmin: true };
+    expect(await iios.getAdminView(forged)).toBeNull();
+    expect(await iios.attachPolicy(forged, BEN_P, OWN_CLASSES)).toEqual({
+      ok: false,
+      reason: "not_admin",
+    });
+  });
+});
+
+describe("access — the narrowing travels in the grant (ADR-039 step 2)", () => {
+  it("IIOS puts orgAdmin and the current narrowing into each resolved grant", async () => {
+    expect((await grantOf(ADMIN)).orgAdmin).toBe(true);
+    expect((await grantOf(SAM)).orgAdmin).toBe(false);
+    expect((await grantOf(SAM)).narrowing).toEqual({ state: "none" });
+    await attach(SAM, FRONT_DESK);
+    expect((await grantOf(SAM)).narrowing).toMatchObject({
+      state: "policy",
+      policyRef: FRONT_DESK,
+      version: 1,
+      name: "Front desk — District 1 only",
+    });
+    __attachForTests(SAM_P, "policy-that-does-not-exist");
+    expect((await grantOf(SAM)).narrowing).toEqual({ state: "unavailable" });
   });
 });
 
@@ -153,7 +216,7 @@ describe("access — a policy only narrows", () => {
   });
 
   it("fail-closed: a membership pointing at a missing or retired policy can do nothing", async () => {
-    __assignForTests(SAM, "policy-that-does-not-exist");
+    __attachForTests(SAM_P, "policy-that-does-not-exist");
     expect((await mockSchedule.getOverview(SAM))!.classes).toEqual([]);
     expect(await mockSchedule.reschedule(SAM, "SES-001", inDays(4))).toEqual({
       ok: false,
@@ -162,7 +225,7 @@ describe("access — a policy only narrows", () => {
     expect((await access.myAccess(SAM)).failedClosed).toBe(true);
     // A retired policy (tampered state — the admin path refuses this) is the same.
     __policiesForTests.get(FRONT_DESK)!.status = "retired";
-    __assignForTests(SAM, FRONT_DESK);
+    __attachForTests(SAM_P, FRONT_DESK);
     expect(allows(SAM, "schedule:manage", { centerId: D1 })).toBe(false);
   });
 });
@@ -173,7 +236,7 @@ describe("access — admin rules", () => {
       ok: false,
       reason: "self",
     });
-    __assignForTests(ADMIN, FRONT_DESK); // another admin restricted Olivia
+    __attachForTests(ADMIN_P, FRONT_DESK); // another admin restricted Olivia
     const p = (await access.getAdminView(ADMIN))!.policies.find((x) => x.id === FRONT_DESK)!;
     expect(p.restrictsYou).toBe(true);
     expect(
@@ -191,7 +254,11 @@ describe("access — admin rules", () => {
   });
 
   it("learners, guardians and no-role members take no policy", async () => {
-    for (const m of ["demo-learner", "demo-guardian", "demo-pending"])
+    for (const m of [
+      "iios-principal-learner-1",
+      "iios-principal-guardian-1",
+      "iios-principal-pending-1",
+    ])
       expect(await access.setMembershipPolicy(ADMIN, m, FRONT_DESK)).toEqual({
         ok: false,
         reason: "not_applicable",
