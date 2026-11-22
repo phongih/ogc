@@ -126,3 +126,8 @@ export const billing: BillingPort = mockBilling;
 export const admissions: AdmissionsPort = mockAdmissions;
 export const students: StudentsPort = mockStudents;
 export const workforce: WorkforcePort = mockWorkforce;
+
+// Business Forecast (owner 22/11). Mock, synthetic history — reads only, never acts.
+import type { ForecastPort } from "@ogc/contracts";
+import { mockForecast } from "../adapters/mockForecast";
+export const forecast: ForecastPort = mockForecast;

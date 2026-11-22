@@ -66,6 +66,17 @@ registerPersistent("workforce", {
 reset();
 
 const settingsOf = (org: string) => settings.get(org) ?? { ...DEFAULT_SETTINGS };
+/** Forecast: the organization's teaching capacity — Σ teachers' target hours / week + thresholds. */
+export function capacityOf(orgId: string): {
+  hoursPerWeek: number;
+  teachers: number;
+  underPct: number;
+  overPct: number;
+} {
+  const ts = teachers.filter((t) => t.orgId === orgId);
+  const hours = ts.reduce((t, x) => t + (targets.get(x.id)?.targetHours ?? 0), 0);
+  return { hoursPerWeek: hours, teachers: ts.length, ...settingsOf(orgId) };
+}
 const targetOf = (t: string) =>
   targets.get(t) ?? { employment: "part_time" as Employment, targetHours: 0 };
 const hoursOf = (s: StoredSession) => sessionStore.classMeta(s.classId).durationMin / 60;
@@ -79,6 +90,16 @@ function windowSessions(now: number): StoredSession[] {
     .filter(
       (s) => s.state === "scheduled" && Date.parse(s.at) >= now && Date.parse(s.at) < now + 7 * DAY,
     );
+}
+
+/** Forecast: teaching hours scheduled in the next 7 days at some centers (live). */
+export function weeklyHoursAt(centerIds: string[], now = Date.now()): number {
+  const at = (id: string) => classes.find((c) => c.id === id)?.centerId;
+  return round(
+    windowSessions(now)
+      .filter((s) => centerIds.includes(at(s.classId) ?? ""))
+      .reduce((t, s) => t + hoursOf(s), 0),
+  );
 }
 
 function point(hours: number, sessions: number, target: number, s: WorkforceSettings): LoadPoint {

@@ -80,7 +80,7 @@ function seedPolicies(): StoredPolicy[] {
     mk(
       "policy-front-desk-d1",
       "Front desk — District 1 only",
-      "Schedule, make-ups, billing and admissions for District 1 only; cannot change class teachers or substitutes.",
+      "Schedule, make-ups, billing, admissions and the forecast for District 1 only; cannot change class teachers or substitutes.",
       [
         {
           action: "schedule:manage",
@@ -91,6 +91,7 @@ function seedPolicies(): StoredPolicy[] {
         { action: "billing:manage", criteria: { centerId: [D1] } },
         { action: "admissions:manage", criteria: { centerId: [D1] } },
         { action: "students:view", criteria: { centerId: [D1] } },
+        { action: "forecast:view", criteria: { centerId: [D1] } },
       ],
     ),
     mk(

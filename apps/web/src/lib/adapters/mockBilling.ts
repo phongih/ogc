@@ -470,6 +470,23 @@ export function overdueInvoicesOf(orgId: string, days: number, now = Date.now())
     .sort((a, b) => b.daysOverdue - a.daysOverdue);
 }
 
+/** Forecast: open and overdue balances of an org's invoices at some centers (void excluded). */
+export function openBalancesOf(
+  orgId: string,
+  centerIds: string[],
+  now = Date.now(),
+): { openVnd: number; overdueVnd: number } {
+  let openVnd = 0;
+  let overdueVnd = 0;
+  for (const i of invoices.values()) {
+    if (i.orgId !== orgId || i.voided || !centerIds.includes(i.centerId)) continue;
+    const v = view(i, now);
+    openVnd += v.balanceVnd;
+    if (v.daysOverdue > 0) overdueVnd += v.balanceVnd;
+  }
+  return { openVnd, overdueVnd };
+}
+
 // ── port ────────────────────────────────────────────────────────────────────────────────────
 
 export const mockBilling: BillingPort = {

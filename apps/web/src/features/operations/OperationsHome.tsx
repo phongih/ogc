@@ -93,6 +93,12 @@ export function OperationsHome() {
         Workforce
       </Link>{" "}
       <Link
+        to="/app/operations/forecast"
+        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+      >
+        Forecast
+      </Link>{" "}
+      <Link
         to="/app/operations/engine"
         className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
       >
