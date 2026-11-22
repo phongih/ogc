@@ -1,3 +1,4 @@
+import { useViewer } from "../../../app/iiosGate";
 /*
  * P1 · Speaking studio (MOCK). Role-play rehearsal, one turn at a time: the coach says a line,
  * the learner picks the most natural reply and says it out loud. After the last turn the learner
@@ -8,7 +9,6 @@ import { useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { SpeakingFeedback } from "@ogc/contracts";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../../ui";
-import { useSession } from "../../../app/session";
 import { useMySpeakingFeedback, useSpeakingStudio, useSubmitRehearsal } from "./queries";
 import { LockedNotice, useActivityLock } from "../PrerequisiteLock";
 
@@ -16,13 +16,12 @@ const newAttemptId = (activityId: string) =>
   `ATT-SPK-${activityId}-${Math.random().toString(36).slice(2, 8)}`;
 
 export function SpeakingStudio() {
-  const { session } = useSession();
-  const personaId = session?.personaId ?? "";
+  const viewer = useViewer();
   const { activityId = "" } = useParams();
-  const studio = useSpeakingStudio(personaId, activityId);
-  const prior = useMySpeakingFeedback(personaId, activityId);
-  const submit = useSubmitRehearsal(personaId, activityId);
-  const lock = useActivityLock(personaId, activityId);
+  const studio = useSpeakingStudio(viewer, activityId);
+  const prior = useMySpeakingFeedback(viewer, activityId);
+  const submit = useSubmitRehearsal(viewer, activityId);
+  const lock = useActivityLock(viewer, activityId);
 
   const attemptId = useRef(newAttemptId(activityId));
   const [rehearsing, setRehearsing] = useState(false);

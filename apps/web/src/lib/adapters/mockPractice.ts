@@ -1,3 +1,4 @@
+import { viaGrant } from "./viewer";
 import type {
   PracticeActivityView,
   PracticePort,
@@ -47,7 +48,7 @@ export function submissionLocked(personaId: string, activityId: string): boolean
   return lockedFor(scope.learnerId, personaMap[personaId]!.orgId, activityId);
 }
 
-export const mockPractice: PracticePort = {
+export const mockPractice: PracticePort = viaGrant<PracticePort>({
   getPractice: (personaId, activityId) =>
     withFault("practice.getPractice", () => {
       const scope = scopeFor(personaId, activityId);
@@ -80,4 +81,4 @@ export const mockPractice: PracticePort = {
         learningStore.submitPractice(personaId, activityId, submission),
       );
     }),
-};
+});

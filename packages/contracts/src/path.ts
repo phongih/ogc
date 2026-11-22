@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { Skill } from "./profile.js";
 import { ConfidenceBand } from "./confidence.js";
@@ -40,5 +41,5 @@ export type LearningPathView = z.infer<typeof LearningPathView>;
 
 // Self-scoped. Fail-closed → null when the persona is not a learner.
 export interface LearningPathPort {
-  getLearningPath(personaId: string): Promise<LearningPathView | null>;
+  getLearningPath(viewer: IiosGrantedContext): Promise<LearningPathView | null>;
 }

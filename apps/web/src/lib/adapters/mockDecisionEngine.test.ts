@@ -13,7 +13,7 @@ const T = "demo-teacher";
 const ORG = organizations[0].id;
 const ruleId = async (kind: string) => (await E.listRules(as(S)))!.find((r) => r.kind === kind)!.id;
 const queueNames = async () =>
-  (await mockSupport.listNeedsSupport(T)).map((i) => i.learnerName).sort();
+  (await mockSupport.listNeedsSupport(as(T))).map((i) => i.learnerName).sort();
 
 beforeEach(() => {
   __resetAttendanceForTests(); // also resets the engine + rules
@@ -112,7 +112,7 @@ describe("Decision Engine — the rules drive the support queue", () => {
       (await E.updateRule(as(S), await ruleId("skill_low"), { params: { threshold: 53 } })).ok,
     ).toBe(true);
     expect(await queueNames()).toEqual(["Huy D.", "Minh T."]);
-    const minh = (await mockSupport.listNeedsSupport(T)).find((i) => i.learnerName === "Minh T.")!;
+    const minh = (await mockSupport.listNeedsSupport(as(T))).find((i) => i.learnerName === "Minh T.")!;
     expect(minh.signals[0]).toMatchObject({ kind: "low_skill", threshold: 53 });
     await E.updateRule(as(S), await ruleId("absence_streak"), { enabled: false });
     expect(await queueNames()).toEqual(["Minh T."]);

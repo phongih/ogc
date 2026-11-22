@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { LearnerProfile } from "./profile.js";
 import { MasteryConfidence } from "./confidence.js";
@@ -65,11 +66,14 @@ export type InterventionResult = z.infer<typeof InterventionResult>;
 // Viewer-scoped with fail-closed authorization: only the owning teacher of the learner may
 // read the view or intervene. Guardian/learner/staff and cross-org teachers are denied.
 export interface TeacherLearningIntelligencePort {
-  getLearnerView(viewerPersonaId: string, learnerId: string): Promise<TeacherLearningView | null>;
+  getLearnerView(
+    viewer: IiosGrantedContext,
+    learnerId: string,
+  ): Promise<TeacherLearningView | null>;
   intervene(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     learnerId: string,
     input: InterventionInput,
   ): Promise<InterventionResult>;
-  listInterventions(viewerPersonaId: string, learnerId: string): Promise<TeacherIntervention[]>;
+  listInterventions(viewer: IiosGrantedContext, learnerId: string): Promise<TeacherIntervention[]>;
 }

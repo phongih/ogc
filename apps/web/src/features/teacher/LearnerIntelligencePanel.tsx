@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useState } from "react";
 import type { InterventionReasonCode } from "@ogc/contracts";
 import { Button, Card, EmptyState, Spinner } from "../../ui";
@@ -25,18 +26,18 @@ const REASON_CODES: InterventionReasonCode[] = [
  * a required reason; reverting restores the system suggestion. Synthetic + fail-closed.
  */
 export function LearnerIntelligencePanel({
-  viewerPersonaId,
+  viewer,
   learnerId,
   learnerName,
 }: {
-  viewerPersonaId: string;
+  viewer: IiosGrantedContext;
   learnerId: string;
   learnerName: string;
 }) {
-  const view = useTeacherLearnerView(viewerPersonaId, learnerId);
-  const active = useActiveApplied(viewerPersonaId, learnerId);
-  const apply = useApplyRecommendation(viewerPersonaId, learnerId);
-  const revert = useRevertApplied(viewerPersonaId, learnerId);
+  const view = useTeacherLearnerView(viewer, learnerId);
+  const active = useActiveApplied(viewer, learnerId);
+  const apply = useApplyRecommendation(viewer, learnerId);
+  const revert = useRevertApplied(viewer, learnerId);
 
   const [selected, setSelected] = useState("");
   const [reasonCode, setReasonCode] = useState<InterventionReasonCode>("pacing");

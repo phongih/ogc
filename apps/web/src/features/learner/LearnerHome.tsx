@@ -1,6 +1,6 @@
+import { useViewer } from "../../app/iiosGate";
 import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, ProgressRing, Spinner, StatTile } from "../../ui";
-import { useSession } from "../../app/session";
 import {
   useAchievements,
   useLearnerDashboard,
@@ -17,13 +17,13 @@ import { TodaysMission } from "./TodaysMission";
 import { MyMakeups } from "./MyMakeups";
 
 export function LearnerHome() {
-  const { session } = useSession();
-  const q = useLearnerDashboard(session?.personaId ?? "");
-  const achievements = useAchievements(session?.personaId ?? "");
-  const liProfile = useLearnerProfile(session?.personaId ?? "");
-  const path = useLearningPath(session?.personaId ?? "");
-  const next = useNextAction(session?.personaId ?? "");
-  const confidence = useMasteryConfidence(session?.personaId ?? "");
+  const viewer = useViewer();
+  const q = useLearnerDashboard(viewer);
+  const achievements = useAchievements(viewer);
+  const liProfile = useLearnerProfile(viewer);
+  const path = useLearningPath(viewer);
+  const next = useNextAction(viewer);
+  const confidence = useMasteryConfidence(viewer);
 
   if (q.isLoading) return <Spinner label="Loading your learning" />;
   if (q.isError) return <ErrorState message="Could not load your learning." onRetry={() => q.refetch()} />;

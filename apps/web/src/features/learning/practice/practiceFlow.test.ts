@@ -1,3 +1,4 @@
+import { as } from "../../../test/grants";
 import { describe, expect, it } from "vitest";
 import { mockPractice as practice } from "../../../lib/adapters/mockPractice";
 import {
@@ -21,7 +22,7 @@ const L = "demo-learner"; // persona for LEARNER_LINH
 const T = "demo-teacher"; // owns Linh's class
 const LINH = LEARNER_LINH;
 
-const ueMastery = async () => (await prof.getProfile(L))!.skills.use_of_english.level;
+const ueMastery = async () => (await prof.getProfile(as(L)))!.skills.use_of_english.level;
 const correctA23 = {
   attemptId: "ATT-PRAC-A23",
   responses: [
@@ -42,25 +43,25 @@ const wrongB12 = {
 
 describe("AUTH-030 integrated practice loop", () => {
   it("baseline: ACT-A2-3 is the available system recommendation; ACT-A2-4 is prerequisite-blocked (scenario 5)", async () => {
-    const path = (await pathPort.getLearningPath(L))!;
+    const path = (await pathPort.getLearningPath(as(L)))!;
     expect(path.steps.find((s) => s.activityId === "ACT-A2-3")!.state).toBe("available");
     expect(path.steps.find((s) => s.activityId === "ACT-A2-4")!.state).toBe("blocked");
-    const next = (await nextPort.getNextAction(L))!;
+    const next = (await nextPort.getNextAction(as(L)))!;
     expect(next.source).toBe("system");
     expect(next.activityId).toBe("ACT-A2-3");
     expect(next.friendlyReason).not.toMatch(/ACT-/); // no internal ids on the learner surface
   });
 
   it("cross-tenant / unauthorized / unenrolled practice submissions fail closed (scenario 11)", async () => {
-    expect((await practice.submitPractice("demo-guardian", "ACT-A2-3", correctA23)).reason).toBe("not_a_learner");
-    expect((await practice.submitPractice("demo-learner-org2", "ACT-A2-3", correctA23)).reason).toBe("cross_org_denied");
-    expect(await practice.getPractice("demo-learner-org2", "ACT-A2-3")).toBeNull();
-    expect((await practice.submitPractice("demo-learner-2", "ACT-A2-3", correctA23)).reason).toBe("not_enrolled");
+    expect((await practice.submitPractice(as("demo-guardian"), "ACT-A2-3", correctA23)).reason).toBe("not_a_learner");
+    expect((await practice.submitPractice(as("demo-learner-org2"), "ACT-A2-3", correctA23)).reason).toBe("cross_org_denied");
+    expect(await practice.getPractice(as("demo-learner-org2"), "ACT-A2-3")).toBeNull();
+    expect((await practice.submitPractice(as("demo-learner-2"), "ACT-A2-3", correctA23)).reason).toBe("not_enrolled");
   });
 
   it("correct submission creates evidence and raises mastery via LI-1 (scenario 1)", async () => {
     const before = await ueMastery();
-    const res = await practice.submitPractice(L, "ACT-A2-3", correctA23);
+    const res = await practice.submitPractice(as(L), "ACT-A2-3", correctA23);
     expect(res.ok).toBe(true);
     expect(res.result!.score).toBe(100);
     expect(res.result!.correct).toBe(4);
@@ -70,51 +71,51 @@ describe("AUTH-030 integrated practice loop", () => {
   });
 
   it("confidence is reported distinctly from mastery (scenario 4)", async () => {
-    const c = (await conf.getConfidence(L))!;
+    const c = (await conf.getConfidence(as(L)))!;
     const band = c.skills.use_of_english.band;
     expect(["low", "medium", "high"]).toContain(band);
     // Mastery and confidence are separate numbers from separate engines.
-    expect(typeof (await prof.getProfile(L))!.skills.use_of_english.level).toBe("number");
+    expect(typeof (await prof.getProfile(as(L)))!.skills.use_of_english.level).toBe("number");
     expect(typeof c.skills.use_of_english.level).toBe("number");
   });
 
   it("recommendation responds to the new evidence; prerequisite is now unblocked (scenario 6 + closed loop)", async () => {
-    const path = (await pathPort.getLearningPath(L))!;
+    const path = (await pathPort.getLearningPath(as(L)))!;
     expect(path.steps.find((s) => s.activityId === "ACT-A2-3")!.state).toBe("completed");
     expect(path.steps.find((s) => s.activityId === "ACT-A2-4")!.state).toBe("available"); // unblocked by the practice
-    const next = (await nextPort.getNextAction(L))!;
+    const next = (await nextPort.getNextAction(as(L)))!;
     expect(next.source).toBe("system");
     expect(next.activityId).not.toBe("ACT-A2-3"); // derived from updated evidence, not a hardcoded transition
   });
 
   it("duplicate submission does not double-count (scenario 3)", async () => {
     const before = await ueMastery();
-    const replay = await practice.submitPractice(L, "ACT-A2-3", correctA23); // same attemptId
+    const replay = await practice.submitPractice(as(L), "ACT-A2-3", correctA23); // same attemptId
     expect(replay.ok).toBe(true);
     expect(replay.idempotentReplay).toBe(true);
     expect(replay.result!.score).toBe(100);
-    const other = await practice.submitPractice(L, "ACT-A2-3", { ...correctA23, attemptId: "ATT-DIFFERENT" });
+    const other = await practice.submitPractice(as(L), "ACT-A2-3", { ...correctA23, attemptId: "ATT-DIFFERENT" });
     expect(other.reason).toBe("already_completed");
     expect(await ueMastery()).toBe(before); // mastery unchanged by the replay
   });
 
   it("incorrect submission lowers mastery appropriately (scenario 2)", async () => {
     const before = await ueMastery();
-    const res = await practice.submitPractice(L, "ACT-B1-2", wrongB12);
+    const res = await practice.submitPractice(as(L), "ACT-B1-2", wrongB12);
     expect(res.ok).toBe(true);
     expect(res.result!.score).toBe(0);
     expect(await ueMastery()).toBeLessThan(before); // EWMA pulled toward 0
   });
 
   it("teacher applies an eligible alternative; learner sees it; system suggestion preserved (scenarios 7 + 8)", async () => {
-    const apply = await applied.applyRecommendation(T, LINH, {
+    const apply = await applied.applyRecommendation(as(T), LINH, {
       selectedActivityId: "ACT-A2-4",
       reasonCode: "remediation",
       note: "Let's focus on speaking next",
     });
     expect(apply.ok).toBe(true);
     expect(apply.applied!.systemActivityIdAtApply).not.toBeNull(); // system recommendation preserved on record
-    const next = (await nextPort.getNextAction(L))!;
+    const next = (await nextPort.getNextAction(as(L)))!;
     expect(next.source).toBe("teacher");
     expect(next.activityId).toBe("ACT-A2-4");
     expect(next.teacherNote).toBe("Let's focus on speaking next");
@@ -122,26 +123,26 @@ describe("AUTH-030 integrated practice loop", () => {
   });
 
   it("teacher reverts; learner returns to the system suggestion (scenario 9)", async () => {
-    const rev = await applied.revertApplied(T, LINH);
+    const rev = await applied.revertApplied(as(T), LINH);
     expect(rev.ok).toBe(true);
-    const next = (await nextPort.getNextAction(L))!;
+    const next = (await nextPort.getNextAction(as(L)))!;
     expect(next.source).toBe("system");
   });
 
   it("completion revalidates applied state to fulfilled (scenario 10)", async () => {
-    const reapply = await applied.applyRecommendation(T, LINH, {
+    const reapply = await applied.applyRecommendation(as(T), LINH, {
       selectedActivityId: "ACT-A2-4",
       reasonCode: "pacing",
       note: "Do this one",
     });
     expect(reapply.ok).toBe(true);
-    expect((await applied.getActiveApplied(T, LINH))!.activityId).toBe("ACT-A2-4");
+    expect((await applied.getActiveApplied(as(T), LINH))!.activityId).toBe("ACT-A2-4");
     // Completing the applied activity revalidates the applied record (fulfilled → not active).
     expect(learningStore.complete(L, "ACT-A2-4").completed).toBe(true);
-    expect(await applied.getActiveApplied(T, LINH)).toBeNull(); // no longer active (revalidated)
+    expect(await applied.getActiveApplied(as(T), LINH)).toBeNull(); // no longer active (revalidated)
     // The learner no longer sees a teacher-sourced action; with every scoped activity now done
     // the next action is "all caught up" (null), which is never the teacher recommendation.
-    const next = await nextPort.getNextAction(L);
+    const next = await nextPort.getNextAction(as(L));
     expect(next?.source ?? "system").not.toBe("teacher");
   });
 });

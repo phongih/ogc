@@ -133,14 +133,14 @@ describe("mockAttendance — summary and support signal", () => {
     ];
     await mockAttendance.recordAttendance(as(T), id, { marks });
     expect(absenceStreakFor(LEARNER_AN, [A2])).toBe(2);
-    let an = (await mockSupport.listNeedsSupport(T)).find((i) => i.learnerName === "An P.")!;
+    let an = (await mockSupport.listNeedsSupport(as(T))).find((i) => i.learnerName === "An P.")!;
     expect(an.signals).toContainEqual({ kind: "absences", source: "attendance", sessions: 2 });
     expect(an.evidenceBacked).toBe(true);
     // Correction: An was actually late — the signal goes away (latest save wins).
     await mockAttendance.recordAttendance(as(T), id, {
       marks: marks.map((m) => ({ ...m, mark: m.learnerId === LEARNER_AN ? "late" : m.mark })),
     });
-    an = (await mockSupport.listNeedsSupport(T)).find((i) => i.learnerName === "An P.")!;
+    an = (await mockSupport.listNeedsSupport(as(T))).find((i) => i.learnerName === "An P.")!;
     expect(an.signals.some((s) => s.kind === "absences")).toBe(false);
     expect(an.evidenceBacked).toBe(false);
   });

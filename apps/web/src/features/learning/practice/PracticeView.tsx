@@ -1,21 +1,20 @@
+import { useViewer } from "../../../app/iiosGate";
 import { useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../../ui";
-import { useSession } from "../../../app/session";
 import { skillLabel } from "../intelligence/skills";
 import { useNextAction } from "../../learner/queries";
 import { usePractice, useSubmitPractice } from "./queries";
 import { LockedNotice, useActivityLock } from "../PrerequisiteLock";
 
 export function PracticeView() {
-  const { session } = useSession();
-  const personaId = session?.personaId ?? "";
-  const { activityId = "" } = useParams();
+  const viewer = useViewer();
+    const { activityId = "" } = useParams();
 
-  const q = usePractice(personaId, activityId);
-  const submit = useSubmitPractice(personaId, activityId);
-  const next = useNextAction(personaId);
-  const lock = useActivityLock(personaId, activityId);
+  const q = usePractice(viewer, activityId);
+  const submit = useSubmitPractice(viewer, activityId);
+  const next = useNextAction(viewer);
+  const lock = useActivityLock(viewer, activityId);
 
   // One stable attempt id per mounted attempt → a re-submit is idempotent (no double-count).
   const attemptId = useRef(`ATT-PRAC-${activityId}-${Math.random().toString(36).slice(2, 8)}`).current;

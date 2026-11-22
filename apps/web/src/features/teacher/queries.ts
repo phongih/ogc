@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { refreshLearningState } from "../../lib/invalidate";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { InterventionInput } from "@ogc/contracts";
@@ -5,8 +6,8 @@ import type { RecordAttendanceInput } from "@ogc/contracts";
 import { useViewer } from "../../app/iiosGate";
 import { attendance, teacher, teacherIntelligence, appliedRecommendation } from "../../lib/api";
 
-export const useTeacherDashboard = (personaId: string) =>
-  useQuery({ queryKey: ["teacher", personaId], queryFn: () => teacher.getDashboard(personaId) });
+export const useTeacherDashboard = (viewer: IiosGrantedContext) =>
+  useQuery({ queryKey: ["teacher", viewer], queryFn: () => teacher.getDashboard(viewer) });
 
 export const useClassRoster = (classId: string) =>
   useQuery({ queryKey: ["roster", classId], queryFn: () => teacher.getClassRoster(classId) });
@@ -60,50 +61,50 @@ export const useRecordAttendance = (sessionId: string) => {
 };
 
 // LI-4 — teacher learning-intelligence view + intervention.
-export const useTeacherLearnerView = (viewerPersonaId: string, learnerId: string) =>
+export const useTeacherLearnerView = (viewer: IiosGrantedContext, learnerId: string) =>
   useQuery({
-    queryKey: ["ti-view", viewerPersonaId, learnerId],
-    queryFn: () => teacherIntelligence.getLearnerView(viewerPersonaId, learnerId),
-    enabled: viewerPersonaId.length > 0 && learnerId.length > 0,
+    queryKey: ["ti-view", viewer, learnerId],
+    queryFn: () => teacherIntelligence.getLearnerView(viewer, learnerId),
+    enabled: !!viewer && learnerId.length > 0,
   });
 
-export const useInterventions = (viewerPersonaId: string, learnerId: string) =>
+export const useInterventions = (viewer: IiosGrantedContext, learnerId: string) =>
   useQuery({
-    queryKey: ["ti-interventions", viewerPersonaId, learnerId],
-    queryFn: () => teacherIntelligence.listInterventions(viewerPersonaId, learnerId),
-    enabled: viewerPersonaId.length > 0 && learnerId.length > 0,
+    queryKey: ["ti-interventions", viewer, learnerId],
+    queryFn: () => teacherIntelligence.listInterventions(viewer, learnerId),
+    enabled: !!viewer && learnerId.length > 0,
   });
 
-export const useIntervene = (viewerPersonaId: string, learnerId: string) => {
+export const useIntervene = (viewer: IiosGrantedContext, learnerId: string) => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: InterventionInput) =>
-      teacherIntelligence.intervene(viewerPersonaId, learnerId, input),
+      teacherIntelligence.intervene(viewer, learnerId, input),
     onSuccess: () => refreshLearningState(qc),
   });
 };
 
 // AUTH-026 — applied teacher recommendation (reaches the learner).
-export const useActiveApplied = (viewerPersonaId: string, learnerId: string) =>
+export const useActiveApplied = (viewer: IiosGrantedContext, learnerId: string) =>
   useQuery({
-    queryKey: ["applied-active", viewerPersonaId, learnerId],
-    queryFn: () => appliedRecommendation.getActiveApplied(viewerPersonaId, learnerId),
-    enabled: viewerPersonaId.length > 0 && learnerId.length > 0,
+    queryKey: ["applied-active", viewer, learnerId],
+    queryFn: () => appliedRecommendation.getActiveApplied(viewer, learnerId),
+    enabled: !!viewer && learnerId.length > 0,
   });
 
-export const useApplyRecommendation = (viewerPersonaId: string, learnerId: string) => {
+export const useApplyRecommendation = (viewer: IiosGrantedContext, learnerId: string) => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: InterventionInput) =>
-      appliedRecommendation.applyRecommendation(viewerPersonaId, learnerId, input),
+      appliedRecommendation.applyRecommendation(viewer, learnerId, input),
     onSuccess: () => refreshLearningState(qc),
   });
 };
 
-export const useRevertApplied = (viewerPersonaId: string, learnerId: string) => {
+export const useRevertApplied = (viewer: IiosGrantedContext, learnerId: string) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => appliedRecommendation.revertApplied(viewerPersonaId, learnerId),
+    mutationFn: () => appliedRecommendation.revertApplied(viewer, learnerId),
     onSuccess: () => refreshLearningState(qc),
   });
 };

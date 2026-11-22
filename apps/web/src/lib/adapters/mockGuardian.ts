@@ -1,3 +1,4 @@
+import { viaGrant } from "./viewer";
 import type { GuardianPort, GuardianDashboard, GuardianLinkView } from "@ogc/contracts";
 import { personaMap } from "../../fixtures/personas";
 import { lessons as fixtureLessons, lessonSession } from "../../fixtures/learning";
@@ -27,7 +28,7 @@ function overallProgress(learnerId: string): number {
   return Math.round(sum / courseIds.length);
 }
 
-export const mockGuardian: GuardianPort = {
+export const mockGuardian: GuardianPort = viaGrant<GuardianPort>({
   // Links are read from the persona's PRE-ESTABLISHED linkedLearnerIds only.
   // D-14: there is no code path by which a guardian adds or self-verifies a link here.
   getDashboard: (personaId) => {
@@ -55,4 +56,4 @@ export const mockGuardian: GuardianPort = {
     };
     return latency<GuardianDashboard | null>(dashboard);
   },
-};
+});

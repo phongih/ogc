@@ -1,3 +1,4 @@
+import { viaGrant } from "./viewer";
 import type { TutorPort, Message, LessonContext } from "@ogc/contracts";
 import { SUGGESTED_PROMPTS, TUTOR_EPOCH } from "../../fixtures/tutor";
 import { personaMap } from "../../fixtures/personas";
@@ -36,7 +37,7 @@ export function tutorReply(text: string, lessonTitle: string | null): string {
   return reply;
 }
 
-export const mockTutor: TutorPort = {
+export const mockTutor: TutorPort = viaGrant<TutorPort>({
   listConversations: (personaId) => latency(tutorStore.list(personaId)),
 
   // Fail-closed: returns null for any conversation the persona does not own.
@@ -70,4 +71,4 @@ export const mockTutor: TutorPort = {
   },
 
   suggestedPrompts: () => latency(SUGGESTED_PROMPTS.slice()),
-};
+});

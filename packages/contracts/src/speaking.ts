@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import type { PracticeActivityView, PracticeResult, PracticeSubmission } from "./practice.js";
 
@@ -75,21 +76,21 @@ export interface SpeakingReviewResult {
 // Learner side is self-scoped (own enrolled activities); teacher side is owning-teacher +
 // same-tenant scoped. Every method fails closed.
 export interface SpeakingPort {
-  getStudio(personaId: string, activityId: string): Promise<PracticeActivityView | null>;
+  getStudio(viewer: IiosGrantedContext, activityId: string): Promise<PracticeActivityView | null>;
   submitRehearsal(
-    personaId: string,
+    viewer: IiosGrantedContext,
     activityId: string,
     submission: PracticeSubmission,
   ): Promise<SpeakingSubmitResult>;
-  getMyFeedback(personaId: string, activityId: string): Promise<SpeakingFeedback | null>;
-  listPendingReviews(viewerPersonaId: string): Promise<SpeakingReviewItem[]>;
+  getMyFeedback(viewer: IiosGrantedContext, activityId: string): Promise<SpeakingFeedback | null>;
+  listPendingReviews(viewer: IiosGrantedContext): Promise<SpeakingReviewItem[]>;
   approve(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     learnerId: string,
     activityId: string,
   ): Promise<SpeakingReviewResult>;
   returnForRetry(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     learnerId: string,
     activityId: string,
     note: string,

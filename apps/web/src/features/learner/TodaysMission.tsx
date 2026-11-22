@@ -1,3 +1,4 @@
+import { useViewer } from "../../app/iiosGate";
 /*
  * P1 · "Today's mission" — ONE next best action at the top of the learner home (design principle 01).
  *
@@ -13,7 +14,6 @@ import { Button, Card } from "../../ui";
 import { activities } from "../../fixtures/activities";
 import { practiceFor } from "../../fixtures/practice";
 import { speakingFor } from "../../fixtures/speaking";
-import { useSession } from "../../app/session";
 import { useMySpeakingFeedback } from "../learning/speaking/queries";
 import { skillLabel } from "../learning/intelligence/skills";
 
@@ -48,10 +48,10 @@ export function TodaysMission({ action }: { action: LearnerNextAction | null | u
 }
 
 function Mission({ action }: { action: LearnerNextAction }) {
-  const { session } = useSession();
+  const viewer = useViewer();
   const practice = practiceFor(action.activityId);
   const speaking = speakingFor(action.activityId);
-  const spoken = useMySpeakingFeedback(session?.personaId ?? "", action.activityId, !!speaking);
+  const spoken = useMySpeakingFeedback(viewer, action.activityId, !!speaking);
   const status = spoken.data?.review.status;
   const fromTeacher = action.source === "teacher";
 

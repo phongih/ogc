@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 
 export const ConsentStatus = z.enum(["active", "revoked", "none"]);
@@ -22,7 +23,7 @@ export const GuardianDashboard = z.object({
 export type GuardianDashboard = z.infer<typeof GuardianDashboard>;
 
 export interface GuardianPort {
-  getDashboard(personaId: string): Promise<GuardianDashboard | null>;
+  getDashboard(viewer: IiosGrantedContext): Promise<GuardianDashboard | null>;
   // D-14: there is deliberately NO self-verification flow here. Guardian relationships
   // are established by a governed backend (future), never self-asserted in this UI.
 }

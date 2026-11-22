@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { CourseLevel } from "./catalog.js";
 import { skillMap } from "./profile.js";
@@ -22,5 +23,5 @@ export type PlacementResult = z.infer<typeof PlacementResult>;
 // Self-scoped read of a learner's own placement. Fail-closed: null when the persona
 // is not a learner or has no placement on record.
 export interface PlacementPort {
-  getPlacement(personaId: string): Promise<PlacementResult | null>;
+  getPlacement(viewer: IiosGrantedContext): Promise<PlacementResult | null>;
 }

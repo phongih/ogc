@@ -1,7 +1,7 @@
+import { useViewer } from "../../app/iiosGate";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressRing, Spinner } from "../../ui";
-import { useSession } from "../../app/session";
 import { useClassAttendance, useClassRoster, useClassSessions } from "./queries";
 import { formatCenterDateTime } from "../../lib/centerTime";
 import { useClassProgress } from "../learning/queries";
@@ -9,11 +9,11 @@ import { LearnerIntelligencePanel } from "./LearnerIntelligencePanel";
 
 export function ClassDetail() {
   const { classId = "" } = useParams();
-  const { session } = useSession();
+  const viewer = useViewer();
   const q = useClassRoster(classId);
   const [openLearner, setOpenLearner] = useState<{ id: string; name: string } | null>(null);
   const progress = useClassProgress(
-    session?.personaId ?? "",
+    viewer,
     (q.data ?? []).map((r) => r.learnerId),
   );
   const attendance = useClassAttendance(classId);
@@ -94,7 +94,7 @@ export function ClassDetail() {
         <section aria-label="Learner learning intelligence">
           <h2 className="mb-2 text-lg font-medium">Learning intelligence · {openLearner.name}</h2>
           <LearnerIntelligencePanel
-            viewerPersonaId={session?.personaId ?? ""}
+            viewer={viewer}
             learnerId={openLearner.id}
             learnerName={openLearner.name}
           />

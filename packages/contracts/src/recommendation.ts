@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { Skill } from "./profile.js";
 import { ConfidenceBand } from "./confidence.js";
@@ -36,8 +37,8 @@ export type PathStep = z.infer<typeof PathStep>;
 
 // Self-scoped. Fail-closed: null / empty when the persona is not a learner.
 export interface RecommendationPort {
-  getRecommendation(personaId: string): Promise<Recommendation | null>;
-  getPath(personaId: string): Promise<PathStep[]>;
+  getRecommendation(viewer: IiosGrantedContext): Promise<Recommendation | null>;
+  getPath(viewer: IiosGrantedContext): Promise<PathStep[]>;
 }
 
 /*
@@ -72,5 +73,5 @@ export type JustifiedRecommendation = z.infer<typeof JustifiedRecommendation>;
 
 // Self-scoped. Never null — always returns a verdict (all_caught_up when nothing is due).
 export interface JustifiedRecommendationPort {
-  getJustified(personaId: string): Promise<JustifiedRecommendation>;
+  getJustified(viewer: IiosGrantedContext): Promise<JustifiedRecommendation>;
 }

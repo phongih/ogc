@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { Course, EnrollmentState } from "./catalog.js";
 
@@ -30,5 +31,5 @@ export type LearnerDashboard = z.infer<typeof LearnerDashboard>;
 
 export interface LearnerPort {
   // personaId scopes to a synthetic learner within their organization
-  getDashboard(personaId: string): Promise<LearnerDashboard | null>;
+  getDashboard(viewer: IiosGrantedContext): Promise<LearnerDashboard | null>;
 }

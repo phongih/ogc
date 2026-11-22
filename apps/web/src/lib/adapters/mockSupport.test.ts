@@ -1,4 +1,5 @@
 // P1 · Learners needing support — owning-teacher scope, evidence first, acts through AUTH-026.
+import { as } from "../../test/grants";
 import { describe, expect, it } from "vitest";
 import { mockSupport, mockAppliedRecommendation, mockLearnerNextAction } from "./mockProfile";
 import { mockPractice } from "./mockPractice";
@@ -8,7 +9,7 @@ const T = "demo-teacher";
 
 describe("needs-support queue", () => {
   it("baseline: placement-only flags, clearly labelled; only Huy rests on a record (attendance)", async () => {
-    const q = await mockSupport.listNeedsSupport(T);
+    const q = await mockSupport.listNeedsSupport(as(T));
     expect(q.map((i) => i.learnerName).sort()).toEqual(["An P.", "Huy D.", "Linh N.", "Minh T."]);
     const placementOnly = q.filter((i) => i.learnerName !== "Huy D.");
     expect(placementOnly.every((i) => !i.evidenceBacked)).toBe(true);
@@ -44,12 +45,12 @@ describe("needs-support queue", () => {
 
   it("is scoped to the owning teacher (others see nothing)", async () => {
     for (const other of ["demo-learner", "demo-guardian", "demo-staff", "demo-staff-org2"])
-      expect(await mockSupport.listNeedsSupport(other)).toEqual([]);
+      expect(await mockSupport.listNeedsSupport(as(other))).toEqual([]);
   });
 
   it("a weak practice result puts the learner FIRST with practice evidence and a drop", async () => {
     // Linh answers 2 of 4 correctly → Use of English 65 → 59
-    const r = await mockPractice.submitPractice("demo-learner", "ACT-A2-3", {
+    const r = await mockPractice.submitPractice(as("demo-learner"), "ACT-A2-3", {
       attemptId: "SUP-1",
       responses: [
         { itemId: "A2-3-Q1", optionId: "a" },
@@ -59,7 +60,7 @@ describe("needs-support queue", () => {
       ],
     });
     expect(r.result!.score).toBe(50);
-    const q = await mockSupport.listNeedsSupport(T);
+    const q = await mockSupport.listNeedsSupport(as(T));
     expect(q[0].learnerName).toBe("Linh N.");
     expect(q[0].evidenceBacked).toBe(true);
     expect(q[0].signals).toContainEqual({
@@ -74,21 +75,23 @@ describe("needs-support queue", () => {
   });
 
   it("suggests only an AVAILABLE activity on the focus skill, and assigning reaches the learner", async () => {
-    const linh = (await mockSupport.listNeedsSupport(T)).find((i) => i.learnerId === LEARNER_LINH)!;
+    const linh = (await mockSupport.listNeedsSupport(as(T))).find(
+      (i) => i.learnerId === LEARNER_LINH,
+    )!;
     expect(linh.suggestedActivityId).toBe("ACT-B1-2");
     expect(linh.suggestedTitle).toBe("Quiz: Opinion phrases");
     expect(linh.suggestionUnlocksTitle).toBeNull(); // a direct suggestion on the focus skill
-    const res = await mockAppliedRecommendation.applyRecommendation(T, LEARNER_LINH, {
+    const res = await mockAppliedRecommendation.applyRecommendation(as(T), LEARNER_LINH, {
       selectedActivityId: linh.suggestedActivityId!,
       reasonCode: "remediation",
       note: "Targeted practice for Use of English",
     });
     expect(res.ok).toBe(true);
-    const after = (await mockSupport.listNeedsSupport(T)).find(
+    const after = (await mockSupport.listNeedsSupport(as(T))).find(
       (i) => i.learnerId === LEARNER_LINH,
     )!;
     expect(after.activeAssignmentTitle).toBe("Quiz: Opinion phrases");
-    const next = await mockLearnerNextAction.getNextAction("demo-learner");
+    const next = await mockLearnerNextAction.getNextAction(as("demo-learner"));
     expect(next).toMatchObject({ source: "teacher", activityId: "ACT-B1-2" });
   });
 });

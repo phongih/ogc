@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 
 export const LessonPlanStatus = z.enum(["draft", "ready"]);
@@ -27,9 +28,12 @@ export type LessonPlan = z.infer<typeof LessonPlan>;
 export type LessonPlanDraft = Omit<LessonPlan, "orgId" | "teacherId">;
 
 export interface LessonPlanPort {
-  listForClass(personaId: string, classId: string): Promise<LessonPlan[]>;
-  get(personaId: string, planId: string): Promise<LessonPlan | null>;
+  listForClass(viewer: IiosGrantedContext, classId: string): Promise<LessonPlan[]>;
+  get(viewer: IiosGrantedContext, planId: string): Promise<LessonPlan | null>;
   // Save is scoped to the persona's assigned teacher/classes; returns validation errors
   // (empty array = saved). Setting status 'ready' enforces completeness.
-  save(personaId: string, draft: LessonPlanDraft): Promise<{ saved: boolean; errors: string[] }>;
+  save(
+    viewer: IiosGrantedContext,
+    draft: LessonPlanDraft,
+  ): Promise<{ saved: boolean; errors: string[] }>;
 }

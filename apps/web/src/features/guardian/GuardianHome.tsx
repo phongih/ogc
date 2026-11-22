@@ -1,3 +1,5 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
+import { useViewer } from "../../app/iiosGate";
 import type { GuardianLinkView } from "@ogc/contracts";
 import { formatCenterDateTime } from "../../lib/centerTime";
 import {
@@ -10,7 +12,6 @@ import {
   Spinner,
   StatTile,
 } from "../../ui";
-import { useSession } from "../../app/session";
 import { useGuardianDashboard } from "./queries";
 import { useLearnerProgress } from "../learning/queries";
 import { MyMakeups } from "../learner/MyMakeups";
@@ -26,12 +27,12 @@ function consentLabel(status: string): string {
 // is not linked to resolves to null). D-14: there is no add/verify control anywhere here.
 function LinkedLearnerCard({
   link,
-  viewerPersonaId,
+  viewer,
 }: {
   link: GuardianLinkView;
-  viewerPersonaId: string;
+  viewer: IiosGrantedContext;
 }) {
-  const prog = useLearnerProgress(viewerPersonaId, link.learnerId);
+  const prog = useLearnerProgress(viewer, link.learnerId);
   const summary = prog.data ?? null;
   const overall = summary?.overallPct ?? link.progressPct;
 
@@ -80,8 +81,8 @@ function LinkedLearnerCard({
 }
 
 export function GuardianHome() {
-  const { session } = useSession();
-  const q = useGuardianDashboard(session?.personaId ?? "");
+  const viewer = useViewer();
+  const q = useGuardianDashboard(viewer);
 
   if (q.isLoading) return <Spinner label="Loading guardian workspace" />;
   if (q.isError)
@@ -123,7 +124,7 @@ export function GuardianHome() {
         <ul className="grid gap-4 sm:grid-cols-2">
           {d.links.map((link) => (
             <li key={link.learnerId}>
-              <LinkedLearnerCard link={link} viewerPersonaId={session?.personaId ?? ""} />
+              <LinkedLearnerCard link={link} viewer={viewer} />
             </li>
           ))}
         </ul>

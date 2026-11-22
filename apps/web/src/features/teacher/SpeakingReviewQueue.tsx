@@ -1,3 +1,5 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
+import { useViewer } from "../../app/iiosGate";
 /*
  * P1 · Speaking rehearsals waiting for the teacher (MOCK). Principle 04 — AI advises, educators
  * govern: a rehearsal counts toward Speaking only after the owning teacher approves it. The
@@ -7,12 +9,10 @@
 import { useState } from "react";
 import type { SpeakingReviewItem } from "@ogc/contracts";
 import { Button, Card, EmptyState, ErrorState, Spinner } from "../../ui";
-import { useSession } from "../../app/session";
 import { usePendingSpeakingReviews, useReviewSpeaking } from "../learning/speaking/queries";
 
 export function SpeakingReviewQueue() {
-  const { session } = useSession();
-  const viewer = session?.personaId ?? "";
+  const viewer = useViewer();
   const q = usePendingSpeakingReviews(viewer);
 
   return (
@@ -42,7 +42,7 @@ export function SpeakingReviewQueue() {
   );
 }
 
-function ReviewCard({ viewer, item }: { viewer: string; item: SpeakingReviewItem }) {
+function ReviewCard({ viewer, item }: { viewer: IiosGrantedContext; item: SpeakingReviewItem }) {
   const review = useReviewSpeaking(viewer);
   const [returning, setReturning] = useState(false);
   const [note, setNote] = useState("");

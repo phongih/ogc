@@ -142,13 +142,13 @@ describe("live schedule reaches every role", () => {
   it("learner and guardian lesson times follow a reschedule and a cancel-with-replacement", async () => {
     const moved = new Date(Date.now() + 4 * DAY).toISOString();
     await mockSchedule.reschedule(as(S), "SES-001", moved);
-    let d = (await mockLearner.getDashboard("demo-learner"))!;
+    let d = (await mockLearner.getDashboard(as("demo-learner")))!;
     expect(d.upcoming.find((l) => l.id === "LSN-A2-07")!.scheduledAt).toBe(moved);
     const repl = new Date(Date.now() + 6 * DAY).toISOString();
     await mockSchedule.cancelWithReplacement(as(S), "SES-001", repl);
-    d = (await mockLearner.getDashboard("demo-learner"))!;
+    d = (await mockLearner.getDashboard(as("demo-learner")))!;
     expect(d.upcoming.find((l) => l.id === "LSN-A2-07")!.scheduledAt).toBe(repl);
-    const g = (await mockGuardian.getDashboard("demo-guardian"))!;
+    const g = (await mockGuardian.getDashboard(as("demo-guardian")))!;
     expect(g.links[0].nextSessionAt).toBe(repl);
   });
 
@@ -158,13 +158,13 @@ describe("live schedule reaches every role", () => {
     )!;
     const soon = nextWeeklySlot([0, 1, 2, 3, 4, 5, 6], 14); // next 14:00 ICT — no class then
     await mockMakeup.openMakeupSession(as(S), huy1.id, soon, TEACHER_BEN);
-    const tara = (await mockTeacher.getDashboard(T))!;
+    const tara = (await mockTeacher.getDashboard(as(T)))!;
     expect(tara.upcoming.find((s) => s.title === "B1 — Unit 1")).toMatchObject({
       makeup: true,
       coveredBy: "Ben",
     });
     expect(tara.classes.find((c) => c.id === classes[1].id)!.nextSessionAt).not.toBe(soon);
-    const ben = (await mockTeacher.getDashboard("demo-teacher-2"))!;
+    const ben = (await mockTeacher.getDashboard(as("demo-teacher-2")))!;
     expect(ben.upcoming.find((s) => s.title === "B1 — Unit 1")).toMatchObject({
       makeup: true,
       asSubstitute: true,

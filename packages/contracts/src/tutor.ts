@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 
 export const TutorRole = z.enum(["learner", "tutor"]);
@@ -26,15 +27,15 @@ export const Conversation = z.object({
 export type Conversation = z.infer<typeof Conversation>;
 
 export interface TutorPort {
-  listConversations(personaId: string): Promise<Conversation[]>;
+  listConversations(viewer: IiosGrantedContext): Promise<Conversation[]>;
   // personaId scopes access: a persona can only read/write its own conversations (fail-closed).
-  getConversation(personaId: string, conversationId: string): Promise<Conversation | null>;
+  getConversation(viewer: IiosGrantedContext, conversationId: string): Promise<Conversation | null>;
   createConversation(
-    personaId: string,
+    viewer: IiosGrantedContext,
     title: string,
     lessonContext?: LessonContext | null,
   ): Promise<Conversation>;
   // Deterministic: same input always yields the same tutor reply. No external LLM.
-  send(personaId: string, conversationId: string, text: string): Promise<Message[]>;
+  send(viewer: IiosGrantedContext, conversationId: string, text: string): Promise<Message[]>;
   suggestedPrompts(): Promise<string[]>;
 }

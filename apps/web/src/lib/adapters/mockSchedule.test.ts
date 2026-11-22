@@ -52,7 +52,7 @@ describe("mockSchedule — moving and cancelling", () => {
     const at = inDays(4);
     const r = await mockSchedule.reschedule(as(S), "SES-001", at);
     expect(r.ok).toBe(true);
-    const d = (await mockTeacher.getDashboard("demo-teacher"))!;
+    const d = (await mockTeacher.getDashboard(as("demo-teacher")))!;
     expect(d.upcoming.find((s) => s.id === "SES-001")!.at).toBe(at);
     expect(d.classes.find((c) => c.id === A2)!.nextSessionAt).toBe(at);
   });
@@ -114,15 +114,15 @@ describe("mockSchedule — moving and cancelling", () => {
 
 describe("mockSchedule — teachers", () => {
   it("reassigning a class moves the dashboard, roster scope and support queue to the new teacher", async () => {
-    expect((await mockSupport.listNeedsSupport("demo-teacher-2")).length).toBe(0);
+    expect((await mockSupport.listNeedsSupport(as("demo-teacher-2"))).length).toBe(0);
     expect((await mockSchedule.assignTeacher(as(S), A2, TEACHER_BEN)).ok).toBe(true);
-    const ben = (await mockTeacher.getDashboard("demo-teacher-2"))!;
+    const ben = (await mockTeacher.getDashboard(as("demo-teacher-2")))!;
     expect(ben.teacherName).toBe("Ben");
     expect(ben.classes.map((c) => c.id)).toEqual([A2, classes[2].id]);
-    const tara = (await mockTeacher.getDashboard("demo-teacher"))!;
+    const tara = (await mockTeacher.getDashboard(as("demo-teacher")))!;
     expect(tara.classes.map((c) => c.id)).toEqual([classes[1].id]);
     expect(
-      (await mockSupport.listNeedsSupport("demo-teacher-2")).map((i) => i.learnerName).sort(),
+      (await mockSupport.listNeedsSupport(as("demo-teacher-2"))).map((i) => i.learnerName).sort(),
     ).toEqual(["An P.", "Linh N.", "Minh T."]);
     expect(await mockAttendance.listClassSessions(as("demo-teacher"), A2)).toBeNull();
     expect(await mockSchedule.assignTeacher(as(S), A2, "nobody")).toEqual({
@@ -153,9 +153,9 @@ describe("mockSchedule — teachers", () => {
     });
 
     expect((await mockSchedule.setSubstitute(as(S), "SES-001", TEACHER_BEN)).ok).toBe(true);
-    const tara = (await mockTeacher.getDashboard("demo-teacher"))!;
+    const tara = (await mockTeacher.getDashboard(as("demo-teacher")))!;
     expect(tara.upcoming.find((s) => s.id === "SES-001")).toMatchObject({ coveredBy: "Ben" });
-    const ben = (await mockTeacher.getDashboard("demo-teacher-2"))!;
+    const ben = (await mockTeacher.getDashboard(as("demo-teacher-2")))!;
     expect(ben.upcoming.find((s) => s.id === "SES-001")).toMatchObject({ asSubstitute: true });
   });
 });

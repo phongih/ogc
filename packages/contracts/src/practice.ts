@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { Skill } from "./profile.js";
 
@@ -103,9 +104,9 @@ export interface PracticeSubmitResult {
 // Self-scoped practice port: a persona practices only its own enrolled activities. The view
 // returned by getPractice never contains correct answers; scoring happens on submit.
 export interface PracticePort {
-  getPractice(personaId: string, activityId: string): Promise<PracticeActivityView | null>;
+  getPractice(viewer: IiosGrantedContext, activityId: string): Promise<PracticeActivityView | null>;
   submitPractice(
-    personaId: string,
+    viewer: IiosGrantedContext,
     activityId: string,
     submission: PracticeSubmission,
   ): Promise<PracticeSubmitResult>;

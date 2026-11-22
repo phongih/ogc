@@ -1,3 +1,4 @@
+import { as } from "../../test/grants";
 import { describe, expect, it } from "vitest";
 import { mockProgressView } from "./mockLearning";
 import { learningStore } from "./store";
@@ -36,18 +37,18 @@ describe("progress coverage — every roster learner has a snapshot", () => {
   it("returns progress for all org learners, including those with no login persona", async () => {
     const org1Learners = learnerDirectory.filter((l) => l.courseIds.length > 0);
     for (const l of org1Learners) {
-      const summary = await mockProgressView.getLearnerProgress(STAFF, l.id);
+      const summary = await mockProgressView.getLearnerProgress(as(STAFF), l.id);
       expect(summary, `learner ${l.displayName}`).not.toBeNull();
       expect(summary!.snapshots.length).toBe(l.courseIds.length);
     }
   });
 
   it("aggregates a learner-level overall percent and state", async () => {
-    const huy = await mockProgressView.getLearnerProgress(STAFF, LEARNER_HUY);
+    const huy = await mockProgressView.getLearnerProgress(as(STAFF), LEARNER_HUY);
     expect(huy!.state).toBe("not_started");
     expect(huy!.overallPct).toBe(0);
 
-    const thao = await mockProgressView.getLearnerProgress(STAFF, LEARNER_THAO);
+    const thao = await mockProgressView.getLearnerProgress(as(STAFF), LEARNER_THAO);
     expect(thao!.state).toBe("completed");
     expect(thao!.overallPct).toBe(100);
   });
@@ -55,15 +56,15 @@ describe("progress coverage — every roster learner has a snapshot", () => {
 
 describe("single source of truth — all roles see the same number", () => {
   it("learner-self, teacher and guardian report identical overall for Linh", async () => {
-    const asLearner = await mockProgressView.getLearnerProgress("demo-learner", LEARNER_LINH);
-    const asTeacher = await mockProgressView.getLearnerProgress("demo-teacher", LEARNER_LINH);
-    const asGuardian = await mockProgressView.getLearnerProgress("demo-guardian", LEARNER_LINH);
+    const asLearner = await mockProgressView.getLearnerProgress(as("demo-learner"), LEARNER_LINH);
+    const asTeacher = await mockProgressView.getLearnerProgress(as("demo-teacher"), LEARNER_LINH);
+    const asGuardian = await mockProgressView.getLearnerProgress(as("demo-guardian"), LEARNER_LINH);
     expect(asLearner!.overallPct).toBe(asTeacher!.overallPct);
     expect(asTeacher!.overallPct).toBe(asGuardian!.overallPct);
   });
 
   it("Minh (roster learner, has a persona) is also consistent across teacher view", async () => {
-    const asTeacher = await mockProgressView.getLearnerProgress("demo-teacher", LEARNER_MINH);
+    const asTeacher = await mockProgressView.getLearnerProgress(as("demo-teacher"), LEARNER_MINH);
     const direct = learningStore.courseProgress(LEARNER_MINH, A2).progressPct;
     expect(asTeacher!.snapshots[0].progressPct).toBe(direct);
   });

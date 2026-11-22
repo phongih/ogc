@@ -78,7 +78,7 @@ describe("demo persistence", () => {
     });
     const linhItem = `${toMark.id}::${LEARNER_LINH}`;
     await mockMakeup.assignSelfStudy(as(S), linhItem);
-    await mockPractice.submitPractice("demo-learner", "ACT-A2-3", {
+    await mockPractice.submitPractice(as("demo-learner"), "ACT-A2-3", {
       attemptId: "PERSIST-1",
       responses: [
         { itemId: "A2-3-Q1", optionId: "a" },

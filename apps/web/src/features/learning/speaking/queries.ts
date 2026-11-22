@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { refreshLearningState } from "../../../lib/invalidate";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PracticeSubmission } from "@ogc/contracts";
@@ -5,38 +6,42 @@ import { speaking } from "../../../lib/api";
 
 // P1 · Speaking studio (mock). Learner + reviewing-teacher hooks.
 
-export const useSpeakingStudio = (personaId: string, activityId: string) =>
+export const useSpeakingStudio = (viewer: IiosGrantedContext, activityId: string) =>
   useQuery({
-    queryKey: ["speaking", "studio", personaId, activityId],
-    queryFn: () => speaking.getStudio(personaId, activityId),
-    enabled: personaId.length > 0 && activityId.length > 0,
+    queryKey: ["speaking", "studio", viewer, activityId],
+    queryFn: () => speaking.getStudio(viewer, activityId),
+    enabled: !!viewer && activityId.length > 0,
   });
 
-export const useMySpeakingFeedback = (personaId: string, activityId: string, enabled = true) =>
+export const useMySpeakingFeedback = (
+  viewer: IiosGrantedContext,
+  activityId: string,
+  enabled = true,
+) =>
   useQuery({
-    queryKey: ["speaking", "feedback", personaId, activityId],
-    queryFn: () => speaking.getMyFeedback(personaId, activityId),
-    enabled: enabled && personaId.length > 0 && activityId.length > 0,
+    queryKey: ["speaking", "feedback", viewer, activityId],
+    queryFn: () => speaking.getMyFeedback(viewer, activityId),
+    enabled: enabled && !!viewer && activityId.length > 0,
   });
 
-export function useSubmitRehearsal(personaId: string, activityId: string) {
+export function useSubmitRehearsal(viewer: IiosGrantedContext, activityId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (submission: PracticeSubmission) =>
-      speaking.submitRehearsal(personaId, activityId, submission),
+      speaking.submitRehearsal(viewer, activityId, submission),
     // A rehearsal does not touch mastery (pending review) — only the speaking views refresh.
     onSuccess: () => qc.invalidateQueries({ queryKey: ["speaking"] }),
   });
 }
 
-export const usePendingSpeakingReviews = (viewerPersonaId: string) =>
+export const usePendingSpeakingReviews = (viewer: IiosGrantedContext) =>
   useQuery({
-    queryKey: ["speaking", "pending", viewerPersonaId],
-    queryFn: () => speaking.listPendingReviews(viewerPersonaId),
-    enabled: viewerPersonaId.length > 0,
+    queryKey: ["speaking", "pending", viewer],
+    queryFn: () => speaking.listPendingReviews(viewer),
+    enabled: !!viewer,
   });
 
-export function useReviewSpeaking(viewerPersonaId: string) {
+export function useReviewSpeaking(viewer: IiosGrantedContext) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (a: {
@@ -46,8 +51,8 @@ export function useReviewSpeaking(viewerPersonaId: string) {
       note?: string;
     }) =>
       a.decision === "approve"
-        ? speaking.approve(viewerPersonaId, a.learnerId, a.activityId)
-        : speaking.returnForRetry(viewerPersonaId, a.learnerId, a.activityId, a.note ?? ""),
+        ? speaking.approve(viewer, a.learnerId, a.activityId)
+        : speaking.returnForRetry(viewer, a.learnerId, a.activityId, a.note ?? ""),
     // Approval writes a completed attempt → mastery, path, next action and progress all change.
     onSuccess: () => refreshLearningState(qc),
   });

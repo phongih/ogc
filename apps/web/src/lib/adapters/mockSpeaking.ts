@@ -1,3 +1,4 @@
+import { viaGrant } from "./viewer";
 import type {
   PracticeActivityView,
   SpeakingFeedback,
@@ -49,7 +50,7 @@ function learnerName(learnerId: string): string {
   return "Learner";
 }
 
-export const mockSpeaking: SpeakingPort = {
+export const mockSpeaking: SpeakingPort = viaGrant<SpeakingPort>({
   getStudio: (personaId, activityId) =>
     withFault("speaking.getStudio", () => {
       const script = speakingFor(activityId);
@@ -141,4 +142,4 @@ export const mockSpeaking: SpeakingPort = {
         learningStore.returnSpeaking(learnerId, activityId, note),
       );
     }),
-};
+});

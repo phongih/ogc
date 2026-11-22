@@ -1,3 +1,4 @@
+import { useViewer } from "../../app/iiosGate";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } from "../../ui";
@@ -7,15 +8,14 @@ import { NeedsSupportQueue } from "./NeedsSupportQueue";
 import { SessionsToMark } from "./SessionsToMark";
 import { EngineNotifications } from "../engine/EngineNotifications";
 import { SelfStudyToConfirm } from "./SelfStudyToConfirm";
-import { useSession } from "../../app/session";
 import { useTeacherDashboard } from "./queries";
 
 // The next few sessions; a new class brings weeks of them (seen 21/11: Ben had 14 listed).
 const UPCOMING_SHOWN = 6;
 
 export function TeacherHome() {
-  const { session } = useSession();
-  const q = useTeacherDashboard(session?.personaId ?? "");
+  const viewer = useViewer();
+  const q = useTeacherDashboard(viewer);
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
 
   if (q.isLoading) return <Spinner label="Loading your teaching" />;

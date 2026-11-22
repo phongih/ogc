@@ -1,3 +1,4 @@
+import { viaGrant } from "./viewer";
 import { refill, registerPersistent } from "./persist";
 import { activeRule, queues } from "./engineRules";
 import type {
@@ -121,21 +122,21 @@ function profileFor(learnerId: string, orgId: string): LearnerProfile | null {
   return updateMastery(seedProfile(placement), evidenceFor(learnerId, scoped));
 }
 
-export const mockPlacement: PlacementPort = {
+export const mockPlacement: PlacementPort = viaGrant<PlacementPort>({
   getPlacement: (personaId) =>
     withFault("placement.getPlacement", () => {
       const s = learnerFor(personaId);
       return latency<PlacementResult | null>(s ? placementFor(s.learnerId, s.orgId) : null);
     }),
-};
+});
 
-export const mockProfile: LearningProfilePort = {
+export const mockProfile: LearningProfilePort = viaGrant<LearningProfilePort>({
   getProfile: (personaId) =>
     withFault("profile.getProfile", () => {
       const s = learnerFor(personaId);
       return latency<LearnerProfile | null>(s ? profileFor(s.learnerId, s.orgId) : null);
     }),
-};
+});
 
 // ── LI-2: evidence quality + confidence ──────────────────────────────────────
 
@@ -172,7 +173,7 @@ function confidenceFor(learnerId: string, orgId: string): Record<Skill, SkillCon
   return computeConfidence(qualityEvidenceFor(learnerId, scoped), assessableBySkill(scoped));
 }
 
-export const mockMasteryConfidence: MasteryConfidencePort = {
+export const mockMasteryConfidence: MasteryConfidencePort = viaGrant<MasteryConfidencePort>({
   getConfidence: (personaId) =>
     withFault("confidence.getConfidence", () => {
       const s = learnerFor(personaId);
@@ -183,27 +184,28 @@ export const mockMasteryConfidence: MasteryConfidencePort = {
         skills: confidenceFor(s.learnerId, s.orgId),
       });
     }),
-};
+});
 
-export const mockJustifiedRecommendation: JustifiedRecommendationPort = {
-  getJustified: (personaId) =>
-    withFault("recommend.getJustified", () => {
-      const s = learnerFor(personaId);
-      // Fail-closed: a non-learner persona gets a well-formed "nothing to recommend" verdict.
-      if (!s)
-        return latency<JustifiedRecommendation>(
-          justify(null, {} as Record<Skill, SkillConfidence>),
-        );
-      const profile = profileFor(s.learnerId, s.orgId);
-      if (!profile)
-        return latency<JustifiedRecommendation>(
-          justify(null, {} as Record<Skill, SkillConfidence>),
-        );
-      const scoped = scopedActivities(s.learnerId, s.orgId);
-      const rec = recommend(profile, scoped, completedIds(s.learnerId, scoped));
-      return latency<JustifiedRecommendation>(justify(rec, confidenceFor(s.learnerId, s.orgId)));
-    }),
-};
+export const mockJustifiedRecommendation: JustifiedRecommendationPort =
+  viaGrant<JustifiedRecommendationPort>({
+    getJustified: (personaId) =>
+      withFault("recommend.getJustified", () => {
+        const s = learnerFor(personaId);
+        // Fail-closed: a non-learner persona gets a well-formed "nothing to recommend" verdict.
+        if (!s)
+          return latency<JustifiedRecommendation>(
+            justify(null, {} as Record<Skill, SkillConfidence>),
+          );
+        const profile = profileFor(s.learnerId, s.orgId);
+        if (!profile)
+          return latency<JustifiedRecommendation>(
+            justify(null, {} as Record<Skill, SkillConfidence>),
+          );
+        const scoped = scopedActivities(s.learnerId, s.orgId);
+        const rec = recommend(profile, scoped, completedIds(s.learnerId, scoped));
+        return latency<JustifiedRecommendation>(justify(rec, confidenceFor(s.learnerId, s.orgId)));
+      }),
+  });
 
 // ── LI-3: prerequisite graph + learning path ─────────────────────────────────
 
@@ -219,7 +221,7 @@ function foreignActivityIds(orgId: string): Set<string> {
   return new Set(activities.filter((a) => a.orgId !== orgId).map((a) => a.id));
 }
 
-export const mockPrerequisite: PrerequisitePort = {
+export const mockPrerequisite: PrerequisitePort = viaGrant<PrerequisitePort>({
   getPrerequisites: (personaId) =>
     withFault("prereq.getPrerequisites", () => {
       const s = learnerFor(personaId);
@@ -227,9 +229,9 @@ export const mockPrerequisite: PrerequisitePort = {
         s ? scopedEdges(scopedActivities(s.learnerId, s.orgId)) : [],
       );
     }),
-};
+});
 
-export const mockLearningPath: LearningPathPort = {
+export const mockLearningPath: LearningPathPort = viaGrant<LearningPathPort>({
   getLearningPath: (personaId) =>
     withFault("path.getLearningPath", () => {
       const s = learnerFor(personaId);
@@ -253,7 +255,7 @@ export const mockLearningPath: LearningPathPort = {
         graph: plan.graph,
       });
     }),
-};
+});
 
 // ── LI-4: teacher intervention & explainability ──────────────────────────────
 
@@ -314,74 +316,76 @@ const INTERVENTION_EPOCH = Date.parse("2026-02-01T00:00:00.000Z");
 let interventionSeq = 0;
 const interventions = new Map<string, TeacherIntervention[]>();
 
-export const mockTeacherIntelligence: TeacherLearningIntelligencePort = {
-  getLearnerView: (viewerPersonaId, learnerId) =>
-    withFault("teacher.getLearnerView", () => {
-      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
-      if (!auth) return latency<TeacherLearningView | null>(null);
-      const profile = profileFor(learnerId, auth.orgId);
-      const path = learnerPathView(learnerId, auth.orgId);
-      if (!profile || !path) return latency<TeacherLearningView | null>(null);
-      const confidence: MasteryConfidence = {
-        learnerId,
-        orgId: auth.orgId,
-        skills: confidenceFor(learnerId, auth.orgId),
-      };
-      return latency<TeacherLearningView>({
-        learnerId,
-        orgId: auth.orgId,
-        profile,
-        confidence,
-        path,
-      });
-    }),
-
-  intervene: (viewerPersonaId, learnerId, input) =>
-    withFault("teacher.intervene", () => {
-      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
-      if (!auth) return latency<InterventionResult>({ ok: false, reason: "not_authorized" });
-      if (!input.note || input.note.trim().length === 0)
-        return latency<InterventionResult>({ ok: false, reason: "reason_required" });
-      const path = learnerPathView(learnerId, auth.orgId);
-      if (!path) return latency<InterventionResult>({ ok: false, reason: "no_path" });
-      const step = path.steps.find((s) => s.activityId === input.selectedActivityId);
-      if (!step) return latency<InterventionResult>({ ok: false, reason: "activity_out_of_scope" });
-      // Prerequisites are never bypassed: only an AVAILABLE activity may be selected.
-      if (step.state !== "available")
-        return latency<InterventionResult>({
-          ok: false,
-          reason: `activity_not_eligible:${step.state}`,
+export const mockTeacherIntelligence: TeacherLearningIntelligencePort =
+  viaGrant<TeacherLearningIntelligencePort>({
+    getLearnerView: (viewerPersonaId, learnerId) =>
+      withFault("teacher.getLearnerView", () => {
+        const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+        if (!auth) return latency<TeacherLearningView | null>(null);
+        const profile = profileFor(learnerId, auth.orgId);
+        const path = learnerPathView(learnerId, auth.orgId);
+        if (!profile || !path) return latency<TeacherLearningView | null>(null);
+        const confidence: MasteryConfidence = {
+          learnerId,
+          orgId: auth.orgId,
+          skills: confidenceFor(learnerId, auth.orgId),
+        };
+        return latency<TeacherLearningView>({
+          learnerId,
+          orgId: auth.orgId,
+          profile,
+          confidence,
+          path,
         });
+      }),
 
-      const idx = ++interventionSeq;
-      const rec: TeacherIntervention = {
-        id: `INT-${idx}`,
-        actorPersonaId: viewerPersonaId,
-        teacherId: auth.teacherId,
-        learnerId,
-        orgId: auth.orgId,
-        // The system recommendation is PRESERVED (recorded, not overwritten).
-        systemActivityId: path.nextStep.recommendation?.activityId ?? null,
-        selectedActivityId: input.selectedActivityId,
-        reasonCode: input.reasonCode,
-        note: input.note.trim(),
-        at: new Date(INTERVENTION_EPOCH + idx * 3600000).toISOString(),
-      };
-      const list = interventions.get(learnerId) ?? [];
-      list.push(rec);
-      interventions.set(learnerId, list);
-      return latency<InterventionResult>({ ok: true, intervention: { ...rec } });
-    }),
+    intervene: (viewerPersonaId, learnerId, input) =>
+      withFault("teacher.intervene", () => {
+        const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+        if (!auth) return latency<InterventionResult>({ ok: false, reason: "not_authorized" });
+        if (!input.note || input.note.trim().length === 0)
+          return latency<InterventionResult>({ ok: false, reason: "reason_required" });
+        const path = learnerPathView(learnerId, auth.orgId);
+        if (!path) return latency<InterventionResult>({ ok: false, reason: "no_path" });
+        const step = path.steps.find((s) => s.activityId === input.selectedActivityId);
+        if (!step)
+          return latency<InterventionResult>({ ok: false, reason: "activity_out_of_scope" });
+        // Prerequisites are never bypassed: only an AVAILABLE activity may be selected.
+        if (step.state !== "available")
+          return latency<InterventionResult>({
+            ok: false,
+            reason: `activity_not_eligible:${step.state}`,
+          });
 
-  listInterventions: (viewerPersonaId, learnerId) =>
-    withFault("teacher.listInterventions", () => {
-      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
-      if (!auth) return latency<TeacherIntervention[]>([]);
-      return latency<TeacherIntervention[]>(
-        (interventions.get(learnerId) ?? []).map((x) => ({ ...x })),
-      );
-    }),
-};
+        const idx = ++interventionSeq;
+        const rec: TeacherIntervention = {
+          id: `INT-${idx}`,
+          actorPersonaId: viewerPersonaId,
+          teacherId: auth.teacherId,
+          learnerId,
+          orgId: auth.orgId,
+          // The system recommendation is PRESERVED (recorded, not overwritten).
+          systemActivityId: path.nextStep.recommendation?.activityId ?? null,
+          selectedActivityId: input.selectedActivityId,
+          reasonCode: input.reasonCode,
+          note: input.note.trim(),
+          at: new Date(INTERVENTION_EPOCH + idx * 3600000).toISOString(),
+        };
+        const list = interventions.get(learnerId) ?? [];
+        list.push(rec);
+        interventions.set(learnerId, list);
+        return latency<InterventionResult>({ ok: true, intervention: { ...rec } });
+      }),
+
+    listInterventions: (viewerPersonaId, learnerId) =>
+      withFault("teacher.listInterventions", () => {
+        const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+        if (!auth) return latency<TeacherIntervention[]>([]);
+        return latency<TeacherIntervention[]>(
+          (interventions.get(learnerId) ?? []).map((x) => ({ ...x })),
+        );
+      }),
+  });
 
 // ── AUTH-026: applied teacher recommendation (reaches the learner) ───────────
 
@@ -407,68 +411,69 @@ function activeAppliedFor(learnerId: string, path: LearningPathView): AppliedRec
   return null;
 }
 
-export const mockAppliedRecommendation: AppliedRecommendationPort = {
-  applyRecommendation: (viewerPersonaId, learnerId, input) =>
-    withFault("applied.apply", () => {
-      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
-      if (!auth) return latency<ApplyResult>({ ok: false, reason: "not_authorized" });
-      if (!input.note || input.note.trim().length === 0)
-        return latency<ApplyResult>({ ok: false, reason: "reason_required" });
-      const path = learnerPathView(learnerId, auth.orgId);
-      if (!path) return latency<ApplyResult>({ ok: false, reason: "no_path" });
-      const step = path.steps.find((s) => s.activityId === input.selectedActivityId);
-      if (!step) return latency<ApplyResult>({ ok: false, reason: "activity_out_of_scope" });
-      if (step.state !== "available")
-        return latency<ApplyResult>({ ok: false, reason: `activity_not_eligible:${step.state}` });
+export const mockAppliedRecommendation: AppliedRecommendationPort =
+  viaGrant<AppliedRecommendationPort>({
+    applyRecommendation: (viewerPersonaId, learnerId, input) =>
+      withFault("applied.apply", () => {
+        const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+        if (!auth) return latency<ApplyResult>({ ok: false, reason: "not_authorized" });
+        if (!input.note || input.note.trim().length === 0)
+          return latency<ApplyResult>({ ok: false, reason: "reason_required" });
+        const path = learnerPathView(learnerId, auth.orgId);
+        if (!path) return latency<ApplyResult>({ ok: false, reason: "no_path" });
+        const step = path.steps.find((s) => s.activityId === input.selectedActivityId);
+        if (!step) return latency<ApplyResult>({ ok: false, reason: "activity_out_of_scope" });
+        if (step.state !== "available")
+          return latency<ApplyResult>({ ok: false, reason: `activity_not_eligible:${step.state}` });
 
-      const log = appliedLog.get(learnerId) ?? [];
-      // One active per learner: supersede any currently-active record.
-      for (const r of log) if (r.status === "active") r.status = "superseded";
+        const log = appliedLog.get(learnerId) ?? [];
+        // One active per learner: supersede any currently-active record.
+        for (const r of log) if (r.status === "active") r.status = "superseded";
 
-      const idx = ++appliedSeq;
-      const rec: AppliedRecommendation = {
-        id: `APP-${idx}`,
-        learnerId,
-        orgId: auth.orgId,
-        activityId: step.activityId,
-        courseId: step.courseId,
-        skill: step.skill,
-        reasonCode: input.reasonCode,
-        note: input.note.trim(),
-        actorPersonaId: viewerPersonaId,
-        teacherId: auth.teacherId,
-        // The system recommendation is PRESERVED (recorded, never overwritten).
-        systemActivityIdAtApply: path.nextStep.recommendation?.activityId ?? null,
-        appliedAt: new Date(APPLIED_EPOCH + idx * 3600000).toISOString(),
-        status: "active",
-      };
-      log.push(rec);
-      appliedLog.set(learnerId, log);
-      return latency<ApplyResult>({ ok: true, applied: { ...rec } });
-    }),
+        const idx = ++appliedSeq;
+        const rec: AppliedRecommendation = {
+          id: `APP-${idx}`,
+          learnerId,
+          orgId: auth.orgId,
+          activityId: step.activityId,
+          courseId: step.courseId,
+          skill: step.skill,
+          reasonCode: input.reasonCode,
+          note: input.note.trim(),
+          actorPersonaId: viewerPersonaId,
+          teacherId: auth.teacherId,
+          // The system recommendation is PRESERVED (recorded, never overwritten).
+          systemActivityIdAtApply: path.nextStep.recommendation?.activityId ?? null,
+          appliedAt: new Date(APPLIED_EPOCH + idx * 3600000).toISOString(),
+          status: "active",
+        };
+        log.push(rec);
+        appliedLog.set(learnerId, log);
+        return latency<ApplyResult>({ ok: true, applied: { ...rec } });
+      }),
 
-  revertApplied: (viewerPersonaId, learnerId) =>
-    withFault("applied.revert", () => {
-      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
-      if (!auth) return latency<ApplyResult>({ ok: false, reason: "not_authorized" });
-      const path = learnerPathView(learnerId, auth.orgId);
-      const active = path ? activeAppliedFor(learnerId, path) : null;
-      if (!active) return latency<ApplyResult>({ ok: false, reason: "no_active_recommendation" });
-      active.status = "reverted";
-      return latency<ApplyResult>({ ok: true, applied: { ...active } });
-    }),
+    revertApplied: (viewerPersonaId, learnerId) =>
+      withFault("applied.revert", () => {
+        const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+        if (!auth) return latency<ApplyResult>({ ok: false, reason: "not_authorized" });
+        const path = learnerPathView(learnerId, auth.orgId);
+        const active = path ? activeAppliedFor(learnerId, path) : null;
+        if (!active) return latency<ApplyResult>({ ok: false, reason: "no_active_recommendation" });
+        active.status = "reverted";
+        return latency<ApplyResult>({ ok: true, applied: { ...active } });
+      }),
 
-  getActiveApplied: (viewerPersonaId, learnerId) =>
-    withFault("applied.getActive", () => {
-      const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
-      if (!auth) return latency<AppliedRecommendation | null>(null);
-      const path = learnerPathView(learnerId, auth.orgId);
-      const active = path ? activeAppliedFor(learnerId, path) : null;
-      return latency<AppliedRecommendation | null>(active ? { ...active } : null);
-    }),
-};
+    getActiveApplied: (viewerPersonaId, learnerId) =>
+      withFault("applied.getActive", () => {
+        const auth = teacherOwnsLearner(viewerPersonaId, learnerId);
+        if (!auth) return latency<AppliedRecommendation | null>(null);
+        const path = learnerPathView(learnerId, auth.orgId);
+        const active = path ? activeAppliedFor(learnerId, path) : null;
+        return latency<AppliedRecommendation | null>(active ? { ...active } : null);
+      }),
+  });
 
-export const mockLearnerNextAction: LearnerNextActionPort = {
+export const mockLearnerNextAction: LearnerNextActionPort = viaGrant<LearnerNextActionPort>({
   getNextAction: (personaId) =>
     withFault("applied.getNextAction", () => {
       const s = learnerFor(personaId);
@@ -516,9 +521,9 @@ export const mockLearnerNextAction: LearnerNextActionPort = {
         teacherNote: null,
       });
     }),
-};
+});
 
-export const mockRecommendation: RecommendationPort = {
+export const mockRecommendation: RecommendationPort = viaGrant<RecommendationPort>({
   getRecommendation: (personaId) =>
     withFault("recommend.getRecommendation", () => {
       const s = learnerFor(personaId);
@@ -538,7 +543,7 @@ export const mockRecommendation: RecommendationPort = {
       const scoped = scopedActivities(s.learnerId, s.orgId);
       return latency(buildPath(profile, scoped, completedIds(s.learnerId, scoped)));
     }),
-};
+});
 
 /**
  * Support signals for one learner under the organization's Decision Engine rules.
@@ -578,7 +583,7 @@ export function learnerSignals(
 // ── P1 · Learners needing support (owning teacher) ───────────────────────────────────────────
 // Evidence first (owner decision 21/11): every flag states its source. Reuses the LI-1 fold, the
 // LI-3 path (only an AVAILABLE activity is suggested) and AUTH-026 (current assignment).
-export const mockSupport: SupportPort = {
+export const mockSupport: SupportPort = viaGrant<SupportPort>({
   listNeedsSupport: (viewerPersonaId) =>
     withFault("support.listNeedsSupport", () => {
       const teacherId = personaMap[viewerPersonaId]?.teacherId;
@@ -649,7 +654,7 @@ export const mockSupport: SupportPort = {
       );
       return latency(items);
     }),
-};
+});
 
 registerPersistent("intelligence", {
   dump: () => ({ interventions, interventionSeq, appliedLog, appliedSeq }),

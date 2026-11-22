@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 
 /*
@@ -41,5 +42,5 @@ export type GraphValidation = z.infer<typeof GraphValidation>;
 
 // Self/org-scoped read of the prerequisite edges in a learner's scope. Fail-closed → [].
 export interface PrerequisitePort {
-  getPrerequisites(personaId: string): Promise<ActivityPrerequisite[]>;
+  getPrerequisites(viewer: IiosGrantedContext): Promise<ActivityPrerequisite[]>;
 }

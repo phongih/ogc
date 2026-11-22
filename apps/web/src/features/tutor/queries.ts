@@ -1,61 +1,63 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LessonContext } from "@ogc/contracts";
 import { tutor } from "../../lib/api";
 // Rename/delete are synthetic, in-memory conveniences on the tutor store. They are kept
 // OFF the shared TutorPort contract on purpose (the contract is preserved as-is).
 import { tutorStore } from "../../lib/adapters/store";
+import { ogcAccountOf } from "../../lib/adapters/viewer";
 
-export const useConversations = (personaId: string) =>
+export const useConversations = (viewer: IiosGrantedContext) =>
   useQuery({
-    queryKey: ["tutor", "list", personaId],
-    queryFn: () => tutor.listConversations(personaId),
-    enabled: personaId.length > 0,
+    queryKey: ["tutor", "list", viewer],
+    queryFn: () => tutor.listConversations(viewer),
+    enabled: !!viewer,
   });
 
-export const useConversation = (personaId: string, conversationId: string) =>
+export const useConversation = (viewer: IiosGrantedContext, conversationId: string) =>
   useQuery({
-    queryKey: ["tutor", "conv", personaId, conversationId],
-    queryFn: () => tutor.getConversation(personaId, conversationId),
-    enabled: personaId.length > 0 && conversationId.length > 0,
+    queryKey: ["tutor", "conv", viewer, conversationId],
+    queryFn: () => tutor.getConversation(viewer, conversationId),
+    enabled: !!viewer && conversationId.length > 0,
   });
 
-export const useSuggestedPrompts = (personaId: string) =>
+export const useSuggestedPrompts = (viewer: IiosGrantedContext) =>
   useQuery({
     queryKey: ["tutor", "prompts"],
     queryFn: () => tutor.suggestedPrompts(),
-    enabled: personaId.length > 0,
+    enabled: !!viewer,
   });
 
-export function useSendMessage(personaId: string, conversationId: string) {
+export function useSendMessage(viewer: IiosGrantedContext, conversationId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (text: string) => tutor.send(personaId, conversationId, text),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tutor", "conv", personaId, conversationId] }),
+    mutationFn: (text: string) => tutor.send(viewer, conversationId, text),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tutor", "conv", viewer, conversationId] }),
   });
 }
 
-export function useCreateConversation(personaId: string) {
+export function useCreateConversation(viewer: IiosGrantedContext) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (args: { title: string; lessonContext?: LessonContext | null }) =>
-      tutor.createConversation(personaId, args.title, args.lessonContext ?? null),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tutor", "list", personaId] }),
+      tutor.createConversation(viewer, args.title, args.lessonContext ?? null),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tutor", "list", viewer] }),
   });
 }
 
-export function useRenameConversation(personaId: string) {
+export function useRenameConversation(viewer: IiosGrantedContext) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (args: { id: string; title: string }) =>
-      tutorStore.rename(personaId, args.id, args.title),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["tutor", "list", personaId] }),
+      tutorStore.rename(ogcAccountOf(viewer), args.id, args.title),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tutor", "list", viewer] }),
   });
 }
 
-export function useDeleteConversation(personaId: string) {
+export function useDeleteConversation(viewer: IiosGrantedContext) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => tutorStore.remove(personaId, id),
+    mutationFn: async (id: string) => tutorStore.remove(ogcAccountOf(viewer), id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tutor"] }),
   });
 }
