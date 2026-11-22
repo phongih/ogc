@@ -256,14 +256,14 @@ function seed() {
     reason?: string;
   };
   const S: Seed[] = [
-    // Lotus — 3 enrolments this month (1 more lifts the rate), 2 still referred, last month settled
-    // except one approved entry past its due date.
+    // Lotus — 3 enrolments this month (1 more lifts the rate), each referred a few days before it
+    // enrolled; 2 still referred; last month settled except one approved entry past its due date.
     {
       p: "PTN-LOTUS",
       rule: lotus,
       name: "Quan B.",
       course: "ENG-A2",
-      referred: now - 20 * DAY,
+      referred: inMonth(10) - 6 * DAY,
       enrolled: inMonth(10),
       status: "enrolled",
     },
@@ -272,7 +272,7 @@ function seed() {
       rule: lotus,
       name: "Nhi P.",
       course: "ENG-B1",
-      referred: now - 18 * DAY,
+      referred: inMonth(30) - 5 * DAY,
       enrolled: inMonth(30),
       status: "enrolled",
     },
@@ -281,7 +281,7 @@ function seed() {
       rule: lotus,
       name: "Dat H.",
       course: "ENG-A2",
-      referred: now - 15 * DAY,
+      referred: inMonth(60) - 4 * DAY,
       enrolled: inMonth(60),
       status: "enrolled",
     },
