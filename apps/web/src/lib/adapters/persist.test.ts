@@ -1,4 +1,5 @@
 // Demo data survives a reload: dump every registered store, reset to seed, restore → same state.
+import { as } from "../../test/grants";
 import { beforeEach, describe, expect, it } from "vitest";
 import { emptyCenterDraft } from "@ogc/contracts";
 import {
@@ -44,7 +45,7 @@ describe("demo persistence", () => {
   });
 
   it("a wizard center, a moved session, attendance, a make-up booking and practice all survive a reload", async () => {
-    const r = await mockCenterSetup.createCenter(S, {
+    const r = await mockCenterSetup.createCenter(as(S), {
       ...emptyCenterDraft(),
       brandId: brands[0].id,
       name: "Kept Center",
@@ -66,17 +67,17 @@ describe("demo persistence", () => {
     });
     expect(r.ok).toBe(true);
     const moved = new Date(Date.now() + 5 * 86_400_000).toISOString();
-    await mockSchedule.reschedule(S, "SES-001", moved);
-    const toMark = (await mockAttendance.listToMark("demo-teacher"))[0];
-    const view = (await mockAttendance.getSessionAttendance("demo-teacher", toMark.id))!;
-    await mockAttendance.recordAttendance("demo-teacher", toMark.id, {
+    await mockSchedule.reschedule(as(S), "SES-001", moved);
+    const toMark = (await mockAttendance.listToMark(as("demo-teacher")))[0];
+    const view = (await mockAttendance.getSessionAttendance(as("demo-teacher"), toMark.id))!;
+    await mockAttendance.recordAttendance(as("demo-teacher"), toMark.id, {
       marks: view.rows.map((x) => ({
         learnerId: x.learnerId,
         mark: x.learnerId === LEARNER_LINH ? ("absent" as const) : ("present" as const),
       })),
     });
     const linhItem = `${toMark.id}::${LEARNER_LINH}`;
-    await mockMakeup.assignSelfStudy(S, linhItem);
+    await mockMakeup.assignSelfStudy(as(S), linhItem);
     await mockPractice.submitPractice("demo-learner", "ACT-A2-3", {
       attemptId: "PERSIST-1",
       responses: [
@@ -87,7 +88,7 @@ describe("demo persistence", () => {
     const before = {
       classes: classes.length,
       evidence: learningStore.getEvidence(LEARNER_LINH, "ACT-A2-3").length,
-      board: (await mockMakeup.getBoard(S))!.counts,
+      board: (await mockMakeup.getBoard(as(S)))!.counts,
     };
 
     saveDemoState();
@@ -102,12 +103,12 @@ describe("demo persistence", () => {
     expect(classes.some((c) => c.name === "Sat — Sat")).toBe(true);
     expect(sessionStore.get("SES-001")!.at).toBe(moved);
     expect(
-      (await mockAttendance.getSessionAttendance("demo-teacher", toMark.id))!.session.status,
+      (await mockAttendance.getSessionAttendance(as("demo-teacher"), toMark.id))!.session.status,
     ).toBe("marked");
-    expect((await mockMakeup.getBoard(S))!.counts).toEqual(before.board);
-    expect((await mockMakeup.listMine("demo-learner"))[0].booking?.kind).toBe("selfstudy");
-    expect(await mockCenterSetup.getFees(S, r.ok ? r.centerId : "")).toHaveLength(1);
-    expect((await mockCenterSetup.getSetupContext(S))!.takenCodes).toContain("KC-1");
+    expect((await mockMakeup.getBoard(as(S)))!.counts).toEqual(before.board);
+    expect((await mockMakeup.listMine(as("demo-learner")))[0].booking?.kind).toBe("selfstudy");
+    expect(await mockCenterSetup.getFees(as(S), r.ok ? r.centerId : "")).toHaveLength(1);
+    expect((await mockCenterSetup.getSetupContext(as(S)))!.takenCodes).toContain("KC-1");
     expect(learningStore.getEvidence(LEARNER_LINH, "ACT-A2-3").length).toBe(before.evidence);
     expect(before.evidence).toBeGreaterThan(0);
     expect(enrollmentStore.get("demo-learner", courses[2].id)).toBeUndefined(); // enrolled after the save

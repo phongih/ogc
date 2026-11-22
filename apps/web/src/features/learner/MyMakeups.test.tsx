@@ -1,4 +1,5 @@
 // P2 · slice 4 in the UI: learner submits self-study, guardian sees it read-only, teacher confirms.
+import { as } from "../../test/grants";
 import { beforeEach, describe, expect, it } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -14,14 +15,14 @@ const unit6 = () =>
 
 beforeEach(async () => {
   __resetAttendanceForTests();
-  const view = (await mockAttendance.getSessionAttendance("demo-teacher", unit6()))!;
-  await mockAttendance.recordAttendance("demo-teacher", unit6(), {
+  const view = (await mockAttendance.getSessionAttendance(as("demo-teacher"), unit6()))!;
+  await mockAttendance.recordAttendance(as("demo-teacher"), unit6(), {
     marks: view.rows.map((r) => ({
       learnerId: r.learnerId,
       mark: r.learnerId === LEARNER_LINH ? ("absent" as const) : ("present" as const),
     })),
   });
-  await mockMakeup.assignSelfStudy("demo-staff", `${unit6()}::${LEARNER_LINH}`);
+  await mockMakeup.assignSelfStudy(as("demo-staff"), `${unit6()}::${LEARNER_LINH}`);
 });
 
 describe("Make-up lessons — learner, guardian, teacher", () => {
@@ -50,7 +51,7 @@ describe("Make-up lessons — learner, guardian, teacher", () => {
 
   it("teacher confirms the submitted self-study", async () => {
     await mockMakeup.submitSelfStudy(
-      "demo-learner",
+      as("demo-learner"),
       `${unit6()}::${LEARNER_LINH}`,
       "Read Unit 6 and did the exercises",
     );
@@ -65,6 +66,6 @@ describe("Make-up lessons — learner, guardian, teacher", () => {
     await waitFor(() =>
       expect(screen.queryByRole("region", { name: "Self-study to confirm" })).toBeNull(),
     );
-    expect((await mockMakeup.listMine("demo-learner"))[0].status).toBe("done");
+    expect((await mockMakeup.listMine(as("demo-learner")))[0].status).toBe("done");
   });
 });

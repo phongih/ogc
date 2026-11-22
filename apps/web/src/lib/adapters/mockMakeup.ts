@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import type {
   MakeupBoard,
   MakeupBooking,
@@ -9,12 +10,13 @@ import type {
   MakeupResult,
 } from "@ogc/contracts";
 import { MAKEUP_DEADLINE_DAYS } from "@ogc/contracts";
-import { personaMap, teacherName, teachers } from "../../fixtures/personas";
+import { teacherName, teachers } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { sessionStore, type SelfStudyRecord, type StoredSession } from "./sessionStore";
 import { allMarks, makeupItemLive, markOf } from "./mockAttendance";
 import { findClashes } from "./clashes";
 import { withFault } from "./faults";
+import { guardianLinksOf, learnerIdOf, staffOrgOf, teacherIdOf } from "./viewer";
 import { allows, centerScope, inScope } from "./accessPolicy";
 
 /*
@@ -30,10 +32,7 @@ const latency = <T>(v: T, ms = 60): Promise<T> =>
 const refuse = (reason: MakeupRefusal) => latency<MakeupResult>({ ok: false, reason });
 const DAY_MS = 86_400_000;
 
-function staffOrg(viewer: string): string | null {
-  const p = personaMap[viewer];
-  return p?.staff ? p.orgId : null;
-}
+const staffOrg = staffOrgOf;
 const className = (id: string) => classes.find((c) => c.id === id)?.name ?? "Class";
 const classOrg = (id: string) => classes.find((c) => c.id === id)?.orgId;
 const learnerName = (classId: string, learnerId: string) =>
@@ -120,10 +119,10 @@ export function makeupItems(orgId: string, now = Date.now()): MakeupItem[] {
 
 const classCenter = (classId: string) => classes.find((c) => c.id === classId)?.centerId ?? "";
 // Access policy (narrows only): the centers this staff member arranges make-ups for.
-const mayArrange = (viewer: string, classId: string) =>
+const mayArrange = (viewer: IiosGrantedContext, classId: string) =>
   allows(viewer, "makeup:manage", { centerId: classCenter(classId) });
 
-function board(orgId: string, viewer: string): MakeupBoard {
+function board(orgId: string, viewer: IiosGrantedContext): MakeupBoard {
   const scope = centerScope(viewer, "makeup:manage");
   const items = makeupItems(orgId).filter((i) => inScope(scope, classCenter(i.classId)));
   const count = (f: (i: MakeupItem) => boolean) => items.filter(f).length;
@@ -166,22 +165,20 @@ const okItem = (orgId: string, itemId: string) =>
   latency<MakeupItemResult>({ ok: true, item: makeupItems(orgId).find((i) => i.id === itemId)! });
 
 // Learner: own id. Guardian: pre-established links only (D-14 — no self-asserted link path).
-function ownLearnerIds(viewer: string): string[] {
-  const p = personaMap[viewer];
-  if (p?.learnerId) return [p.learnerId];
-  if (p?.guardianId) return [...(p.linkedLearnerIds ?? [])];
-  return [];
+function ownLearnerIds(viewer: IiosGrantedContext): string[] {
+  const learner = learnerIdOf(viewer);
+  if (learner) return [learner];
+  return guardianLinksOf(viewer);
 }
 
 // The learner's OWN class teacher (not a substitute) confirms self-study — same tenant.
-function teachesClass(viewer: string, classId: string): boolean {
-  const p = personaMap[viewer];
-  return !!p?.teacherId && classTeachers[classId] === p.teacherId && classOrg(classId) === p.orgId;
+function teachesClass(viewer: IiosGrantedContext, classId: string): boolean {
+  const teacherId = teacherIdOf(viewer);
+  return !!teacherId && classTeachers[classId] === teacherId && classOrg(classId) === viewer.orgId;
 }
-function teacherItem(viewer: string, itemId: string): MakeupItem | undefined {
-  const p = personaMap[viewer];
-  if (!p?.teacherId) return undefined;
-  return makeupItems(p.orgId).find((i) => i.id === itemId && teachesClass(viewer, i.classId));
+function teacherItem(viewer: IiosGrantedContext, itemId: string): MakeupItem | undefined {
+  if (!teacherIdOf(viewer)) return undefined;
+  return makeupItems(viewer.orgId).find((i) => i.id === itemId && teachesClass(viewer, i.classId));
 }
 
 export const mockMakeup: MakeupPort = {
@@ -293,16 +290,18 @@ export const mockMakeup: MakeupPort = {
   listMine: (viewer) =>
     withFault("makeup.listMine", () => {
       const ids = ownLearnerIds(viewer);
-      const org = personaMap[viewer]?.orgId;
-      if (!org || ids.length === 0) return latency<MakeupItem[]>([]);
+      const org = viewer.orgId;
+      if (ids.length === 0) return latency<MakeupItem[]>([]);
       return latency(makeupItems(org).filter((i) => ids.includes(i.learnerId)));
     }),
 
   submitSelfStudy: (viewer, itemId, note) =>
     withFault("makeup.submitSelfStudy", () => {
-      const p = personaMap[viewer];
-      if (!p?.learnerId) return refuseItem("not_found"); // learners only, own items only
-      const item = makeupItems(p.orgId).find((i) => i.id === itemId && i.learnerId === p.learnerId);
+      const learnerId = learnerIdOf(viewer);
+      if (!learnerId) return refuseItem("not_found"); // learners only, own items only
+      const item = makeupItems(viewer.orgId).find(
+        (i) => i.id === itemId && i.learnerId === learnerId,
+      );
       if (!item) return refuseItem("not_found");
       const rec = sessionStore.selfStudies.get(itemId);
       if (!rec) return refuseItem("not_self_study");
@@ -314,15 +313,14 @@ export const mockMakeup: MakeupPort = {
         note: note.trim(),
         returnedNote: null,
       });
-      return okItem(p.orgId, itemId);
+      return okItem(viewer.orgId, itemId);
     }),
 
   listToConfirm: (viewer) =>
     withFault("makeup.listToConfirm", () => {
-      const p = personaMap[viewer];
-      if (!p?.teacherId) return latency<MakeupItem[]>([]);
+      if (!teacherIdOf(viewer)) return latency<MakeupItem[]>([]);
       return latency(
-        makeupItems(p.orgId).filter(
+        makeupItems(viewer.orgId).filter(
           (i) => i.status === "to_confirm" && teachesClass(viewer, i.classId),
         ),
       );
@@ -337,7 +335,7 @@ export const mockMakeup: MakeupPort = {
       if (rec.confirmedAt) return refuseItem("already_done");
       if (!rec.submittedAt) return refuseItem("not_submitted");
       sessionStore.selfStudies.set(itemId, { ...rec, confirmedAt: new Date().toISOString() });
-      return okItem(personaMap[viewer]!.orgId, itemId);
+      return okItem(viewer.orgId, itemId);
     }),
 
   returnSelfStudy: (viewer, itemId, note) =>
@@ -354,6 +352,6 @@ export const mockMakeup: MakeupPort = {
         submittedAt: null,
         returnedNote: note.trim(),
       });
-      return okItem(personaMap[viewer]!.orgId, itemId);
+      return okItem(viewer.orgId, itemId);
     }),
 };

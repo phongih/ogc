@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 
 /*
@@ -75,27 +76,27 @@ export const ScheduleResult = z.discriminatedUnion("ok", [
 export type ScheduleResult = z.infer<typeof ScheduleResult>;
 
 export interface SchedulePort {
-  getOverview(viewerPersonaId: string): Promise<OperationsOverview | null>; // staff only
-  reschedule(viewerPersonaId: string, sessionId: string, newAt: string): Promise<ScheduleResult>;
+  getOverview(viewer: IiosGrantedContext): Promise<OperationsOverview | null>; // staff only
+  reschedule(viewer: IiosGrantedContext, sessionId: string, newAt: string): Promise<ScheduleResult>;
   // Cancel REQUIRES a replacement time: a new session with the same title is created for the class.
   cancelWithReplacement(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     sessionId: string,
     replacementAt: string,
   ): Promise<ScheduleResult>;
   addSession(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     classId: string,
     title: string,
     at: string,
   ): Promise<ScheduleResult>;
   assignTeacher(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     classId: string,
     teacherId: string,
   ): Promise<ScheduleResult>;
   setSubstitute(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     sessionId: string,
     teacherId: string | null,
   ): Promise<ScheduleResult>;

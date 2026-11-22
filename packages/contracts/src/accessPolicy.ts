@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 
 /*
  * Access policy — ADDITIVE, SYNTHETIC, mock only. Pattern taken from HealthcareOS HCOS-F2.
@@ -206,5 +207,5 @@ export interface MyAccess {
  * them, as UI hints. Adapters enforce through `authorize()`.
  */
 export interface MyAccessPort {
-  myAccess(viewerPersonaId: string): Promise<MyAccess>;
+  myAccess(viewer: IiosGrantedContext): Promise<MyAccess>;
 }

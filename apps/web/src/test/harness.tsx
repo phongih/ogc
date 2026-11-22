@@ -6,11 +6,19 @@ import { createMockSession, type MockPersona, type MockRole } from "@ogc/mock-au
 import { SessionProvider } from "../app/session";
 import { routes } from "../app/router";
 import { NonProductionBanner } from "../ui";
+import { GrantedContextProvider } from "../app/iiosGate";
+import { as } from "./grants";
 
 const ORG = "00000000-0000-4000-8000-000000000001";
 export function persona(role: MockRole): MockPersona {
   const id =
-    role === "learner" ? "demo-learner" : role === "teacher" ? "demo-teacher" : role === "guardian" ? "demo-guardian" : "demo-staff";
+    role === "learner"
+      ? "demo-learner"
+      : role === "teacher"
+        ? "demo-teacher"
+        : role === "guardian"
+          ? "demo-guardian"
+          : "demo-staff";
   return { personaId: id, displayName: `${role} demo`, role, orgId: ORG };
 }
 
@@ -21,10 +29,16 @@ function newQc() {
 /** Render a single component with providers and a router (no app routes). */
 export function renderUI(ui: ReactNode, opts?: { role?: MockRole }) {
   const session = opts?.role ? createMockSession(persona(opts.role)) : null;
+  // ADR-039 step 3b: a rendered page gets the IIOS-granted context the gate would have admitted.
+  const routed = <MemoryRouter>{ui}</MemoryRouter>;
   return render(
     <QueryClientProvider client={newQc()}>
       <SessionProvider initialSession={session}>
-        <MemoryRouter>{ui}</MemoryRouter>
+        {session ? (
+          <GrantedContextProvider value={as(session.personaId)}>{routed}</GrantedContextProvider>
+        ) : (
+          routed
+        )}
       </SessionProvider>
     </QueryClientProvider>,
   );

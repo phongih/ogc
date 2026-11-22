@@ -3,18 +3,18 @@
  * counts as a make-up only once the learner's own class teacher confirms it. The teacher can
  * confirm, or send it back with a note.
  */
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MakeupItem, MakeupItemResult } from "@ogc/contracts";
 import { makeup } from "../../lib/api";
-import { useSession } from "../../app/session";
+import { useViewer } from "../../app/iiosGate";
 import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDate } from "../../lib/centerTime";
 import { Button, Card } from "../../ui";
 
 export function SelfStudyToConfirm() {
-  const { session } = useSession();
-  const viewer = session?.personaId ?? "";
+  const viewer = useViewer();
   const q = useQuery({
     queryKey: ["makeup-to-confirm", viewer],
     queryFn: () => makeup.listToConfirm(viewer),
@@ -35,7 +35,7 @@ export function SelfStudyToConfirm() {
   );
 }
 
-function ConfirmCard({ viewer, item }: { viewer: string; item: MakeupItem }) {
+function ConfirmCard({ viewer, item }: { viewer: IiosGrantedContext; item: MakeupItem }) {
   const qc = useQueryClient();
   const act = useMutation({
     mutationFn: (run: () => Promise<MakeupItemResult>) => run(),

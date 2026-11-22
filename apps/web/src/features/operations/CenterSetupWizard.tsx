@@ -4,13 +4,14 @@
  * EduOS campus wizard: steps on the left, the required checklist on the right, a draft kept in
  * this browser, a review step. Opening the center creates its classes and first sessions.
  */
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CenterSetupDraft, CenterSetupResult, SetupClass, SetupContext } from "@ogc/contracts";
 import { centerSetupChecklist, classIssues, emptyCenterDraft, feeIssues } from "@ogc/contracts";
 import { centerSetup } from "../../lib/api";
-import { useSession } from "../../app/session";
+import { useViewer } from "../../app/iiosGate";
 import { refreshLearningState } from "../../lib/invalidate";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 
@@ -24,10 +25,10 @@ const STEPS = [
 ];
 const DAYS = [1, 2, 3, 4, 5, 6, 0];
 const DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const draftKey = (viewer: string) => `ogc.centerSetup.draft.${viewer}`;
+const draftKey = (viewer: IiosGrantedContext) => `ogc.centerSetup.draft.${viewer.principalId}`;
 
 // Browser storage can be missing or throw (private mode); the wizard works without it.
-function loadDraft(viewer: string): CenterSetupDraft | null {
+function loadDraft(viewer: IiosGrantedContext): CenterSetupDraft | null {
   try {
     const raw = window.localStorage.getItem(draftKey(viewer));
     return raw
@@ -37,7 +38,7 @@ function loadDraft(viewer: string): CenterSetupDraft | null {
     return null;
   }
 }
-function saveDraft(viewer: string, d: CenterSetupDraft | null) {
+function saveDraft(viewer: IiosGrantedContext, d: CenterSetupDraft | null) {
   try {
     if (d) window.localStorage.setItem(draftKey(viewer), JSON.stringify(d));
     else window.localStorage.removeItem(draftKey(viewer));
@@ -49,8 +50,7 @@ function saveDraft(viewer: string, d: CenterSetupDraft | null) {
 const input = "mt-1 block w-full rounded-ogc border border-border bg-surface p-1.5 text-sm";
 
 export function CenterSetupWizard() {
-  const { session } = useSession();
-  const viewer = session?.personaId ?? "";
+  const viewer = useViewer();
   const ctx = useQuery({
     queryKey: ["center-setup-ctx", viewer],
     queryFn: () => centerSetup.getSetupContext(viewer),
@@ -69,7 +69,7 @@ export function CenterSetupWizard() {
   return <Wizard viewer={viewer} ctx={ctx.data} />;
 }
 
-function Wizard({ viewer, ctx }: { viewer: string; ctx: SetupContext }) {
+function Wizard({ viewer, ctx }: { viewer: IiosGrantedContext; ctx: SetupContext }) {
   const qc = useQueryClient();
   const restored = useMemo(() => loadDraft(viewer), [viewer]);
   const [draft, setDraft] = useState<CenterSetupDraft>(
@@ -630,7 +630,7 @@ function ReviewStep({
   pending,
   onOpen,
 }: {
-  viewer: string;
+  viewer: IiosGrantedContext;
   draft: CenterSetupDraft;
   ctx: SetupContext;
   canOpen: boolean;

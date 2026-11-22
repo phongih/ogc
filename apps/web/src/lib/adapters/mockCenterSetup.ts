@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { refill, registerPersistent } from "./persist";
 import type {
   CenterSetupDraft,
@@ -9,12 +10,13 @@ import type {
 import { centerSetupChecklist, feeIssues } from "@ogc/contracts";
 import { brands, centerDetails, centers, organizations } from "../../fixtures/directory";
 import { courses } from "../../fixtures/catalog";
-import { personaMap, teachers } from "../../fixtures/personas";
+import { teachers } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { nextWeeklySlot } from "../../fixtures/demoClock";
 import { sessionStore } from "./sessionStore";
 import { findClashes } from "./clashes";
 import { withFault } from "./faults";
+import { staffOrgOf } from "./viewer";
 import { allows } from "./accessPolicy";
 
 /*
@@ -45,12 +47,9 @@ sessionStore.onReset(() => {
   seq = 0;
 });
 
-const staffOrg = (viewer: string) => {
-  const p = personaMap[viewer];
-  return p?.staff ? p.orgId : null;
-};
+const staffOrg = staffOrgOf;
 // Access policy (narrows only): may this staff member set up centers?
-const maySetUp = (viewer: string) => allows(viewer, "center:setup");
+const maySetUp = (viewer: IiosGrantedContext) => allows(viewer, "center:setup");
 const hexId = (kind: string, n: number) =>
   `00000000-0000-4000-8000-${kind}${n.toString(16).padStart(8, "0")}`;
 // The first FIRST_WEEKS weeks of a class's weekly slot, in center time.

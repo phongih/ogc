@@ -2,6 +2,7 @@
 // only and never on their own access. Enforced in the adapters, not just hidden in the UI.
 // OGC-ADR-039 step 2: the policies live in the MOCK IIOS; the admin calls IiosPolicyAdminPort with
 // their granted context, and the narrowing reaches OGC inside each grant.
+import { as } from "../../test/grants";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { PolicyRule } from "@ogc/contracts";
 import type { IiosGrantedContext } from "@ogc/contracts";
@@ -13,7 +14,6 @@ import {
 } from "../integration/mockIiosPolicy";
 import { mockIiosContext } from "../integration/mockIiosContext";
 import { presentedGrantFor } from "../../app/iiosGate";
-import { clearCurrentGrants, setCurrentGrant } from "../integration/currentGrant";
 import { organizations } from "../../fixtures/directory";
 import { mockSchedule } from "./mockSchedule";
 import { mockMakeup } from "./mockMakeup";
@@ -44,7 +44,6 @@ const a2ToMark = () =>
 
 beforeEach(() => {
   __resetAttendanceForTests();
-  clearCurrentGrants();
 }); // resets the schedule, and with it access policies
 
 /** The granted context the mock IIOS issues for a persona right now. */
@@ -75,7 +74,7 @@ const access = {
     iios.retirePolicy(await grantOf(p), ref, v),
   setMembershipPolicy: async (p: string, member: string, ref: string | null) =>
     iios.attachPolicy(await grantOf(p), PRINCIPAL[member] ?? member, ref),
-  myAccess: (p: string) => mockMyAccess.myAccess(p),
+  myAccess: (p: string) => mockMyAccess.myAccess(as(p)),
 };
 
 describe("access — admin view", () => {
@@ -138,45 +137,45 @@ describe("access — the narrowing travels in the grant (ADR-039 step 2)", () =>
 
 describe("access — a policy only narrows", () => {
   it("no policy: the role's normal access is unchanged", async () => {
-    expect((await mockSchedule.getOverview(SAM))!.classes).toHaveLength(3);
+    expect((await mockSchedule.getOverview(as(SAM)))!.classes).toHaveLength(3);
     expect((await access.myAccess(SAM)).policyName).toBeNull();
     // A policy never grants: a teacher holding a staff rule still cannot manage the schedule.
     await access.createPolicy(ADMIN, { name: "Wide", rules: [{ action: "schedule:manage" }] });
     const wide = (await access.getAdminView(ADMIN))!.policies.find((p) => p.name === "Wide")!;
     await attach(BEN, wide.id);
-    expect(allows(BEN, "schedule:manage")).toBe(false);
-    expect(await mockSchedule.getOverview(BEN)).toBeNull();
+    expect(allows(as(BEN), "schedule:manage")).toBe(false);
+    expect(await mockSchedule.getOverview(as(BEN))).toBeNull();
   });
 
   it("front desk: District 1 only, and class teacher / substitute are read-only", async () => {
     await attach(SAM, FRONT_DESK);
-    const o = (await mockSchedule.getOverview(SAM))!;
+    const o = (await mockSchedule.getOverview(as(SAM)))!;
     expect(o.classes.map((c) => c.className)).toEqual([
       "A2 Morning — Mon/Wed",
       "A2 Evening — Tue/Thu",
     ]);
     expect(o.classes.every((c) => c.centerId === D1)).toBe(true);
     // Thu Duc: refused even though Sam is staff.
-    expect(await mockSchedule.reschedule(SAM, "SES-002", inDays(4))).toEqual({
+    expect(await mockSchedule.reschedule(as(SAM), "SES-002", inDays(4))).toEqual({
       ok: false,
       reason: "access_policy",
     });
     // District 1: rescheduling is fine…
-    expect((await mockSchedule.reschedule(SAM, "SES-001", inDays(4))).ok).toBe(true);
+    expect((await mockSchedule.reschedule(as(SAM), "SES-001", inDays(4))).ok).toBe(true);
     // …but teacher and substitute are read-only.
-    expect(await mockSchedule.assignTeacher(SAM, A2, TEACHER_BEN)).toEqual({
+    expect(await mockSchedule.assignTeacher(as(SAM), A2, TEACHER_BEN)).toEqual({
       ok: false,
       reason: "access_policy",
     });
-    expect(await mockSchedule.setSubstitute(SAM, "SES-001", TEACHER_BEN)).toEqual({
+    expect(await mockSchedule.setSubstitute(as(SAM), "SES-001", TEACHER_BEN)).toEqual({
       ok: false,
       reason: "access_policy",
     });
     // Make-ups: only District 1 items, and no center setup (not in the policy).
-    const board = (await mockMakeup.getBoard(SAM))!;
+    const board = (await mockMakeup.getBoard(as(SAM)))!;
     const d1 = new Set(classes.filter((c) => c.centerId === D1).map((c) => c.id));
     expect(board.items.every((i) => d1.has(i.classId))).toBe(true);
-    expect(await mockCenterSetup.getSetupContext(SAM)).toBeNull();
+    expect(await mockCenterSetup.getSetupContext(as(SAM))).toBeNull();
     const me = await access.myAccess(SAM);
     expect(me.policyName).toBe("Front desk — District 1 only");
     expect(me.allowed["center:setup"]).toBe(false);
@@ -186,13 +185,13 @@ describe("access — a policy only narrows", () => {
 
   it("own classes only: the teacher can no longer mark as a substitute", async () => {
     const sid = a2ToMark();
-    expect((await mockSchedule.setSubstitute(SAM, sid, TEACHER_BEN)).ok).toBe(true);
-    expect((await mockAttendance.listToMark(BEN)).some((s) => s.id === sid)).toBe(true);
+    expect((await mockSchedule.setSubstitute(as(SAM), sid, TEACHER_BEN)).ok).toBe(true);
+    expect((await mockAttendance.listToMark(as(BEN))).some((s) => s.id === sid)).toBe(true);
     await attach(BEN, OWN_CLASSES);
-    expect((await mockAttendance.listToMark(BEN)).some((s) => s.id === sid)).toBe(false);
-    expect(await mockAttendance.getSessionAttendance(BEN, sid)).toBeNull();
+    expect((await mockAttendance.listToMark(as(BEN))).some((s) => s.id === sid)).toBe(false);
+    expect(await mockAttendance.getSessionAttendance(as(BEN), sid)).toBeNull();
     await attach(BEN, null);
-    expect((await mockAttendance.listToMark(BEN)).some((s) => s.id === sid)).toBe(true);
+    expect((await mockAttendance.listToMark(as(BEN))).some((s) => s.id === sid)).toBe(true);
   });
 
   it("engine: thresholds can be tuned while rule actions stay read-only", async () => {
@@ -205,24 +204,29 @@ describe("access — a policy only narrows", () => {
       (p) => p.name === "Engine tuner",
     )!.id;
     await attach(SAM, id);
-    const rule = (await mockDecisionEngine.listRules(SAM))!.find((x) => x.kind === "skill_low")!;
+    const rule = (await mockDecisionEngine.listRules(as(SAM)))!.find(
+      (x) => x.kind === "skill_low",
+    )!;
     expect(
-      (await mockDecisionEngine.updateRule(SAM, rule.id, { params: { threshold: 53 } })).ok,
+      (await mockDecisionEngine.updateRule(as(SAM), rule.id, { params: { threshold: 53 } })).ok,
     ).toBe(true);
     expect(
-      await mockDecisionEngine.updateRule(SAM, rule.id, { actions: ["notify_staff"] }),
+      await mockDecisionEngine.updateRule(as(SAM), rule.id, { actions: ["notify_staff"] }),
     ).toMatchObject({ ok: false, reason: "access_policy" });
     // Same actions in another order is not a change.
     expect(
-      (await mockDecisionEngine.updateRule(SAM, rule.id, { actions: [...rule.actions].reverse() }))
-        .ok,
+      (
+        await mockDecisionEngine.updateRule(as(SAM), rule.id, {
+          actions: [...rule.actions].reverse(),
+        })
+      ).ok,
     ).toBe(true);
   });
 
   it("fail-closed: a membership pointing at a missing or retired policy can do nothing", async () => {
     __attachForTests(SAM_P, "policy-that-does-not-exist");
-    expect((await mockSchedule.getOverview(SAM))!.classes).toEqual([]);
-    expect(await mockSchedule.reschedule(SAM, "SES-001", inDays(4))).toEqual({
+    expect((await mockSchedule.getOverview(as(SAM)))!.classes).toEqual([]);
+    expect(await mockSchedule.reschedule(as(SAM), "SES-001", inDays(4))).toEqual({
       ok: false,
       reason: "access_policy",
     });
@@ -230,7 +234,7 @@ describe("access — a policy only narrows", () => {
     // A retired policy (tampered state — the admin path refuses this) is the same.
     __policiesForTests.get(FRONT_DESK)!.status = "retired";
     __attachForTests(SAM_P, FRONT_DESK);
-    expect(allows(SAM, "schedule:manage", { centerId: D1 })).toBe(false);
+    expect(allows(as(SAM), "schedule:manage", { centerId: D1 })).toBe(false);
   });
 });
 
@@ -332,37 +336,52 @@ describe("access — admin rules", () => {
   });
 });
 
-describe("access — adapters enforce with the grant IIOS decided (ADR-039 step 3)", () => {
-  it("a denied grant (gate recorded null) leaves nothing allowed, even for staff", async () => {
-    setCurrentGrant(SAM, null);
-    expect((await mockSchedule.getOverview(SAM))!.classes).toEqual([]);
-    expect(await mockSchedule.reschedule(SAM, "SES-001", inDays(4))).toEqual({
+describe("access — ports take the IIOS-granted context (ADR-039 step 3b)", () => {
+  it("the role comes from the grant, not from OGC fixtures", async () => {
+    const samAsTeacher = { ...as(SAM), role: "teacher" as const };
+    expect(allows(samAsTeacher, "schedule:manage", { centerId: D1 })).toBe(false);
+    expect(await mockSchedule.getOverview(samAsTeacher)).toBeNull();
+    // Olivia: IIOS grants "staff" (+ orgAdmin) — she manages the schedule as staff.
+    expect(as(ADMIN).role).toBe("staff");
+    expect(as(ADMIN).orgAdmin).toBe(true);
+    expect(allows(as(ADMIN), "schedule:manage", { centerId: D1 })).toBe(true);
+  });
+
+  it("a grant is a snapshot: the narrowing in force is the one the caller presents", async () => {
+    const before = as(SAM);
+    await attach(SAM, FRONT_DESK);
+    expect(allows(before, "schedule:manage", { centerId: centers[1].id })).toBe(true);
+    expect(allows(as(SAM), "schedule:manage", { centerId: centers[1].id })).toBe(false);
+  });
+
+  it("another tenant's resource is refused by the contract", () => {
+    expect(allows(as(SAM), "schedule:manage", { centerId: centers[3].id })).toBe(false); // Lumen
+  });
+
+  it("IIOS active center (AZ7) narrows what the ports return", async () => {
+    const atD1 = { ...as(SAM), activeCenter: D1 };
+    const o = (await mockSchedule.getOverview(atD1))!;
+    expect(o.classes.every((c) => c.centerId === D1)).toBe(true);
+    expect(o.classes.length).toBe(2);
+    expect(await mockSchedule.reschedule(atD1, "SES-002", inDays(4))).toEqual({
       ok: false,
       reason: "access_policy",
     });
-    expect((await mockMakeup.getBoard(SAM))!.items).toEqual([]);
+    // Organization-level action under an active center: refused (ADR-039 §4.4, pending IIOS).
+    expect(await mockCenterSetup.getSetupContext(atD1)).toBeNull();
   });
 
-  it("the role comes from the grant, not from OGC fixtures", async () => {
-    setCurrentGrant(SAM, { ...(await grantOf(SAM)), role: "teacher" });
-    expect(allows(SAM, "schedule:manage", { centerId: D1 })).toBe(false);
-    // Olivia: IIOS grants "staff" (+ orgAdmin) — she manages the schedule as staff.
-    const olivia = await grantOf(ADMIN);
-    expect(olivia.role).toBe("staff");
-    setCurrentGrant(ADMIN, olivia);
-    expect(allows(ADMIN, "schedule:manage", { centerId: D1 })).toBe(true);
+  it("a principal OGC has no record for gets nothing, whatever role the grant claims", async () => {
+    const stranger = { ...as("demo-teacher"), principalId: "iios-principal-unknown" };
+    expect(await mockAttendance.listToMark(stranger)).toEqual([]);
+    expect(await mockMakeup.listToConfirm(stranger)).toEqual([]);
+    const strangerLearner = { ...as("demo-learner"), principalId: "iios-principal-unknown" };
+    expect(await mockMakeup.listMine(strangerLearner)).toEqual([]);
   });
 
-  it("the narrowing in force is the one in the recorded grant (refreshed on navigation)", async () => {
-    setCurrentGrant(SAM, await grantOf(SAM)); // before the policy is attached
-    await attach(SAM, FRONT_DESK);
-    expect(allows(SAM, "schedule:manage", { centerId: centers[1].id })).toBe(true); // old grant
-    setCurrentGrant(SAM, await grantOf(SAM)); // next navigation
-    expect(allows(SAM, "schedule:manage", { centerId: centers[1].id })).toBe(false);
-  });
-
-  it("a resource in another tenant is refused by the contract", async () => {
-    setCurrentGrant(SAM, await grantOf(SAM));
-    expect(allows(SAM, "schedule:manage", { centerId: centers[3].id })).toBe(false); // Lumen org
+  it("an unavailable narrowing (policy missing / retired in IIOS) allows nothing", async () => {
+    const g = { ...as(SAM), narrowing: { state: "unavailable" as const } };
+    expect((await mockSchedule.getOverview(g))!.classes).toEqual([]);
+    expect((await mockMakeup.getBoard(g))!.items).toEqual([]);
   });
 });

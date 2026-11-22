@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import type {
   ClassSchedule,
   OperationsOverview,
@@ -7,13 +8,14 @@ import type {
   ScheduledSession,
   TeacherRef,
 } from "@ogc/contracts";
-import { personaMap, teachers } from "../../fixtures/personas";
+import { teachers } from "../../fixtures/personas";
 import { classTeachers, classes } from "../../fixtures/teaching";
 import { centers } from "../../fixtures/directory";
 import { sessionStore, type StoredSession } from "./sessionStore";
 import { isMarked } from "./mockAttendance";
 import { findClashes, slotOf } from "./clashes";
 import { withFault } from "./faults";
+import { staffOrgOf } from "./viewer";
 import { allows, allowsField, centerScope, inScope } from "./accessPolicy";
 
 /*
@@ -30,10 +32,7 @@ const refuse = (reason: ScheduleRefusal) => latency<ScheduleResult>({ ok: false,
 const clash = (clashes: string[]) =>
   latency<ScheduleResult>({ ok: false, reason: "clash", clashes });
 
-function staffOrg(viewerPersonaId: string): string | null {
-  const p = personaMap[viewerPersonaId];
-  return p?.staff ? p.orgId : null;
-}
+const staffOrg = staffOrgOf;
 
 const teacherRef = (id: string | null | undefined): TeacherRef | null => {
   const t = teachers.find((x) => x.id === id);
@@ -71,13 +70,13 @@ function classSchedule(classId: string): ClassSchedule {
 }
 
 // A class in the staff member's own tenant, or null (fail-closed).
-function staffClass(viewer: string, classId: string) {
+function staffClass(viewer: IiosGrantedContext, classId: string) {
   const org = staffOrg(viewer);
   const c = classes.find((x) => x.id === classId);
   return org && c && c.orgId === org ? c : null;
 }
 
-function staffSession(viewer: string, sessionId: string) {
+function staffSession(viewer: IiosGrantedContext, sessionId: string) {
   const s = sessionStore.get(sessionId);
   return s && staffClass(viewer, s.classId) ? s : null;
 }
@@ -85,7 +84,7 @@ function staffSession(viewer: string, sessionId: string) {
 const future = (iso: string) => Number.isFinite(Date.parse(iso)) && Date.parse(iso) > Date.now();
 const centerOf = (classId: string) => classes.find((c) => c.id === classId)?.centerId;
 // Access policy (narrows only): may this staff member manage this class's center?
-const mayManage = (viewer: string, classId: string) =>
+const mayManage = (viewer: IiosGrantedContext, classId: string) =>
   allows(viewer, "schedule:manage", { centerId: centerOf(classId) });
 
 const isHistory = (s: StoredSession) => Date.parse(s.at) <= Date.now() || isMarked(s.id);

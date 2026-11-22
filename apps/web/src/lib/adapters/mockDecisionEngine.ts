@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import type {
   ActionLogEntry,
   DecisionEnginePort,
@@ -8,7 +9,7 @@ import type {
   RuleUpdateResult,
 } from "@ogc/contracts";
 import { QUEUE_KINDS, RULE_PARAMS } from "@ogc/contracts";
-import { personaMap, teacherName } from "../../fixtures/personas";
+import { teacherName } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { formatCenterDate, formatCenterDateTime } from "../centerTime";
 import { sessionStore } from "./sessionStore";
@@ -21,6 +22,7 @@ import { rulesFor, resetRules } from "./engineRules";
 import { refill, registerPersistent } from "./persist";
 import { skillLabel } from "../../features/learning/intelligence/skills";
 import { withFault } from "./faults";
+import { staffOrgOf, teacherIdOf } from "./viewer";
 import { decide } from "./accessPolicy";
 
 /*
@@ -332,14 +334,11 @@ function ensureRecent(orgId: string): void {
   if (!last || Date.now() - Date.parse(last) >= JOB_INTERVAL_SEC * 1000) runEngine(orgId);
 }
 
-const staffOrg = (viewer: string) => {
-  const p = personaMap[viewer];
-  return p?.staff ? p.orgId : null;
-};
-const recipientOf = (viewer: string): { key: string; orgId: string } | null => {
-  const p = personaMap[viewer];
-  if (p?.staff) return { key: `staff:${p.orgId}`, orgId: p.orgId };
-  if (p?.teacherId) return { key: `teacher:${p.teacherId}`, orgId: p.orgId };
+const staffOrg = staffOrgOf;
+const recipientOf = (viewer: IiosGrantedContext): { key: string; orgId: string } | null => {
+  if (staffOrgOf(viewer)) return { key: `staff:${viewer.orgId}`, orgId: viewer.orgId };
+  const teacherId = teacherIdOf(viewer);
+  if (teacherId) return { key: `teacher:${teacherId}`, orgId: viewer.orgId };
   return null;
 };
 

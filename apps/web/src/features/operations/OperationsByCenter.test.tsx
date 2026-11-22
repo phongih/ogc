@@ -1,4 +1,5 @@
 // Center operations grouped by center; long schedules collapsed; build id in the footer.
+import { as } from "../../test/grants";
 import { beforeEach, describe, expect, it } from "vitest";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -14,7 +15,7 @@ beforeEach(() => __resetAttendanceForTests());
 
 describe("Center operations by center", () => {
   it("groups classes under their center and collapses a long schedule", async () => {
-    await mockCenterSetup.createCenter("demo-staff", {
+    await mockCenterSetup.createCenter(as("demo-staff"), {
       ...emptyCenterDraft(),
       brandId: brands[0].id,
       name: "London School",

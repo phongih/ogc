@@ -3,24 +3,25 @@
  * 21/11: no learner loses a lesson — every missed unit is shown until it is made up, with where /
  * when, or the self-study to do and submit for the class teacher to confirm.
  */
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MakeupItem } from "@ogc/contracts";
 import { makeup } from "../../lib/api";
 import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDate } from "../../lib/centerTime";
+import { useViewer } from "../../app/iiosGate";
 import { Button, Card } from "../../ui";
 import { MAKEUP_STATUS, bookingText } from "../operations/makeupText";
 
 export function MyMakeups({
-  viewer,
   readOnly = false,
   learnerId,
 }: {
-  viewer: string;
   readOnly?: boolean;
   learnerId?: string;
 }) {
+  const viewer = useViewer(); // OGC-ADR-039 step 3b: the caller is the IIOS-granted context
   const q = useQuery({
     queryKey: ["makeup-mine", viewer],
     queryFn: () => makeup.listMine(viewer),
@@ -48,7 +49,7 @@ function MakeupRow({
   item,
   readOnly,
 }: {
-  viewer: string;
+  viewer: IiosGrantedContext;
   item: MakeupItem;
   readOnly: boolean;
 }) {

@@ -1,4 +1,5 @@
 // P2 · no double-booking: a teacher cannot teach two overlapping sessions, a room cannot hold two.
+import { as } from "../../test/grants";
 import { beforeEach, describe, expect, it } from "vitest";
 import { emptyCenterDraft } from "@ogc/contracts";
 import { __resetAttendanceForTests } from "./mockAttendance";
@@ -19,7 +20,7 @@ beforeEach(() => __resetAttendanceForTests());
 
 describe("schedule changes refuse double-bookings", () => {
   it("reschedule onto the teacher's other class", async () => {
-    const r = await mockSchedule.reschedule(S, "SES-001", at("SES-002"));
+    const r = await mockSchedule.reschedule(as(S), "SES-001", at("SES-002"));
     expect(r).toMatchObject({ ok: false, reason: "clash" });
     expect(!r.ok && r.clashes![0]).toMatch(/^Tara already teaches B1 Evening — Tue\/Thu on /);
     expect(sessionStore.get("SES-001")!.at).not.toBe(at("SES-002")); // unchanged
@@ -27,33 +28,39 @@ describe("schedule changes refuse double-bookings", () => {
 
   it("overlap counts, not only the same start (90-minute sessions)", async () => {
     const thirtyLater = new Date(Date.parse(at("SES-002")) + 30 * 60_000).toISOString();
-    expect(await mockSchedule.reschedule(S, "SES-001", thirtyLater)).toMatchObject({
+    expect(await mockSchedule.reschedule(as(S), "SES-001", thirtyLater)).toMatchObject({
       reason: "clash",
     });
     const twoHoursLater = new Date(Date.parse(at("SES-002")) + 120 * 60_000).toISOString();
-    expect((await mockSchedule.reschedule(S, "SES-001", twoHoursLater)).ok).toBe(true);
+    expect((await mockSchedule.reschedule(as(S), "SES-001", twoHoursLater)).ok).toBe(true);
   });
 
   it("cancel-with-replacement, extra session, substitute and class teacher", async () => {
-    expect(await mockSchedule.cancelWithReplacement(S, "SES-001", at("SES-002"))).toMatchObject({
-      reason: "clash",
-    });
+    expect(await mockSchedule.cancelWithReplacement(as(S), "SES-001", at("SES-002"))).toMatchObject(
+      {
+        reason: "clash",
+      },
+    );
     expect(sessionStore.get("SES-001")!.state).toBe("scheduled"); // nothing cancelled
-    expect(await mockSchedule.addSession(S, classes[0].id, "Extra", at("SES-002"))).toMatchObject({
+    expect(
+      await mockSchedule.addSession(as(S), classes[0].id, "Extra", at("SES-002")),
+    ).toMatchObject({
       reason: "clash",
     });
-    expect(await mockSchedule.setSubstitute(S, "SES-002", TEACHER_BEN)).toMatchObject({
+    expect(await mockSchedule.setSubstitute(as(S), "SES-002", TEACHER_BEN)).toMatchObject({
       reason: "clash",
     });
-    expect(await mockSchedule.assignTeacher(S, classes[1].id, TEACHER_BEN)).toMatchObject({
+    expect(await mockSchedule.assignTeacher(as(S), classes[1].id, TEACHER_BEN)).toMatchObject({
       reason: "clash",
     });
-    expect((await mockSchedule.assignTeacher(S, classes[0].id, TEACHER_BEN)).ok).toBe(true); // Mon/Wed 09:00 is free
+    expect((await mockSchedule.assignTeacher(as(S), classes[0].id, TEACHER_BEN)).ok).toBe(true); // Mon/Wed 09:00 is free
   });
 
   it("a make-up session cannot be opened when its teacher is busy", async () => {
-    const huy1 = (await mockMakeup.getBoard(S))!.items.find((i) => i.unitTitle === "B1 — Unit 1")!;
-    const r = await mockMakeup.openMakeupSession(S, huy1.id, at("SES-003"), TEACHER_BEN);
+    const huy1 = (await mockMakeup.getBoard(as(S)))!.items.find(
+      (i) => i.unitTitle === "B1 — Unit 1",
+    )!;
+    const r = await mockMakeup.openMakeupSession(as(S), huy1.id, at("SES-003"), TEACHER_BEN);
     expect(r).toMatchObject({ ok: false, reason: "clash" });
     expect(!r.ok && r.clashes![0]).toMatch(/^Ben already teaches A2 Evening — Tue\/Thu on /);
   });
@@ -80,9 +87,12 @@ describe("center setup refuses double-bookings", () => {
 
   it("a new class at the time its teacher already teaches (the 21/11 live case)", async () => {
     const d = { ...base(), classes: [cls("B1 new", TEACHER_BEN, [2, 4, 6], "18:00")] };
-    const preview = await mockCenterSetup.previewClashes(S, d);
+    const preview = await mockCenterSetup.previewClashes(as(S), d);
     expect(preview[0]).toMatch(/^Ben already teaches A2 Evening — Tue\/Thu on Tue, /);
-    expect(await mockCenterSetup.createCenter(S, d)).toMatchObject({ ok: false, reason: "clash" });
+    expect(await mockCenterSetup.createCenter(as(S), d)).toMatchObject({
+      ok: false,
+      reason: "clash",
+    });
   });
 
   it("two new classes in the same room at the same time; same teacher twice", async () => {
@@ -90,7 +100,7 @@ describe("center setup refuses double-bookings", () => {
       ...base(),
       classes: [cls("A", TEACHER_TARA, [6], "10:00"), cls("B", TEACHER_BEN, [6], "10:30")],
     };
-    expect((await mockCenterSetup.previewClashes(S, room))[0]).toMatch(
+    expect((await mockCenterSetup.previewClashes(as(S), room))[0]).toMatch(
       /^R1 is already used by A \(new\) on Sat, /,
     );
     const twice = {
@@ -101,15 +111,15 @@ describe("center setup refuses double-bookings", () => {
       ],
       classes: [cls("A", TEACHER_TARA, [6], "10:00"), cls("B", TEACHER_TARA, [6], "11:00", "R2")],
     };
-    expect((await mockCenterSetup.previewClashes(S, twice))[0]).toMatch(
+    expect((await mockCenterSetup.previewClashes(as(S), twice))[0]).toMatch(
       /^Tara already teaches A \(new\) on Sat, /,
     );
   });
 
   it("a free slot opens fine, and its sessions then block later double-bookings", async () => {
     const d = { ...base(), classes: [cls("Sat A2", TEACHER_BEN, [6], "09:00")] };
-    expect(await mockCenterSetup.previewClashes(S, d)).toEqual([]);
-    const r = await mockCenterSetup.createCenter(S, d);
+    expect(await mockCenterSetup.previewClashes(as(S), d)).toEqual([]);
+    const r = await mockCenterSetup.createCenter(as(S), d);
     expect(r.ok).toBe(true);
     const again = {
       ...d,
@@ -117,6 +127,6 @@ describe("center setup refuses double-bookings", () => {
       name: "Again",
       classes: [cls("Sat 2", TEACHER_BEN, [6], "10:00")],
     };
-    expect(await mockCenterSetup.previewClashes(S, again)).not.toEqual([]); // 09:00–10:30 overlaps 10:00
+    expect(await mockCenterSetup.previewClashes(as(S), again)).not.toEqual([]); // 09:00–10:30 overlaps 10:00
   });
 });

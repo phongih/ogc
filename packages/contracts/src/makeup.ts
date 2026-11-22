@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 
 /*
@@ -107,26 +108,34 @@ export type MakeupResult = z.infer<typeof MakeupResult>;
 
 // Staff methods: staff only, own tenant (fail-closed: null / not_staff / not_found).
 export interface MakeupPort {
-  getBoard(viewerPersonaId: string): Promise<MakeupBoard | null>;
-  listOptions(viewerPersonaId: string, itemId: string): Promise<MakeupOption[] | null>;
-  book(viewerPersonaId: string, itemId: string, sessionId: string): Promise<MakeupResult>;
+  getBoard(viewer: IiosGrantedContext): Promise<MakeupBoard | null>;
+  listOptions(viewer: IiosGrantedContext, itemId: string): Promise<MakeupOption[] | null>;
+  book(viewer: IiosGrantedContext, itemId: string, sessionId: string): Promise<MakeupResult>;
   // Opens one make-up session for a unit and books every learner still missing that unit into it.
   openMakeupSession(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     itemId: string,
     at: string,
     teacherId: string,
   ): Promise<MakeupResult>;
-  assignSelfStudy(viewerPersonaId: string, itemId: string): Promise<MakeupResult>;
+  assignSelfStudy(viewer: IiosGrantedContext, itemId: string): Promise<MakeupResult>;
 
   // Learner (own items) and guardian (pre-established links only, read-only). Others: [].
-  listMine(viewerPersonaId: string): Promise<MakeupItem[]>;
-  submitSelfStudy(viewerPersonaId: string, itemId: string, note: string): Promise<MakeupItemResult>;
+  listMine(viewer: IiosGrantedContext): Promise<MakeupItem[]>;
+  submitSelfStudy(
+    viewer: IiosGrantedContext,
+    itemId: string,
+    note: string,
+  ): Promise<MakeupItemResult>;
 
   // The learner's own class teacher (same tenant): self-study waiting for confirmation.
-  listToConfirm(viewerPersonaId: string): Promise<MakeupItem[]>;
-  confirmSelfStudy(viewerPersonaId: string, itemId: string): Promise<MakeupItemResult>;
-  returnSelfStudy(viewerPersonaId: string, itemId: string, note: string): Promise<MakeupItemResult>;
+  listToConfirm(viewer: IiosGrantedContext): Promise<MakeupItem[]>;
+  confirmSelfStudy(viewer: IiosGrantedContext, itemId: string): Promise<MakeupItemResult>;
+  returnSelfStudy(
+    viewer: IiosGrantedContext,
+    itemId: string,
+    note: string,
+  ): Promise<MakeupItemResult>;
 }
 
 export const MakeupItemResult = z.discriminatedUnion("ok", [

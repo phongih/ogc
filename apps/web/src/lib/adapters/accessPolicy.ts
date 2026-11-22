@@ -1,13 +1,12 @@
 /*
- * OGC-side enforcement of the IIOS-decided narrowing (OGC-ADR-039 steps 2–3). SYNTHETIC, mock.
+ * OGC-side enforcement of the IIOS-decided narrowing (OGC-ADR-039 steps 2–3b). SYNTHETIC, mock.
  *
  * Policies are no longer stored here: IIOS (mock: lib/integration/mockIiosPolicy.ts) stores and
  * decides them. This module only ENFORCES, through the contract's `authorize()`, using the same
  * tenant / role / narrowing IIOS would put into the persona's granted context.
  *
- * Step 3: the context is the grant IIOS actually decided (recorded by the IIOS gate on every
- * navigation, see lib/integration/currentGrant.ts) — its role, tenant and narrowing. A denied grant
- * leaves nothing allowed.
+ * Step 3b: callers pass the IIOS-granted context itself (ports take it as their first argument);
+ * nothing here looks up a persona.
  */
 import {
   authorize,
@@ -23,7 +22,6 @@ import {
   type SessionRole,
 } from "@ogc/contracts";
 import { centers } from "../../fixtures/directory";
-import { grantFor } from "../integration/currentGrant";
 import { withFault } from "./faults";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
@@ -35,12 +33,7 @@ export interface Facts {
 }
 type Verdict = { ok: true; readonly: ReadonlyField[] } | { ok: false };
 
-/** The grant IIOS decided for this persona (step 3: no longer rebuilt from OGC fixtures). */
-const contextOf = (personaId: string): IiosGrantedContext | null => grantFor(personaId);
-
-export function decide(personaId: string, action: PolicyAction, facts: Facts = {}): Verdict {
-  const ctx = contextOf(personaId);
-  if (!ctx) return { ok: false };
+export function decide(ctx: IiosGrantedContext, action: PolicyAction, facts: Facts = {}): Verdict {
   // The resource's tenant: from its center when it has one; otherwise the adapter has already
   // refused resources outside the caller's tenant (fail-closed not_found).
   const orgId = facts.centerId
@@ -51,38 +44,45 @@ export function decide(personaId: string, action: PolicyAction, facts: Facts = {
   return d.allow ? { ok: true, readonly: d.readonly } : { ok: false };
 }
 
-export const allows = (personaId: string, action: PolicyAction, facts: Facts = {}): boolean =>
-  decide(personaId, action, facts).ok;
+export const allows = (ctx: IiosGrantedContext, action: PolicyAction, facts: Facts = {}): boolean =>
+  decide(ctx, action, facts).ok;
 
 /** Like allows(), but also refuses when `field` is read-only for the matching rules. */
 export function allowsField(
-  personaId: string,
+  ctx: IiosGrantedContext,
   action: PolicyAction,
   facts: Facts,
   field: ReadonlyField,
 ): boolean {
-  const v = decide(personaId, action, facts);
+  const v = decide(ctx, action, facts);
   return v.ok && !v.readonly.includes(field);
 }
 
-const narrowingOf = (personaId: string): GrantNarrowing | null =>
-  contextOf(personaId)?.narrowing ?? null;
-const roleHas = (personaId: string, action: PolicyAction): boolean => {
-  const ctx = contextOf(personaId);
-  return !!ctx && roleHolds(ctx.role, action);
-};
+const narrowingOf = (ctx: IiosGrantedContext): GrantNarrowing => ctx.narrowing ?? { state: "none" };
+const roleHas = (ctx: IiosGrantedContext, action: PolicyAction): boolean =>
+  roleHolds(ctx.role, action);
 
 /** Centers this persona may act on for an action (listing filter). */
-export function centerScope(personaId: string, action: PolicyAction): string[] | "any" | "none" {
-  if (!roleHas(personaId, action)) return "none";
-  const n = narrowingOf(personaId);
-  if (!n || n.state === "none") return "any";
+export function centerScope(
+  ctx: IiosGrantedContext,
+  action: PolicyAction,
+): string[] | "any" | "none" {
+  if (!roleHas(ctx, action)) return "none";
+  // IIOS active center (AZ7) narrows first.
+  const within = (ids: string[] | "any") =>
+    ctx.activeCenter === undefined
+      ? ids
+      : ids === "any" || ids.includes(ctx.activeCenter)
+        ? [ctx.activeCenter]
+        : [];
+  const n = narrowingOf(ctx);
+  if (n.state === "none") return within("any");
   if (n.state === "unavailable") return "none";
   const rules = n.rules.filter((r) => r.action === action);
   if (rules.length === 0) return "none";
   // A rule without a center condition applies at every center.
-  if (rules.some((r) => !r.criteria?.centerId)) return "any";
-  return [...new Set(rules.flatMap((r) => r.criteria?.centerId ?? []))];
+  if (rules.some((r) => !r.criteria?.centerId)) return within("any");
+  return within([...new Set(rules.flatMap((r) => r.criteria?.centerId ?? []))]);
 }
 
 export const inScope = (scope: string[] | "any" | "none", centerId: string) =>
@@ -91,7 +91,7 @@ export const inScope = (scope: string[] | "any" | "none", centerId: string) =>
 export const mockMyAccess: MyAccessPort = {
   myAccess: (viewer) =>
     withFault("access.myAccess", () => {
-      const n = narrowingOf(viewer);
+      const n: GrantNarrowing | null = narrowingOf(viewer);
       const allowed = {} as Record<PolicyAction, boolean>;
       const scope: MyAccess["centers"] = {};
       const readonly: MyAccess["readonly"] = {};

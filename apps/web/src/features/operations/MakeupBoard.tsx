@@ -4,6 +4,7 @@
  * session of the same unit, or a make-up session opened for everyone missing that unit.
  * Deadline 14 days; overdue items come first.
  */
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { MakeupItem, MakeupResult, TeacherRef } from "@ogc/contracts";
@@ -33,7 +34,13 @@ const REFUSAL: Record<string, string> = {
   clash: "That teacher is already teaching then:",
 };
 
-export function MakeupBoard({ viewer, teachers }: { viewer: string; teachers: TeacherRef[] }) {
+export function MakeupBoard({
+  viewer,
+  teachers,
+}: {
+  viewer: IiosGrantedContext;
+  teachers: TeacherRef[];
+}) {
   const q = useQuery({
     queryKey: ["makeup-board", viewer],
     queryFn: () => makeup.getBoard(viewer),
@@ -76,7 +83,7 @@ function MakeupCard({
   item,
   teachers,
 }: {
-  viewer: string;
+  viewer: IiosGrantedContext;
   item: MakeupItem;
   teachers: TeacherRef[];
 }) {
