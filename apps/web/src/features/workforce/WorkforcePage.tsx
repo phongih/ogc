@@ -31,7 +31,12 @@ const BAND_STYLE: Record<LoadBand, string> = {
   meet: "border-brand text-brand",
   over: "border-danger text-danger",
 };
-const KIND_LABEL = { class: "class teacher", substitute: "substitute", makeup: "make-up" } as const;
+const KIND_LABEL = {
+  class: "class teacher",
+  substitute: "substitute",
+  makeup: "make-up",
+  prep: "Learning Studio prep",
+} as const;
 const REFUSAL: Record<string, string> = {
   not_staff: "Only center staff can do this.",
   not_found: "Not found.",
@@ -163,8 +168,10 @@ function TeacherRow({ t }: { t: TeacherLoad }) {
               <ul aria-label={`Sessions of ${t.name}`}>
                 {t.breakdown.map((b, i) => (
                   <li key={i}>
-                    {b.label} · {KIND_LABEL[b.kind]} · {b.sessions} session
-                    {b.sessions === 1 ? "" : "s"} · {b.hours} h
+                    {b.label} · {KIND_LABEL[b.kind]} ·{" "}
+                    {b.kind === "prep"
+                      ? `${b.hours} h / week`
+                      : `${b.sessions} session${b.sessions === 1 ? "" : "s"} · ${b.hours} h`}
                   </li>
                 ))}
               </ul>

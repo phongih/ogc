@@ -141,6 +141,18 @@ export const DEFAULT_RULES: Seed[] = [
     params: { days: 7 },
     actions: ["notify_staff"],
   },
+  {
+    kind: "studio_inactive",
+    category: "engagement",
+    name: "No Learning Studio activity",
+    description:
+      "A learner of a class linked to a Learning Studio course has not completed anything there for this many days (completion only).",
+    enabled: false,
+    priority: "P3",
+    cooldownMin: 4320,
+    params: { days: 14 },
+    actions: ["notify_teacher"],
+  },
 ];
 
 // orgId → rules

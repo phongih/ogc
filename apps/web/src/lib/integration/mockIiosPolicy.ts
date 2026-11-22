@@ -92,6 +92,7 @@ function seedPolicies(): StoredPolicy[] {
         { action: "admissions:manage", criteria: { centerId: [D1] } },
         { action: "students:view", criteria: { centerId: [D1] } },
         { action: "forecast:view", criteria: { centerId: [D1] } },
+        { action: "courses:link", criteria: { centerId: [D1] } },
       ],
     ),
     mk(

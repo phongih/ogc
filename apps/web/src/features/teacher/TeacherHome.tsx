@@ -38,8 +38,13 @@ export function TeacherHome() {
         className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
       >
         My students · care
+      </Link>{" "}
+      <Link
+        to="/app/teaching/courses"
+        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+      >
+        Learning Studio courses
       </Link>
-
       <div className="grid gap-3 sm:grid-cols-3">
         <StatTile label="Classes" value={d.classes.length} />
         <StatTile label="Sessions" value={d.upcoming.length} hint="upcoming" />
@@ -49,17 +54,11 @@ export function TeacherHome() {
           hint="across your classes"
         />
       </div>
-
       <EngineNotifications />
-
       <SessionsToMark />
-
       <SelfStudyToConfirm />
-
       <SpeakingReviewQueue />
-
       <NeedsSupportQueue />
-
       <div>
         <h2 className="mb-3 text-lg font-medium">Assigned classes</h2>
         {d.classes.length === 0 ? (
@@ -88,7 +87,6 @@ export function TeacherHome() {
           </ul>
         )}
       </div>
-
       <div>
         <h2 className="mb-3 text-lg font-medium">Upcoming sessions</h2>
         {d.upcoming.length === 0 ? (

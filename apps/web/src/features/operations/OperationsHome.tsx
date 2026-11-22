@@ -47,6 +47,7 @@ export function OperationsHome() {
   const me = useMyAccess();
   const canSetUp = me.data?.allowed["center:setup"] ?? false;
   const canPartners = me.data?.allowed["partners:manage"] ?? false;
+  const canCourses = me.data?.allowed["courses:link"] ?? false;
   const q = useQuery({
     queryKey: ["ops-overview", viewer],
     queryFn: () => schedule.getOverview(viewer),
@@ -99,6 +100,16 @@ export function OperationsHome() {
       >
         Forecast
       </Link>{" "}
+      {canCourses ? (
+        <>
+          <Link
+            to="/app/operations/courses"
+            className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+          >
+            Learning Studio courses
+          </Link>{" "}
+        </>
+      ) : null}
       {canPartners ? (
         <>
           <Link

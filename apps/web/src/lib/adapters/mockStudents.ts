@@ -28,6 +28,7 @@ import { staffOrgOf, teacherIdOf } from "./viewer";
 import { skillLabel } from "../../features/learning/intelligence/skills";
 import { listInvoicesOfLearner } from "./mockBilling";
 import { withFault } from "./faults";
+import { studioOfLearner } from "./mockStudioLinks";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -193,6 +194,11 @@ function cardFor(
     ),
     lastPracticeAt: last,
     makeups: { open: items.length, overdue: items.filter((i) => i.overdue).length },
+    studio: studioOfLearner(
+      learnerId,
+      own.map((c) => c.id),
+      now,
+    ),
     tuition: invoices
       ? {
           balanceVnd: invoices.reduce((t, i) => t + i.balanceVnd, 0),

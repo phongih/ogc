@@ -29,6 +29,7 @@ import { findClashes, slotOf, teacherOfSession } from "./clashes";
 import { allows } from "./accessPolicy";
 import { staffOrgOf } from "./viewer";
 import { withFault } from "./faults";
+import { prepHoursOf } from "./mockStudioLinks";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -129,7 +130,18 @@ function loadOf(teacherId: string, org: string, now: number): TeacherLoad {
     g.hours = round(g.hours + hoursOf(x));
     groups.set(key, g);
   }
-  const hours = mine.reduce((t, x) => t + hoursOf(x), 0);
+  // Learning Studio: weekly prep hours staff set on a linked course count for the class teacher.
+  const prep = prepHoursOf(teacherId).filter((p) =>
+    classes.some((c) => c.id === p.classId && c.orgId === org),
+  );
+  for (const p of prep)
+    groups.set(`${p.classId}|prep`, {
+      label: p.className,
+      kind: "prep",
+      sessions: 0,
+      hours: p.hours,
+    });
+  const hours = mine.reduce((t, x) => t + hoursOf(x), 0) + prep.reduce((t, p) => t + p.hours, 0);
   const tg = targetOf(teacherId);
   return {
     teacherId,

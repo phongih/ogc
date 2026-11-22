@@ -23,7 +23,7 @@ afterEach(() => vi.useRealTimers());
 
 describe("Decision Engine — access", () => {
   it("rules, events, log and job are for the org's staff only", async () => {
-    expect((await E.listRules(as(S)))!.length).toBe(12);
+    expect((await E.listRules(as(S)))!.length).toBe(13); // + studio_inactive (22/11, off by default)
     for (const other of [T, "demo-teacher-2", "demo-learner", "demo-guardian"]) {
       expect(await E.listRules(as(other))).toBeNull();
       expect(await E.listEvents(as(other))).toEqual([]);

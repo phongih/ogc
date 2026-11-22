@@ -168,6 +168,13 @@ function StudentCardView({
             : ""}
           {c.makeups.overdue ? ` (${c.makeups.overdue} overdue)` : ""}
         </p>
+        {c.studio ? (
+          <p className="text-sm text-muted" data-testid={`studio-${c.name}`}>
+            Learning Studio · {c.studio.title}: {c.studio.completedLessons} of{" "}
+            {c.studio.totalLessons} lessons · last activity{" "}
+            {c.studio.lastActivityAt ? formatCenterDate(c.studio.lastActivityAt) : "—"}
+          </p>
+        ) : null}
         {c.care.evidence.length ? (
           <ul className="space-y-0.5 text-sm" aria-label={`Evidence for ${c.name}`}>
             {c.care.evidence.map((e, i) => (

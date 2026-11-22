@@ -12,6 +12,7 @@ import { QUEUE_KINDS, RULE_PARAMS } from "@ogc/contracts";
 import { teacherName } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { formatCenterDate, formatCenterDateTime } from "../centerTime";
+import { studioInactiveLearners } from "./mockStudioLinks";
 import { overdueInvoicesOf } from "./mockBilling";
 import { sessionStore } from "./sessionStore";
 import { isMarked } from "./mockAttendance";
@@ -237,6 +238,16 @@ function detect(orgId: string, now: number): Detection[] {
         subject: { type: "invoice", id: inv.id, label: `${inv.no} · ${inv.learnerName}` },
         evidence: `${inv.daysOverdue} days overdue (due ${inv.dueDate}); balance ${inv.balanceVnd.toLocaleString("vi-VN")} ₫ at ${inv.centerName}`,
         teacherIds: [],
+      });
+  const studio = byKind.get("studio_inactive");
+  if (studio)
+    for (const x of studioInactiveLearners(orgId, studio.params.days, now))
+      out.push({
+        rule: studio,
+        key: `${x.classId}|${x.learnerId}`,
+        subject: { type: "learner", id: x.learnerId, label: x.name },
+        evidence: `No Learning Studio activity since ${formatCenterDateTime(x.since)} in "${x.course}" (${x.className})`,
+        teacherIds: classTeachers[x.classId] ? [classTeachers[x.classId]] : [],
       });
   if (noTeacher)
     for (const c of cls)

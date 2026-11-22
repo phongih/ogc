@@ -54,3 +54,4 @@ jobs:
           node e2e/workforce-journey.mjs || echo "workforce journey E2E skipped/soft-failed (non-blocking)"
           node e2e/forecast-journey.mjs || echo "forecast journey E2E skipped/soft-failed (non-blocking)"
           node e2e/partners-journey.mjs || echo "partners journey E2E skipped/soft-failed (non-blocking)"
+          node e2e/studio-journey.mjs || echo "studio journey E2E skipped/soft-failed (non-blocking)"
