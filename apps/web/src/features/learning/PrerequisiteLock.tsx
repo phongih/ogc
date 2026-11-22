@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 /*
  * Hard prerequisite gate — UI side (owner decision 21/11). The learner's own LI-3 learning path
  * is the single source of truth: a step in state "blocked" lists the activities still required.
@@ -14,8 +15,8 @@ export interface ActivityLock {
   requires: { id: string; title: string; courseId: string }[];
 }
 
-export function useActivityLock(personaId: string, activityId: string): ActivityLock {
-  const path = useLearningPath(personaId);
+export function useActivityLock(viewer: IiosGrantedContext, activityId: string): ActivityLock {
+  const path = useLearningPath(viewer);
   if (!path.data) return { ready: !path.isLoading, locked: false, requires: [] };
   const step = path.data.steps.find((s) => s.activityId === activityId);
   if (!step || step.state !== "blocked") return { ready: true, locked: false, requires: [] };

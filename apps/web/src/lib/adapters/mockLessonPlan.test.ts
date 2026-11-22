@@ -1,3 +1,4 @@
+import { as } from "../../test/grants";
 import { describe, expect, it } from "vitest";
 import type { LessonPlanDraft } from "@ogc/contracts";
 import { mockLessonPlan } from "./mockLessonPlan";
@@ -21,11 +22,11 @@ const baseDraft = (classId: string, overrides: Partial<LessonPlanDraft> = {}): L
 describe("mock lesson plan", () => {
   it("saves a draft for the teacher's own class and lists it", async () => {
     const classId = classes[0].id;
-    const result = await mockLessonPlan.save(TEACHER, baseDraft(classId));
+    const result = await mockLessonPlan.save(as(TEACHER), baseDraft(classId));
     expect(result.saved).toBe(true);
     expect(result.errors).toEqual([]);
 
-    const list = await mockLessonPlan.listForClass(TEACHER, classId);
+    const list = await mockLessonPlan.listForClass(as(TEACHER), classId);
     expect(list.length).toBeGreaterThanOrEqual(1);
     // org scope is derived from the class, not the client
     expect(list[0].orgId).toBe(classes[0].orgId);
@@ -34,7 +35,7 @@ describe("mock lesson plan", () => {
   it("enforces completeness when marking a plan 'ready'", async () => {
     const classId = classes[0].id;
     const result = await mockLessonPlan.save(
-      TEACHER,
+      as(TEACHER),
       baseDraft(classId, {
         status: "ready",
         title: "",
@@ -49,7 +50,7 @@ describe("mock lesson plan", () => {
 
   // NEGATIVE: a persona without teacher scope cannot edit lesson plans.
   it("denies lesson-plan editing to a non-teacher persona", async () => {
-    const result = await mockLessonPlan.save(LEARNER, baseDraft(classes[0].id));
+    const result = await mockLessonPlan.save(as(LEARNER), baseDraft(classes[0].id));
     expect(result.saved).toBe(false);
     expect(result.errors[0]).toMatch(/not authorized/i);
   });
@@ -57,7 +58,7 @@ describe("mock lesson plan", () => {
   // NEGATIVE: a teacher cannot edit plans for a class they do not own.
   it("denies editing a class not assigned to the teacher", async () => {
     const result = await mockLessonPlan.save(
-      TEACHER,
+      as(TEACHER),
       baseDraft("00000000-0000-4000-8000-0000000000zz"),
     );
     expect(result.saved).toBe(false);

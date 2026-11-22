@@ -34,11 +34,10 @@ export function renderUI(ui: ReactNode, opts?: { role?: MockRole }) {
   return render(
     <QueryClientProvider client={newQc()}>
       <SessionProvider initialSession={session}>
-        {session ? (
-          <GrantedContextProvider value={as(session.personaId)}>{routed}</GrantedContextProvider>
-        ) : (
-          routed
-        )}
+        {/* No persona: a grant for a principal OGC does not know — it resolves to nothing. */}
+        <GrantedContextProvider value={as(session ? session.personaId : "no-session")}>
+          {routed}
+        </GrantedContextProvider>
       </SessionProvider>
     </QueryClientProvider>,
   );

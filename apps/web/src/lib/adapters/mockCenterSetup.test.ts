@@ -135,7 +135,7 @@ describe("opening a center", () => {
       ]);
     }
     // Teacher dashboard, operations overview, attendance list all see the new class.
-    const ben = (await mockTeacher.getDashboard("demo-teacher-2"))!;
+    const ben = (await mockTeacher.getDashboard(as("demo-teacher-2")))!;
     expect(ben.classes.map((c) => c.name)).toContain("A2 Sat — Sat");
     expect(
       (await mockSchedule.getOverview(as(S)))!.classes.some((c) => c.classId === r.classIds[0]),

@@ -1,3 +1,4 @@
+import { useViewer } from "../../app/iiosGate";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
@@ -7,11 +8,11 @@ import { useEnroll, useEnrollmentState } from "../enrollment/queries";
 export function CourseDetail() {
   const { courseId = "" } = useParams();
   const { session } = useSession();
+  const viewer = useViewer();
   const navigate = useNavigate();
-  const personaId = session?.personaId ?? "";
   const q = useCourse(session?.orgId ?? "", courseId);
-  const stateQ = useEnrollmentState(personaId, courseId);
-  const enroll = useEnroll(personaId);
+  const stateQ = useEnrollmentState(viewer, courseId);
+  const enroll = useEnroll(viewer);
   const catalog = useCourses(session?.orgId ?? "");
 
   if (q.isLoading) return <Spinner label="Loading course" />;

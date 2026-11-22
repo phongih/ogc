@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { CourseLevel } from "./catalog.js";
 
@@ -59,5 +60,5 @@ export type SkillEvidence = z.infer<typeof SkillEvidence>;
 // Self-scoped read of a learner's own profile. Fail-closed: null when the persona is
 // not a learner, or (for a viewer variant) not authorized for the subject.
 export interface LearningProfilePort {
-  getProfile(personaId: string): Promise<LearnerProfile | null>;
+  getProfile(viewer: IiosGrantedContext): Promise<LearnerProfile | null>;
 }

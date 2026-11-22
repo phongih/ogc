@@ -1,3 +1,4 @@
+import { viaGrant } from "./viewer";
 import type { TeacherPort, TeacherDashboard, LearnerRow, Session } from "@ogc/contracts";
 import { personaMap, teacherName } from "../../fixtures/personas";
 import { classes, classTeachers, rosters } from "../../fixtures/teaching";
@@ -11,7 +12,7 @@ const latency = <T>(v: T, ms = 100): Promise<T> =>
  * staff); upcoming sessions come from the live schedule — the teacher's own classes (noting a
  * substitute when one covers a session) plus sessions this teacher substitutes for.
  */
-export const mockTeacher: TeacherPort = {
+export const mockTeacher: TeacherPort = viaGrant<TeacherPort>({
   getDashboard: (personaId) => {
     const p = personaMap[personaId];
     if (!p || !p.teacherId) return latency(null); // fail-closed: no teacher scope for this persona
@@ -49,4 +50,4 @@ export const mockTeacher: TeacherPort = {
     return latency(dashboard);
   },
   getClassRoster: (classId): Promise<LearnerRow[]> => latency(rosters[classId] ?? []),
-};
+});

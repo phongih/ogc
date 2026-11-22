@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 
 export const ClassSummary = z.object({
@@ -40,6 +41,6 @@ export const TeacherDashboard = z.object({
 export type TeacherDashboard = z.infer<typeof TeacherDashboard>;
 
 export interface TeacherPort {
-  getDashboard(personaId: string): Promise<TeacherDashboard | null>;
+  getDashboard(viewer: IiosGrantedContext): Promise<TeacherDashboard | null>;
   getClassRoster(classId: string): Promise<LearnerRow[]>;
 }

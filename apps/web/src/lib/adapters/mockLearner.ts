@@ -1,3 +1,4 @@
+import { viaGrant } from "./viewer";
 import type { LearnerPort, LearnerDashboard, EnrolledCourse } from "@ogc/contracts";
 import { personaMap } from "../../fixtures/personas";
 import { lessons as fixtureLessons, lessonSession } from "../../fixtures/learning";
@@ -16,7 +17,7 @@ const liveLessons = () =>
 const latency = <T>(v: T, ms = 100): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
 
-export const mockLearner: LearnerPort = {
+export const mockLearner: LearnerPort = viaGrant<LearnerPort>({
   getDashboard: (personaId) =>
     withFault("learner.getDashboard", () => {
       const p = personaMap[personaId];
@@ -54,4 +55,4 @@ export const mockLearner: LearnerPort = {
       };
       return latency(dashboard);
     }),
-};
+});

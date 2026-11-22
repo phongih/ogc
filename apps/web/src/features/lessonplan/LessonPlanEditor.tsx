@@ -1,8 +1,8 @@
+import { useViewer } from "../../app/iiosGate";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { Activity, LessonPlanDraft, LessonPlanStatus } from "@ogc/contracts";
 import { Button, Card, EmptyState, PageHeader, Spinner } from "../../ui";
-import { useSession } from "../../app/session";
 import { usePlansForClass, useSavePlan } from "./queries";
 import { draftCache } from "./draftCache";
 
@@ -20,11 +20,10 @@ function parseActivities(s: string): Activity[] {
 }
 
 export function LessonPlanEditor() {
-  const { session } = useSession();
-  const personaId = session?.personaId ?? "";
-  const { classId = "" } = useParams();
-  const plans = usePlansForClass(personaId, classId);
-  const save = useSavePlan(personaId, classId);
+  const viewer = useViewer();
+    const { classId = "" } = useParams();
+  const plans = usePlansForClass(viewer, classId);
+  const save = useSavePlan(viewer, classId);
 
   const cached = draftCache.get(classId)?.fields;
   const [title, setTitle] = useState(cached?.title ?? "");

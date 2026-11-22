@@ -1,3 +1,4 @@
+import { useViewer } from "../../app/iiosGate";
 import { Link, useParams } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, ProgressBar, Spinner } from "../../ui";
 import { useSession } from "../../app/session";
@@ -15,18 +16,18 @@ import {
 
 export function CourseLearning() {
   const { session } = useSession();
-  const personaId = session?.personaId ?? "";
+  const viewer = useViewer();
   const { courseId = "" } = useParams();
   const course = useCourse(session?.orgId ?? "", courseId);
-  const acts = useActivities(personaId, courseId);
-  const progress = useCourseProgress(personaId, courseId);
+  const acts = useActivities(viewer, courseId);
+  const progress = useCourseProgress(viewer, courseId);
   const attempts = useActivityAttempts(
-    personaId,
+    viewer,
     (acts.data ?? []).map((a) => a.id),
   );
-  const complete = useCompleteActivity(personaId, courseId);
+  const complete = useCompleteActivity(viewer, courseId);
   // Hard prerequisite gate: blocked steps of the learner's own path cannot be started here.
-  const path = useLearningPath(personaId);
+  const path = useLearningPath(viewer);
   const blockedBy = new Map(
     (path.data?.steps ?? [])
       .filter((s) => s.state === "blocked")

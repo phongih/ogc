@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { Skill, skillMap } from "./profile.js";
 
@@ -63,5 +64,5 @@ export type QualityEvidence = z.infer<typeof QualityEvidence>;
 
 // Self-scoped read of a learner's own mastery confidence. Fail-closed → null.
 export interface MasteryConfidencePort {
-  getConfidence(personaId: string): Promise<MasteryConfidence | null>;
+  getConfidence(viewer: IiosGrantedContext): Promise<MasteryConfidence | null>;
 }

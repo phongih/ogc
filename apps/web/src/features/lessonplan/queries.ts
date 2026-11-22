@@ -1,18 +1,19 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { LessonPlanDraft } from "@ogc/contracts";
 import { lessonPlan } from "../../lib/api";
 
-export const usePlansForClass = (personaId: string, classId: string) =>
+export const usePlansForClass = (viewer: IiosGrantedContext, classId: string) =>
   useQuery({
-    queryKey: ["lessonplan", "class", personaId, classId],
-    queryFn: () => lessonPlan.listForClass(personaId, classId),
-    enabled: personaId.length > 0 && classId.length > 0,
+    queryKey: ["lessonplan", "class", viewer, classId],
+    queryFn: () => lessonPlan.listForClass(viewer, classId),
+    enabled: !!viewer && classId.length > 0,
   });
 
-export function useSavePlan(personaId: string, classId: string) {
+export function useSavePlan(viewer: IiosGrantedContext, classId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (draft: LessonPlanDraft) => lessonPlan.save(personaId, draft),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["lessonplan", "class", personaId, classId] }),
+    mutationFn: (draft: LessonPlanDraft) => lessonPlan.save(viewer, draft),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["lessonplan", "class", viewer, classId] }),
   });
 }

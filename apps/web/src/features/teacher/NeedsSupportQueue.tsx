@@ -1,3 +1,5 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
+import { useViewer } from "../../app/iiosGate";
 import { refreshLearningState } from "../../lib/invalidate";
 /*
  * P1 · Learners needing support (owning teacher). Evidence first (owner decision 21/11): each
@@ -9,7 +11,6 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SupportItem, SupportSignal } from "@ogc/contracts";
 import { appliedRecommendation, support } from "../../lib/api";
-import { useSession } from "../../app/session";
 import { Button, Card, EmptyState, ErrorState, Spinner } from "../../ui";
 import { skillLabel } from "../learning/intelligence/skills";
 
@@ -42,12 +43,11 @@ export function signalText(s: SupportSignal): string {
 }
 
 export function NeedsSupportQueue() {
-  const { session } = useSession();
-  const viewer = session?.personaId ?? "";
+  const viewer = useViewer();
   const q = useQuery({
     queryKey: ["support", viewer],
     queryFn: () => support.listNeedsSupport(viewer),
-    enabled: viewer.length > 0,
+    enabled: !!viewer,
   });
 
   return (
@@ -81,7 +81,7 @@ export function NeedsSupportQueue() {
   );
 }
 
-function SupportCard({ viewer, item }: { viewer: string; item: SupportItem }) {
+function SupportCard({ viewer, item }: { viewer: IiosGrantedContext; item: SupportItem }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   // Built when the form OPENS (not on mount): the item may refresh after a cached first paint.

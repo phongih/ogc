@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 
 // ── Activities ───────────────────────────────────────────────────────────────
@@ -89,17 +90,17 @@ export type LearnerProgressSummary = z.infer<typeof LearnerProgressSummary>;
 
 // Self-scoped learning: a persona acts only on its own enrolled courses/activities.
 export interface LearningPort {
-  listActivities(personaId: string, courseId: string): Promise<LearningActivity[]>;
-  getAttempt(personaId: string, activityId: string): Promise<LearningAttempt | null>;
+  listActivities(viewer: IiosGrantedContext, courseId: string): Promise<LearningActivity[]>;
+  getAttempt(viewer: IiosGrantedContext, activityId: string): Promise<LearningAttempt | null>;
   // Fail-closed + idempotent: denies when the persona is not enrolled in the activity's
   // course, and never double-counts a second completion of the same activity.
   completeActivity(
-    personaId: string,
+    viewer: IiosGrantedContext,
     activityId: string,
   ): Promise<{ completed: boolean; reason?: string }>;
-  getEvidence(personaId: string, activityId: string): Promise<LearningEvidence[]>;
-  getProgress(personaId: string, courseId: string): Promise<ProgressSnapshot | null>;
-  listMyProgress(personaId: string): Promise<ProgressSnapshot[]>;
+  getEvidence(viewer: IiosGrantedContext, activityId: string): Promise<LearningEvidence[]>;
+  getProgress(viewer: IiosGrantedContext, courseId: string): Promise<ProgressSnapshot | null>;
+  listMyProgress(viewer: IiosGrantedContext): Promise<ProgressSnapshot[]>;
 }
 
 // Cross-role viewing: a viewer persona reads ANOTHER learner's progress only when
@@ -107,7 +108,7 @@ export interface LearningPort {
 // staff). Returns null when the viewer is not authorized for that learner (fail-closed).
 export interface ProgressViewPort {
   getLearnerProgress(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     learnerId: string,
   ): Promise<LearnerProgressSummary | null>;
 }

@@ -1,4 +1,5 @@
 // P1 · Learners needing support — teacher UI (evidence labels + assign through AUTH-026).
+import { as } from "../../test/grants";
 import { describe, expect, it } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -25,7 +26,7 @@ describe("Learners needing support (teacher home)", () => {
 
   it("practice evidence moves a learner to the top; the teacher assigns the suggested activity", async () => {
     const user = userEvent.setup();
-    await mockPractice.submitPractice("demo-learner", "ACT-A2-3", {
+    await mockPractice.submitPractice(as("demo-learner"), "ACT-A2-3", {
       attemptId: "SUP-UI-1",
       responses: [
         { itemId: "A2-3-Q1", optionId: "a" },

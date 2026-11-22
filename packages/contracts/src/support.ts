@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { Skill } from "./profile.js";
 
@@ -53,5 +54,5 @@ export type SupportItem = z.infer<typeof SupportItem>;
 
 // Owning-teacher + same-tenant scoped; non-teachers and unrelated teachers get [].
 export interface SupportPort {
-  listNeedsSupport(viewerPersonaId: string): Promise<SupportItem[]>;
+  listNeedsSupport(viewer: IiosGrantedContext): Promise<SupportItem[]>;
 }

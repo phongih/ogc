@@ -1,3 +1,4 @@
+import { viaGrant } from "./viewer";
 import type {
   LearningPort,
   ProgressViewPort,
@@ -95,7 +96,7 @@ function summaryFor(learnerId: string): LearnerProgressSummary {
   };
 }
 
-export const mockLearning: LearningPort = {
+export const mockLearning: LearningPort = viaGrant<LearningPort>({
   listActivities: (personaId, courseId) =>
     withFault("learning.listActivities", () => latency(courseActivitiesFor(personaId, courseId))),
 
@@ -140,7 +141,7 @@ export const mockLearning: LearningPort = {
       .filter((s): s is ProgressSnapshot => s !== null);
     return withFault("learning.listMyProgress", () => latency(snaps));
   },
-};
+});
 
 // ── Cross-role authorization for viewing another learner's progress ───────────
 function teacherAuthorized(viewerPersonaId: string, learnerId: string): boolean {
@@ -158,7 +159,7 @@ function guardianAuthorized(viewerPersonaId: string, learnerId: string): boolean
   return (personaMap[viewerPersonaId]?.linkedLearnerIds ?? []).includes(learnerId);
 }
 
-export const mockProgressView: ProgressViewPort = {
+export const mockProgressView: ProgressViewPort = viaGrant<ProgressViewPort>({
   getLearnerProgress: (viewerPersonaId, learnerId) => {
     const viewer = personaMap[viewerPersonaId];
     const run = (v: LearnerProgressSummary | null) =>
@@ -177,4 +178,4 @@ export const mockProgressView: ProgressViewPort = {
     if (!authorized || !target) return run(null);
     return run(summaryFor(learnerId));
   },
-};
+});

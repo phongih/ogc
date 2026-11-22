@@ -1,4 +1,5 @@
-import { personaMap } from "../../fixtures/personas";
+import type { IiosGrantedContext } from "@ogc/contracts";
+import { learnerIdOf } from "../../lib/adapters/viewer";
 
 // Synthetic, in-memory learner streak + achievements. NOT a shared contract and NOT real
 // data — a demo-only accessor, fail-closed to learner personas (persona isolation).
@@ -24,7 +25,7 @@ const DEMO: LearnerAchievements = {
   ],
 };
 
-export function getAchievements(personaId: string): LearnerAchievements | null {
-  // Only learner personas have a streak/achievements panel.
-  return personaMap[personaId]?.learnerId ? DEMO : null;
+export function getAchievements(viewer: IiosGrantedContext): LearnerAchievements | null {
+  // Only learner grants (with an OGC learner record) have a streak/achievements panel.
+  return learnerIdOf(viewer) ? DEMO : null;
 }

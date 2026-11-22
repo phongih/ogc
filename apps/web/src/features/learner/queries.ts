@@ -1,3 +1,4 @@
+import type { IiosGrantedContext } from "@ogc/contracts";
 import { useQuery } from "@tanstack/react-query";
 import {
   learner,
@@ -10,58 +11,58 @@ import {
 } from "../../lib/api";
 import { getAchievements } from "./achievements";
 
-export const useLearnerDashboard = (personaId: string) =>
-  useQuery({ queryKey: ["learner", personaId], queryFn: () => learner.getDashboard(personaId) });
+export const useLearnerDashboard = (viewer: IiosGrantedContext) =>
+  useQuery({ queryKey: ["learner", viewer], queryFn: () => learner.getDashboard(viewer) });
 
-export const useAchievements = (personaId: string) =>
+export const useAchievements = (viewer: IiosGrantedContext) =>
   useQuery({
-    queryKey: ["achievements", personaId],
-    queryFn: async () => getAchievements(personaId),
-    enabled: personaId.length > 0,
+    queryKey: ["achievements", viewer],
+    queryFn: async () => getAchievements(viewer),
+    enabled: !!viewer,
   });
 
 // LI-1 — learner intelligence: mastery profile + evidence-driven next step.
-export const useLearnerProfile = (personaId: string) =>
+export const useLearnerProfile = (viewer: IiosGrantedContext) =>
   useQuery({
-    queryKey: ["li-profile", personaId],
-    queryFn: () => profile.getProfile(personaId),
-    enabled: personaId.length > 0,
+    queryKey: ["li-profile", viewer],
+    queryFn: () => profile.getProfile(viewer),
+    enabled: !!viewer,
   });
 
-export const useRecommendation = (personaId: string) =>
+export const useRecommendation = (viewer: IiosGrantedContext) =>
   useQuery({
-    queryKey: ["li-recommendation", personaId],
-    queryFn: () => recommendation.getRecommendation(personaId),
-    enabled: personaId.length > 0,
+    queryKey: ["li-recommendation", viewer],
+    queryFn: () => recommendation.getRecommendation(viewer),
+    enabled: !!viewer,
   });
 
 // LI-2 — evidence quality: confidence per skill + evidence-justified next step.
-export const useMasteryConfidence = (personaId: string) =>
+export const useMasteryConfidence = (viewer: IiosGrantedContext) =>
   useQuery({
-    queryKey: ["li-confidence", personaId],
-    queryFn: () => masteryConfidence.getConfidence(personaId),
-    enabled: personaId.length > 0,
+    queryKey: ["li-confidence", viewer],
+    queryFn: () => masteryConfidence.getConfidence(viewer),
+    enabled: !!viewer,
   });
 
-export const useJustifiedRecommendation = (personaId: string) =>
+export const useJustifiedRecommendation = (viewer: IiosGrantedContext) =>
   useQuery({
-    queryKey: ["li-justified", personaId],
-    queryFn: () => justifiedRecommendation.getJustified(personaId),
-    enabled: personaId.length > 0,
+    queryKey: ["li-justified", viewer],
+    queryFn: () => justifiedRecommendation.getJustified(viewer),
+    enabled: !!viewer,
   });
 
 // LI-3 — prerequisite-governed learning path (steps + prerequisite-aware next step).
-export const useLearningPath = (personaId: string) =>
+export const useLearningPath = (viewer: IiosGrantedContext) =>
   useQuery({
-    queryKey: ["li-path", personaId],
-    queryFn: () => learningPath.getLearningPath(personaId),
-    enabled: personaId.length > 0,
+    queryKey: ["li-path", viewer],
+    queryFn: () => learningPath.getLearningPath(viewer),
+    enabled: !!viewer,
   });
 
 // AUTH-026 — the learner's single next action (teacher-applied or system), learner-friendly.
-export const useNextAction = (personaId: string) =>
+export const useNextAction = (viewer: IiosGrantedContext) =>
   useQuery({
-    queryKey: ["li-next-action", personaId],
-    queryFn: () => learnerNextAction.getNextAction(personaId),
-    enabled: personaId.length > 0,
+    queryKey: ["li-next-action", viewer],
+    queryFn: () => learnerNextAction.getNextAction(viewer),
+    enabled: !!viewer,
   });

@@ -1,3 +1,4 @@
+import { as } from "../../../test/grants";
 import { describe, expect, it } from "vitest";
 import type { ClientContext, ClientRegistration } from "@ogc/contracts";
 import { createIntegrationService } from "../../../lib/integration/integrationService";
@@ -41,7 +42,7 @@ describe("AUTH-030 × AUTH-027 — practice-updated state across the multi-clien
     const svc = createIntegrationService(REGISTRY);
 
     // Practice ACT-A2-3 (shared store) → unblocks ACT-A2-4 for the learner.
-    const res = await practice.submitPractice("demo-learner", "ACT-A2-3", correctA23);
+    const res = await practice.submitPractice(as("demo-learner"), "ACT-A2-3", correctA23);
     expect(res.ok).toBe(true);
 
     // EduOS (client A) applies the now-available ACT-A2-4.

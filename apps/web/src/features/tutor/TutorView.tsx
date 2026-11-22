@@ -1,7 +1,7 @@
+import { useViewer } from "../../app/iiosGate";
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
-import { useSession } from "../../app/session";
 import {
   useConversation,
   useConversations,
@@ -13,18 +13,17 @@ import {
 } from "./queries";
 
 export function TutorView() {
-  const { session } = useSession();
-  const personaId = session?.personaId ?? "";
-  const { convId } = useParams();
+  const viewer = useViewer();
+    const { convId } = useParams();
   const navigate = useNavigate();
-  const list = useConversations(personaId);
+  const list = useConversations(viewer);
   const activeId = convId ?? list.data?.[0]?.id ?? "";
-  const conv = useConversation(personaId, activeId);
-  const prompts = useSuggestedPrompts(personaId);
-  const send = useSendMessage(personaId, activeId);
-  const create = useCreateConversation(personaId);
-  const rename = useRenameConversation(personaId);
-  const del = useDeleteConversation(personaId);
+  const conv = useConversation(viewer, activeId);
+  const prompts = useSuggestedPrompts(viewer);
+  const send = useSendMessage(viewer, activeId);
+  const create = useCreateConversation(viewer);
+  const rename = useRenameConversation(viewer);
+  const del = useDeleteConversation(viewer);
   const [text, setText] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");

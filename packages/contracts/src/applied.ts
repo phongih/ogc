@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { IiosGrantedContext } from "./iiosContext.js";
 import { Id } from "./common.js";
 import { Skill } from "./profile.js";
 import { ConfidenceBand } from "./confidence.js";
@@ -64,18 +65,18 @@ export type LearnerNextAction = z.infer<typeof LearnerNextAction>;
 // Teacher-facing, fail-closed authorization (owning teacher + same tenant).
 export interface AppliedRecommendationPort {
   applyRecommendation(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     learnerId: string,
     input: InterventionInput,
   ): Promise<ApplyResult>;
-  revertApplied(viewerPersonaId: string, learnerId: string): Promise<ApplyResult>;
+  revertApplied(viewer: IiosGrantedContext, learnerId: string): Promise<ApplyResult>;
   getActiveApplied(
-    viewerPersonaId: string,
+    viewer: IiosGrantedContext,
     learnerId: string,
   ): Promise<AppliedRecommendation | null>;
 }
 
 // Learner-facing, self-scoped: resolves teacher-applied vs system into one next action.
 export interface LearnerNextActionPort {
-  getNextAction(personaId: string): Promise<LearnerNextAction | null>;
+  getNextAction(viewer: IiosGrantedContext): Promise<LearnerNextAction | null>;
 }

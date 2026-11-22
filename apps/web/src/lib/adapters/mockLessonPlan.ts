@@ -1,3 +1,4 @@
+import { viaGrant } from "./viewer";
 import type { LessonPlanPort, LessonPlan, LessonPlanDraft } from "@ogc/contracts";
 import { personaMap } from "../../fixtures/personas";
 import { classes, classTeachers } from "../../fixtures/teaching";
@@ -28,7 +29,7 @@ function validate(draft: LessonPlanDraft): string[] {
   return errors;
 }
 
-export const mockLessonPlan: LessonPlanPort = {
+export const mockLessonPlan: LessonPlanPort = viaGrant<LessonPlanPort>({
   listForClass: (personaId, classId) => {
     if (!ownedTeacherId(personaId, classId)) return latency<LessonPlan[]>([]); // fail-closed
     return latency(lessonPlanStore.listForClass(classId));
@@ -60,4 +61,4 @@ export const mockLessonPlan: LessonPlanPort = {
     lessonPlanStore.upsert(plan);
     return latency({ saved: true, errors: [] });
   },
-};
+});
