@@ -29,6 +29,7 @@ export const RuleKind = z.enum([
   "teacher_overload",
   "class_without_teacher",
   "no_practice",
+  "invoice_overdue",
 ]);
 export type RuleKind = z.infer<typeof RuleKind>;
 
@@ -56,6 +57,7 @@ export const RULE_PARAMS: Record<
   },
   class_without_teacher: {},
   no_practice: { days: { label: "days without practice", min: 1, max: 60 } },
+  invoice_overdue: { days: { label: "days overdue, at least", min: 1, max: 120 } },
 };
 
 // Only learner cases can go to the support queue.
@@ -90,7 +92,7 @@ export const RuleUpdate = Rule.pick({
 export type RuleUpdate = z.infer<typeof RuleUpdate>;
 
 export const EngineSubject = z.object({
-  type: z.enum(["learner", "session", "teacher", "class", "makeup"]),
+  type: z.enum(["learner", "session", "teacher", "class", "makeup", "invoice"]),
   id: z.string(),
   label: z.string(),
 });

@@ -41,7 +41,8 @@ export interface ReferralLead {
   createdAt: string;
   placedAt: string | null;
   enrolledAt: string | null;
-  firstPaymentVnd: number | null;
+  invoiceNo: string | null; // the new learner's first invoice (Billing, 22/11)
+  firstPaymentVnd: number | null; // from that invoice once paid — staff no longer type it
   rewardVnd: number | null; // set when confirmed
   confirmedAt: string | null;
   rejectedReason: string | null;
@@ -122,11 +123,8 @@ export interface GrowthPort {
   // Center staff of the organization.
   listLeads(viewer: IiosGrantedContext): Promise<ReferralLead[] | null>;
   markPlaced(viewer: IiosGrantedContext, leadId: string): Promise<GrowthResult>;
-  markEnrolled(
-    viewer: IiosGrantedContext,
-    leadId: string,
-    firstPaymentVnd: number,
-  ): Promise<GrowthResult>;
+  // "Enrolled and paid" is no longer a staff click: Billing moves the lead when its first invoice
+  // is paid (BillingPort.issueFirstInvoice → recordPayment), with the amount from the invoice.
   confirm(viewer: IiosGrantedContext, leadId: string): Promise<GrowthResult>;
   reject(viewer: IiosGrantedContext, leadId: string, reason: string): Promise<GrowthResult>;
   getMetrics(viewer: IiosGrantedContext): Promise<GrowthMetrics | null>;

@@ -36,6 +36,7 @@ describe("demo persistence", () => {
   it("every mock store is registered", () => {
     expect(registeredKeys().sort()).toEqual([
       "attendance",
+      "billing",
       "centerSetup",
       "engine",
       "engineRules",

@@ -1,6 +1,7 @@
 /*
  * Growth Engine — Playwright E2E (NON-PRODUCTION, MOCK). Mai shares her link; a friend sends a
- * synthetic enquiry; Sam runs placement → enrolled → confirm; Mai sees the credit; Linh (minor) has no link.
+ * synthetic enquiry; Sam: placement → first invoice → payment in Billing → confirm; Mai sees the
+ * credit; Linh (minor) has no link.
  */
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -80,11 +81,24 @@ async function main() {
     await page.getByRole("link", { name: "Growth Engine" }).click();
     await page.getByRole("tab", { name: "Funnel" }).click();
     await page.getByRole("button", { name: "Placement done · Bao T." }).click();
-    await page.getByLabel("First payment for Bao T.").fill("10000000");
-    await page.getByRole("button", { name: "Enrolled and paid · Bao T." }).click();
+    // Billing (22/11): staff issue the first invoice; the lead moves on when it is paid in full.
+    await page.getByRole("button", { name: "Issue first invoice · Bao T." }).click();
+    await page.getByText(/First invoice INV-\d{4}-\d{4} — waiting for payment/).waitFor();
+    check("[sam] first invoice issued from the funnel", true);
+    await page.getByRole("link", { name: "Billing", exact: true }).click();
+    await page.getByRole("tab", { name: "Invoices" }).click();
+    const bao = page.locator("li", { hasText: "Bao T." });
+    const no = ((await bao.locator("[data-invoice]").getAttribute("data-invoice")) ?? "").trim();
+    await bao.getByRole("button", { name: `Record payment · ${no}` }).click();
+    await page.locator("li", { hasText: "Bao T." }).waitFor({ state: "detached" }); // paid → leaves "Open"
+    await page.getByRole("link", { name: "← Center operations" }).click();
+    await page.getByRole("link", { name: "Growth Engine" }).click();
+    await page.getByRole("tab", { name: "Funnel" }).click();
+    await page.getByText(/paid: 6\.900\.000 ₫/).waitFor();
+    check("[sam] invoice paid → lead enrolled with the invoice amount (6,900,000)", true);
     await page.getByRole("button", { name: "Confirm reward · Bao T." }).click();
-    await page.getByText(/credit 700\.000 ₫ to Mai/).waitFor();
-    check("[sam] confirmed: 5% + 2% campaign of 10,000,000 = 700,000 ₫", true);
+    await page.getByText(/credit 483\.000 ₫ to Mai/).waitFor();
+    check("[sam] confirmed: 5% + 2% campaign of 6,900,000 = 483,000 ₫", true);
     await page.getByRole("tab", { name: "Dashboard" }).click();
     check("[sam] K-factor 0.50 (1 confirmed / 2 referrers)", ((await page.getByTestId("k-factor").textContent()) ?? "") === "0.50");
     await shot(page, "02-sam-growth");
@@ -93,7 +107,7 @@ async function main() {
     await persona(/Mai \(Guardian\)/);
     await page.getByRole("link", { name: "Refer a friend" }).first().click();
     await page.getByRole("tab", { name: "Wallet" }).click();
-    check("[mai] wallet shows the credit", /700\.000/.test((await page.getByTestId("wallet-balance").textContent()) ?? ""));
+    check("[mai] wallet shows the credit", /483\.000/.test((await page.getByTestId("wallet-balance").textContent()) ?? ""));
     await shot(page, "03-mai-wallet");
     await signOut();
 
