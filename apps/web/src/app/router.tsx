@@ -34,6 +34,7 @@ const ReferralsPage = page(() => import("../features/growth/ReferralsPage"), "Re
 const WorkforcePage = page(() => import("../features/workforce/WorkforcePage"), "WorkforcePage");
 const StudentsPage = page(() => import("../features/students/StudentsPage"), "StudentsPage");
 const ForecastPage = page(() => import("../features/forecast/ForecastPage"), "ForecastPage");
+const PartnersPage = page(() => import("../features/partners/PartnersPage"), "PartnersPage");
 const AdmissionsPage = page(() => import("../features/admissions/AdmissionsPage"), "AdmissionsPage");
 const BillingPage = page(() => import("../features/billing/BillingPage"), "BillingPage");
 const TuitionPage = page(() => import("../features/billing/TuitionPage"), "TuitionPage");
@@ -66,6 +67,7 @@ export const routes = [
       { path: "operations/growth", element: <RequireSection section="operations"><Lazy><GrowthAdminPage /></Lazy></RequireSection> },
       { path: "operations/workforce", element: <RequireSection section="operations"><Lazy><WorkforcePage /></Lazy></RequireSection> },
       { path: "operations/forecast", element: <RequireSection section="operations"><Lazy><ForecastPage /></Lazy></RequireSection> },
+      { path: "operations/partners", element: <RequireSection section="operations"><Lazy><PartnersPage /></Lazy></RequireSection> },
       { path: "operations/students", element: <RequireSection section="operations"><Lazy><StudentsPage back={{ to: "/app/operations", label: "Center operations" }} /></Lazy></RequireSection> },
       { path: "teaching/students", element: <RequireSection section="teaching"><Lazy><StudentsPage back={{ to: "/app/teaching", label: "Teaching" }} /></Lazy></RequireSection> },
       { path: "operations/admissions", element: <RequireSection section="operations"><Lazy><AdmissionsPage /></Lazy></RequireSection> },

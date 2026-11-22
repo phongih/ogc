@@ -26,6 +26,7 @@ const views: Array<{ name: string; path: string; role: Parameters<typeof renderA
   { name: "teacher home", path: "/app/teaching", role: "teacher", ready: /Teaching/i },
   { name: "workforce", path: "/app/operations/workforce", role: "staff", ready: /Utilization/i },
   { name: "forecast", path: "/app/operations/forecast", role: "staff", ready: /Four horizons/i },
+  { name: "partner commissions", path: "/app/operations/partners", role: "staff", ready: /Decision signals/i },
   { name: "current students", path: "/app/operations/students", role: "staff", ready: /Needs support/i },
   { name: "admissions", path: "/app/operations/admissions", role: "staff", ready: /Lead → enrolled/i },
   { name: "billing", path: "/app/operations/billing", role: "staff", ready: /Billing & payments/i },

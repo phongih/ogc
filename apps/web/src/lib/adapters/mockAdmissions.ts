@@ -602,6 +602,21 @@ export function leadForBilling(id: string): LeadForBilling | null {
       }
     : null;
 }
+/** Partner Commissions: an open lead (not waiting for a first invoice) handed to a partner. */
+export function canReferOut(id: string): string | null {
+  const l = leads.get(id);
+  if (!l) return "lead not found";
+  if (!isOpen(l)) return "the lead is closed";
+  if (l.stage === "offer") return `first invoice ${l.invoiceNo} is open — void it in Billing first`;
+  return null;
+}
+export function referLeadOut(id: string, partnerName: string, by: string): void {
+  const l = leads.get(id);
+  if (!l || canReferOut(id)) return;
+  l.lostReason = `Referred to partner: ${partnerName}`;
+  setStage(l, "lost", by);
+}
+
 /** First invoice issued → "offer"; voided (null) → back to "placement". */
 export function attachFirstInvoice(id: string, invoiceNo: string | null, by = "Billing"): void {
   const l = leads.get(id);

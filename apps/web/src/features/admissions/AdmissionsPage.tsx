@@ -26,6 +26,7 @@ import { useViewer } from "../../app/iiosGate";
 import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDate, formatCenterDateTime } from "../../lib/centerTime";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } from "../../ui";
+import { ReferToPartner } from "../partners/ReferToPartner";
 import { AccessBanner } from "../access/AccessBanner";
 import { useMyAccess } from "../access/useMyAccess";
 import { centers } from "../../fixtures/directory";
@@ -509,6 +510,7 @@ function LeadDetail({ lead: l }: { lead: Lead }) {
   const act = useAction();
   const me = useMyAccess();
   const canBill = me.data?.allowed["billing:manage"] ?? true;
+  const canRefer = me.data?.allowed["partners:manage"] ?? false;
   const counselors = useQuery({
     queryKey: ["adm-counselors", viewer],
     queryFn: () => admissions.counselors(viewer),
@@ -643,6 +645,9 @@ function LeadDetail({ lead: l }: { lead: Lead }) {
                   Move · {l.learnerName}
                 </Button>
               </>
+            ) : null}
+            {canRefer && l.stage !== "offer" ? (
+              <ReferToPartner leadId={l.id} learnerName={l.learnerName} />
             ) : null}
             {l.stage === "placement" ? (
               <Button
