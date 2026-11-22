@@ -13,6 +13,7 @@ import {
 } from "../integration/mockIiosPolicy";
 import { mockIiosContext } from "../integration/mockIiosContext";
 import { presentedGrantFor } from "../../app/iiosGate";
+import { clearCurrentGrants, setCurrentGrant } from "../integration/currentGrant";
 import { organizations } from "../../fixtures/directory";
 import { mockSchedule } from "./mockSchedule";
 import { mockMakeup } from "./mockMakeup";
@@ -41,7 +42,10 @@ const a2ToMark = () =>
     (s) => s.classId === A2 && !s.seededMarks && Date.parse(s.at) <= Date.now(),
   )[0].id;
 
-beforeEach(() => __resetAttendanceForTests()); // resets the schedule, and with it access policies
+beforeEach(() => {
+  __resetAttendanceForTests();
+  clearCurrentGrants();
+}); // resets the schedule, and with it access policies
 
 /** The granted context the mock IIOS issues for a persona right now. */
 async function grantOf(persona: string): Promise<IiosGrantedContext> {
@@ -325,5 +329,40 @@ describe("access — admin rules", () => {
         rules: [{ action: "center:setup" }],
       }),
     ).toEqual({ ok: false, reason: "name_taken" });
+  });
+});
+
+describe("access — adapters enforce with the grant IIOS decided (ADR-039 step 3)", () => {
+  it("a denied grant (gate recorded null) leaves nothing allowed, even for staff", async () => {
+    setCurrentGrant(SAM, null);
+    expect((await mockSchedule.getOverview(SAM))!.classes).toEqual([]);
+    expect(await mockSchedule.reschedule(SAM, "SES-001", inDays(4))).toEqual({
+      ok: false,
+      reason: "access_policy",
+    });
+    expect((await mockMakeup.getBoard(SAM))!.items).toEqual([]);
+  });
+
+  it("the role comes from the grant, not from OGC fixtures", async () => {
+    setCurrentGrant(SAM, { ...(await grantOf(SAM)), role: "teacher" });
+    expect(allows(SAM, "schedule:manage", { centerId: D1 })).toBe(false);
+    // Olivia: IIOS grants "staff" (+ orgAdmin) — she manages the schedule as staff.
+    const olivia = await grantOf(ADMIN);
+    expect(olivia.role).toBe("staff");
+    setCurrentGrant(ADMIN, olivia);
+    expect(allows(ADMIN, "schedule:manage", { centerId: D1 })).toBe(true);
+  });
+
+  it("the narrowing in force is the one in the recorded grant (refreshed on navigation)", async () => {
+    setCurrentGrant(SAM, await grantOf(SAM)); // before the policy is attached
+    await attach(SAM, FRONT_DESK);
+    expect(allows(SAM, "schedule:manage", { centerId: centers[1].id })).toBe(true); // old grant
+    setCurrentGrant(SAM, await grantOf(SAM)); // next navigation
+    expect(allows(SAM, "schedule:manage", { centerId: centers[1].id })).toBe(false);
+  });
+
+  it("a resource in another tenant is refused by the contract", async () => {
+    setCurrentGrant(SAM, await grantOf(SAM));
+    expect(allows(SAM, "schedule:manage", { centerId: centers[3].id })).toBe(false); // Lumen org
   });
 });

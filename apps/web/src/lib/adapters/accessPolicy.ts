@@ -1,12 +1,13 @@
 /*
- * OGC-side enforcement of the IIOS-decided narrowing (OGC-ADR-039 step 2). SYNTHETIC, mock.
+ * OGC-side enforcement of the IIOS-decided narrowing (OGC-ADR-039 steps 2–3). SYNTHETIC, mock.
  *
  * Policies are no longer stored here: IIOS (mock: lib/integration/mockIiosPolicy.ts) stores and
  * decides them. This module only ENFORCES, through the contract's `authorize()`, using the same
  * tenant / role / narrowing IIOS would put into the persona's granted context.
  *
- * Interim (until step 3): adapters still receive a persona id, so the context is rebuilt here from
- * the persona's IIOS principal. Step 3 passes the real granted context into the adapters instead.
+ * Step 3: the context is the grant IIOS actually decided (recorded by the IIOS gate on every
+ * navigation, see lib/integration/currentGrant.ts) — its role, tenant and narrowing. A denied grant
+ * leaves nothing allowed.
  */
 import {
   authorize,
@@ -21,8 +22,8 @@ import {
   type ReadonlyField,
   type SessionRole,
 } from "@ogc/contracts";
-import { personaMap, principalOf } from "../../fixtures/personas";
-import { narrowingFor } from "../integration/mockIiosPolicy";
+import { centers } from "../../fixtures/directory";
+import { grantFor } from "../integration/currentGrant";
 import { withFault } from "./faults";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
@@ -34,31 +35,18 @@ export interface Facts {
 }
 type Verdict = { ok: true; readonly: ReadonlyField[] } | { ok: false };
 
-/** The granted context IIOS would issue for this persona (interim — see header). */
-function contextOf(personaId: string): IiosGrantedContext | null {
-  const p = personaMap[personaId];
-  const principal = principalOf(personaId);
-  if (!p || !principal) return null;
-  const role = p.staff ? "staff" : p.teacherId ? "teacher" : p.guardianId ? "guardian" : "learner";
-  return {
-    clientId: "eduos",
-    orgId: p.orgId,
-    principalId: principal,
-    role,
-    purpose: "learning.read",
-    requestId: "req-interim",
-    grantRef: "interim",
-    expiresAt: "2099-01-01T00:00:00.000Z",
-    narrowing: narrowingFor(principal, p.orgId),
-  };
-}
+/** The grant IIOS decided for this persona (step 3: no longer rebuilt from OGC fixtures). */
+const contextOf = (personaId: string): IiosGrantedContext | null => grantFor(personaId);
 
 export function decide(personaId: string, action: PolicyAction, facts: Facts = {}): Verdict {
   const ctx = contextOf(personaId);
   if (!ctx) return { ok: false };
-  // Adapters have already refused resources outside the caller's tenant (fail-closed not_found),
-  // so the resource is in ctx.orgId here.
-  const res: AuthzResource = { orgId: ctx.orgId, ...facts };
+  // The resource's tenant: from its center when it has one; otherwise the adapter has already
+  // refused resources outside the caller's tenant (fail-closed not_found).
+  const orgId = facts.centerId
+    ? (centers.find((c) => c.id === facts.centerId)?.orgId ?? "unknown")
+    : ctx.orgId;
+  const res: AuthzResource = { orgId, ...facts };
   const d = authorize(ctx, action, res);
   return d.allow ? { ok: true, readonly: d.readonly } : { ok: false };
 }
