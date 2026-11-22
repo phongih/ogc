@@ -1,6 +1,6 @@
 # OGC-ADR-039 — Security, Audit & Operational Integrity Foundation
 
-- **Status:** Proposed — survey and design only. Nothing here is approved for implementation.
+- **Status:** Proposed — survey and design only. Nothing here is approved for implementation. **F1 direction chosen by the owner on 22/11 (§5).**
 - **Date:** 22/11/2026
 - **Decides:** the owner, and IIOS where IIOS is named. This document lists options; it does not choose for them.
 - **Inputs:**
@@ -133,7 +133,43 @@ Bundle splitting, unit planning per course, seat limits on joins, and editing a 
 
 ## 4. Open questions
 
-1. **F1:** A, B or C? If A, who records the DEC-027 exception?
+1. ~~**F1:** A, B or C?~~ The owner chose the IIOS direction on 22/11 (§5).
 2. **F2:** does IIOS gain an "org admin" notion, or does OGC map `staff` + an OGC membership attribute? This is the existing open question, now with a concrete case.
 3. Should demo history (policy versions, engine log) survive "Reset demo data"? Today it does not.
 4. Retention of audit events — **not answered here.** It is part of the legal review (Track C) and outside Claude's scope.
+
+---
+
+## 5. Owner direction, 22/11: build out IIOS (F1 → Option C)
+
+Owner, 22/11: *"mình thấy xây dựng IIOS để mở rộng thực tế"* — build out IIOS so OGC can grow for real. So narrowing policy moves to IIOS, and DEC-027 stays as written: OGC writes no authorization relation.
+
+Read as **Option C**: IIOS stores and decides; the OGC Access page stays as the editing UI, but it calls IIOS instead of storing anything itself.
+
+### What this means in this repository (allowed scope)
+
+- **Contracts only, on the OGC side of the boundary:**
+  - the grant carries the narrowing that applies, which OGC enforces;
+  - a new `IiosPolicyAdminPort` (list / create / revise / retire / attach) that the Access page calls.
+- **The mock IIOS** (`lib/integration/`, synthetic fixtures) implements both. PR #38's store moves behind it. OGC adapters stop reading `personaMap` for permissions and read the granted context instead (F2).
+- **Proposed grant change for IIOS (OGC-IIOS-001), not decided by OGC:**
+  - an org-admin notion in the grant (F2);
+  - the policy effect, or a reference to it, carried with the decision;
+  - `activeCenter` ∩ policy centers (F3).
+
+### What this does not mean
+
+- No work on the real IIOS, on the frozen IIOS security source r1, on 009B, or on any production system from this repository or this session. Those stay with the owner / IIOS team and the held gates (G2-C, 33.S, D-14, R-06 / R-16).
+- The mock IIOS proving the shape is not evidence that real IIOS can or does behave this way.
+
+### Next PRs (each separate, CI-gated)
+
+1. **Contract:**
+   - `IiosGrantedContext` gains `narrowing` (policy rules or a reference to them) and an admin marker;
+   - `IiosPolicyAdminPort`;
+   - `authorize(ctx, action, resource)`.
+
+   Design-level tests only.
+2. **Mock IIOS implements the contract:** the PR #38 policy store moves behind it; the Access page calls the port. Same behaviour, new owner.
+3. **Adapters take the granted context** instead of `personaId` for permissions. Olivia's grant carries the admin marker, which closes the F2 mismatch in the mock.
+4. Then items 2–5 of §3 (audit event contract, idempotency, tenant matrix, outbox), unchanged.
