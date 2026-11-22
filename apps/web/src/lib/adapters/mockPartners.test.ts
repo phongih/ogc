@@ -1,7 +1,7 @@
 // Partner Commissions (owner 22/11): leads go out from Admissions, partners ranked by fit for the
 // learner (never by commission), staff record / Org Admin approves (never their own step), tiered
 // commissions with rule snapshots, signals only suggest, append-only activity. SYNTHETIC.
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { commissionFor, tierRuleIssue, type TierRuleDraft } from "@ogc/contracts";
 import { as } from "../../test/grants";
 import { __resetPartnersForTests, mockPartners as P } from "./mockPartners";
@@ -229,6 +229,29 @@ describe("partners — seed data is consistent (22/11, live d3ba226)", () => {
         expect(Date.parse(e.enrolledAt)).toBeGreaterThanOrEqual(Date.parse(e.referredAt));
         expect(Date.parse(e.enrolledAt)).toBeLessThanOrEqual(Date.parse(e.expiresAt));
       }
+  });
+
+  it("holds on any day of the month (failed just after midnight on 23/11)", async () => {
+    // Center time is UTC+7: these are 00:03 on the 23rd, 00:03 on the 1st, 23:59 on the 31st.
+    for (const at of ["2026-11-22T17:03:00Z", "2026-10-31T17:03:00Z", "2026-12-31T16:59:00Z"]) {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(at));
+      try {
+        __resetPartnersForTests();
+        for (const e of (await P.listEntries(as(S)))!) {
+          if (!e.enrolledAt) continue;
+          const enrolled = Date.parse(e.enrolledAt);
+          expect(enrolled, `${at} ${e.learnerDisplayName}`).toBeGreaterThanOrEqual(
+            Date.parse(e.referredAt),
+          );
+          expect(enrolled).toBeLessThanOrEqual(Date.parse(e.expiresAt));
+          expect(enrolled).toBeLessThanOrEqual(Date.now());
+          if (e.dueDate) expect(Date.parse(e.dueDate)).toBeGreaterThan(enrolled);
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    }
   });
 });
 
