@@ -222,3 +222,14 @@ describe("partners — decision signals only suggest", () => {
     expect(o.kpis.awaitingEnrolment).toBe(list.filter((e) => e.status === "referred").length);
   });
 });
+
+describe("partners — seed data is consistent (22/11, live d3ba226)", () => {
+  it("every enrolment comes after its referral and inside the attribution window", async () => {
+    // Live showed Quan B. / Nhi P. / Dat H. enrolled before they were referred.
+    for (const e of (await P.listEntries(as(S)))!)
+      if (e.enrolledAt) {
+        expect(Date.parse(e.enrolledAt)).toBeGreaterThanOrEqual(Date.parse(e.referredAt));
+        expect(Date.parse(e.enrolledAt)).toBeLessThanOrEqual(Date.parse(e.expiresAt));
+      }
+  });
+});
