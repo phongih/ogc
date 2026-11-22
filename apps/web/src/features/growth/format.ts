@@ -2,7 +2,7 @@ export const vnd = (n: number) => `${new Intl.NumberFormat("vi-VN").format(n)} �
 export const STATUS_LABEL: Record<string, string> = {
   lead: "New lead",
   placed: "Placement done",
-  enrolled: "Enrolled · waiting for staff",
+  enrolled: "Enrolled and paid · waiting for staff",
   confirmed: "Confirmed · reward issued",
   rejected: "Not counted",
 };

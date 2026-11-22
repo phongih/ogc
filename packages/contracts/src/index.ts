@@ -32,3 +32,4 @@ export * from "./accessPolicy.js";
 export * from "./authorize.js";
 export * from "./gamification.js";
 export * from "./growth.js";
+export * from "./billing.js";

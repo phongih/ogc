@@ -18,7 +18,9 @@ export function persona(role: MockRole): MockPersona {
         ? "demo-teacher"
         : role === "guardian"
           ? "demo-guardian"
-          : "demo-staff";
+          : role === "admin"
+            ? "demo-admin"
+            : "demo-staff";
   return { personaId: id, displayName: `${role} demo`, role, orgId: ORG };
 }
 

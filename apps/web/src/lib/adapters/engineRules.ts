@@ -129,6 +129,18 @@ export const DEFAULT_RULES: Seed[] = [
     params: { days: 7 },
     actions: ["log_only"],
   },
+  {
+    kind: "invoice_overdue",
+    category: "operations",
+    name: "Invoice overdue",
+    description:
+      "An invoice is unpaid this many days after its due date. Staff are told; learning is never blocked.",
+    enabled: true,
+    priority: "P2",
+    cooldownMin: 1440,
+    params: { days: 7 },
+    actions: ["notify_staff"],
+  },
 ];
 
 // orgId → rules
@@ -144,7 +156,14 @@ function seed(orgId: string): Rule[] {
   return list;
 }
 export function rulesFor(orgId: string): Rule[] {
-  return rulesByOrg.get(orgId) ?? seed(orgId);
+  const list = rulesByOrg.get(orgId);
+  if (!list) return seed(orgId);
+  // A save from before a rule existed (e.g. invoice_overdue, 22/11): add the missing defaults.
+  DEFAULT_RULES.forEach((r, i) => {
+    if (!list.some((x) => x.kind === r.kind))
+      list.push({ ...r, params: { ...r.params }, actions: [...r.actions], id: `R-${i + 1}` });
+  });
+  return list;
 }
 export function resetRules(): void {
   rulesByOrg.clear();

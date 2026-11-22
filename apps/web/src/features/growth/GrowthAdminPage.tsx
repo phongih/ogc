@@ -6,8 +6,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { GrowthResult, ReferralLead, ReferralProgram } from "@ogc/contracts";
-import { growth } from "../../lib/api";
+import type { BillingResult, GrowthResult, ReferralLead, ReferralProgram } from "@ogc/contracts";
+import { billing, growth } from "../../lib/api";
 import { useViewer } from "../../app/iiosGate";
 import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDate } from "../../lib/centerTime";
@@ -26,6 +26,7 @@ const REFUSAL: Record<string, string> = {
   flagged: "Cannot confirm — anti-fraud checks flagged",
   invalid: "Not valid",
   access_policy: "Your access policy does not allow this.",
+  no_fee_line: "No approved fee line",
 };
 
 export function GrowthAdminPage() {
@@ -182,7 +183,7 @@ function Dashboard() {
 function useGrowthAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (run: () => Promise<GrowthResult>) => run(),
+    mutationFn: (run: () => Promise<GrowthResult | BillingResult<object>>) => run(),
     onSuccess: () => refreshLearningState(qc),
   });
 }
@@ -215,7 +216,7 @@ function LeadCard({ lead: l }: { lead: ReferralLead }) {
   const act = useGrowthAction();
   const me = useMyAccess();
   const can = me.data?.allowed["growth:manage"] ?? true;
-  const [pay, setPay] = useState("");
+  const canBill = me.data?.allowed["billing:manage"] ?? true;
   const [why, setWhy] = useState("");
   const label = l.learnerName;
   return (
@@ -241,9 +242,24 @@ function LeadCard({ lead: l }: { lead: ReferralLead }) {
             Anti-fraud: {l.flags.map((f) => FLAG_LABEL[f]).join(" · ")}
           </p>
         ) : null}
+        {l.status === "placed" && l.invoiceNo ? (
+          <p className="text-sm">
+            First invoice {l.invoiceNo} — waiting for payment. Record it in{" "}
+            <Link className="text-accent underline" to="/app/operations/billing">
+              Billing
+            </Link>
+            ; the lead moves on when it is paid in full.
+          </p>
+        ) : null}
+        {l.status === "enrolled" ? (
+          <p className="text-sm">
+            First invoice {l.invoiceNo} paid: {vnd(l.firstPaymentVnd ?? 0)}
+          </p>
+        ) : null}
         {l.status === "confirmed" ? (
           <p className="text-sm">
-            First payment {vnd(l.firstPaymentVnd ?? 0)} → credit {vnd(l.rewardVnd ?? 0)} to{" "}
+            First payment {vnd(l.firstPaymentVnd ?? 0)}
+            {l.invoiceNo ? ` (${l.invoiceNo})` : ""} → credit {vnd(l.rewardVnd ?? 0)} to{" "}
             {l.referrerName}
           </p>
         ) : null}
@@ -260,27 +276,14 @@ function LeadCard({ lead: l }: { lead: ReferralLead }) {
                 Placement done · {label}
               </Button>
             ) : null}
-            {l.status === "placed" ? (
-              <>
-                <label>
-                  <span className="block text-xs text-muted">
-                    First tuition payment (VND, mock)
-                  </span>
-                  <input
-                    aria-label={`First payment for ${label}`}
-                    type="number"
-                    className="w-40 rounded-ogc border border-border bg-surface p-1"
-                    value={pay}
-                    onChange={(e) => setPay(e.target.value)}
-                  />
-                </label>
-                <Button
-                  variant="ghost"
-                  onClick={() => act.mutate(() => growth.markEnrolled(viewer, l.id, Number(pay)))}
-                >
-                  Enrolled and paid · {label}
-                </Button>
-              </>
+            {l.status === "placed" && !l.invoiceNo ? (
+              <Button
+                variant="ghost"
+                disabled={!canBill}
+                onClick={() => act.mutate(() => billing.issueFirstInvoice(viewer, l.id))}
+              >
+                Issue first invoice · {label}
+              </Button>
             ) : null}
             {l.status === "enrolled" ? (
               <Button onClick={() => act.mutate(() => growth.confirm(viewer, l.id))}>

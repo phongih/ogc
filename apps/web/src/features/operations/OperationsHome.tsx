@@ -90,6 +90,12 @@ export function OperationsHome() {
         className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
       >
         Growth Engine
+      </Link>{" "}
+      <Link
+        to="/app/operations/billing"
+        className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
+      >
+        Billing & payments
       </Link>
       <EngineNotifications />
       <MakeupBoard viewer={viewer} teachers={q.data.teachers} />

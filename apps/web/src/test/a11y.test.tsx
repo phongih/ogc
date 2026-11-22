@@ -24,6 +24,8 @@ const views: Array<{ name: string; path: string; role: Parameters<typeof renderA
   // Views carrying the new progress visualizations and directory pages.
   { name: "learner home", path: "/app/learning", role: "learner", ready: /My Learning/i },
   { name: "teacher home", path: "/app/teaching", role: "teacher", ready: /Teaching/i },
+  { name: "billing", path: "/app/operations/billing", role: "staff", ready: /Billing & payments/i },
+  { name: "tuition", path: "/app/tuition", role: "guardian", ready: /Referral credit waiting/i },
   { name: "organizations", path: "/app/orgs", role: "staff", ready: /Organizations/i },
   { name: "organization detail", path: `/app/orgs/${organizations[0].id}`, role: "staff", ready: /Nova Learning Group/i },
   { name: "center detail", path: `/app/centers/${centers[0].id}`, role: "staff", ready: /District 1/i },

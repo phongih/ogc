@@ -13,6 +13,8 @@ import { AccessHome } from "../features/access/AccessHome";
 import { RewardsSettingsPage } from "../features/engine/RewardsSettingsPage";
 import { GrowthAdminPage } from "../features/growth/GrowthAdminPage";
 import { ReferralsPage } from "../features/growth/ReferralsPage";
+import { BillingPage } from "../features/billing/BillingPage";
+import { TuitionPage } from "../features/billing/TuitionPage";
 import { JoinPage } from "../routes/public/JoinPage";
 import { DecisionEnginePage } from "../features/engine/DecisionEnginePage";
 import { LearnerHome } from "../features/learner/LearnerHome";
@@ -41,6 +43,8 @@ export const routes = [
       { path: "orgs/:orgId", element: <RequireSection section="directory"><OrgDetail /></RequireSection> },
       { path: "centers/:centerId", element: <RequireSection section="directory"><CenterDetail /></RequireSection> },
       { path: "operations/growth", element: <RequireSection section="operations"><GrowthAdminPage /></RequireSection> },
+      { path: "operations/billing", element: <RequireSection section="operations"><BillingPage /></RequireSection> },
+      { path: "tuition", element: <RequireSection section="tuition"><TuitionPage /></RequireSection> },
       { path: "referrals", element: <RequireSection section="referrals"><ReferralsPage /></RequireSection> },
       { path: "operations/rewards", element: <RequireSection section="operations"><RewardsSettingsPage /></RequireSection> },
       { path: "operations/engine", element: <RequireSection section="operations"><DecisionEnginePage /></RequireSection> },

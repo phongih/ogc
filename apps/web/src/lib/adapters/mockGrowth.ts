@@ -191,6 +191,71 @@ const view = (l: StoredLead): ReferralLead => {
 const balanceOf = (principalId: string) =>
   (wallets.get(principalId) ?? []).reduce((t, e) => t + e.amountVnd, 0);
 
+// ── Billing hooks (adapter-internal, not part of GrowthPort) ────────────────────────────────
+// Billing (22/11) owns invoices; Growth owns leads and wallets. Billing calls these.
+
+export const walletBalanceOf = balanceOf;
+
+/** Apply up to maxVnd of a referrer's wallet credit to an invoice; returns what was applied. */
+export function consumeCredit(principalId: string, maxVnd: number, note: string): number {
+  const amount = Math.min(balanceOf(principalId), Math.max(0, maxVnd));
+  if (amount <= 0) return 0;
+  const list = wallets.get(principalId) ?? [];
+  list.push({
+    id: `W-${++seq}`,
+    at: new Date().toISOString(),
+    kind: "applied",
+    amountVnd: -amount,
+    note,
+  });
+  wallets.set(principalId, list);
+  return amount;
+}
+
+/** Give credit back (the invoice it was applied to was voided). */
+export function refundCredit(principalId: string, amountVnd: number, note: string): void {
+  if (amountVnd <= 0) return;
+  const list = wallets.get(principalId) ?? [];
+  list.push({ id: `W-${++seq}`, at: new Date().toISOString(), kind: "credit", amountVnd, note });
+  wallets.set(principalId, list);
+}
+
+export interface LeadForBilling {
+  id: string;
+  orgId: string;
+  status: ReferralLead["status"];
+  learnerName: string;
+  courseCode: string;
+  centerName: string;
+  invoiceNo: string | null;
+}
+export function leadForBilling(leadId: string): LeadForBilling | null {
+  const l = leads.get(leadId);
+  return l
+    ? {
+        id: l.id,
+        orgId: l.orgId,
+        status: l.status,
+        learnerName: l.learnerName,
+        courseCode: l.courseCode,
+        centerName: l.centerName,
+        invoiceNo: l.invoiceNo ?? null,
+      }
+    : null;
+}
+export function attachFirstInvoice(leadId: string, invoiceNo: string | null): void {
+  const l = leads.get(leadId);
+  if (l) l.invoiceNo = invoiceNo;
+}
+/** The first invoice is paid in full: the lead is enrolled and paid, amount from the invoice. */
+export function markLeadPaid(leadId: string, amountVnd: number): void {
+  const l = leads.get(leadId);
+  if (!l || l.status !== "placed") return;
+  l.status = "enrolled";
+  l.enrolledAt = new Date().toISOString();
+  l.firstPaymentVnd = amountVnd;
+}
+
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
 const monthOf = (iso: string) =>
   new Date(Date.parse(iso) + 7 * 3600 * 1000).toISOString().slice(0, 7); // center time
@@ -296,6 +361,7 @@ export const mockGrowth: GrowthPort = {
         createdAt: new Date().toISOString(),
         placedAt: null,
         enrolledAt: null,
+        invoiceNo: null,
         firstPaymentVnd: null,
         rewardVnd: null,
         confirmedAt: null,
@@ -324,23 +390,6 @@ export const mockGrowth: GrowthPort = {
       if (l.status !== "lead") return refuse("invalid_step", "only a new lead can be placed");
       l.status = "placed";
       l.placedAt = new Date().toISOString();
-      return ok();
-    }),
-
-  markEnrolled: (viewer, leadId, firstPaymentVnd) =>
-    withFault("growth.markEnrolled", () => {
-      const l = staffWrite(viewer, leadId);
-      if (isResult(l)) return latency(l);
-      if (l.status !== "placed") return refuse("invalid_step", "place the learner first");
-      if (
-        !Number.isInteger(firstPaymentVnd) ||
-        firstPaymentVnd <= 0 ||
-        firstPaymentVnd > 200_000_000
-      )
-        return refuse("invalid", "first payment must be 1–200,000,000 VND");
-      l.status = "enrolled";
-      l.enrolledAt = new Date().toISOString();
-      l.firstPaymentVnd = firstPaymentVnd;
       return ok();
     }),
 

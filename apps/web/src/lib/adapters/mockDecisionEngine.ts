@@ -12,6 +12,7 @@ import { QUEUE_KINDS, RULE_PARAMS } from "@ogc/contracts";
 import { teacherName } from "../../fixtures/personas";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { formatCenterDate, formatCenterDateTime } from "../centerTime";
+import { overdueInvoicesOf } from "./mockBilling";
 import { sessionStore } from "./sessionStore";
 import { isMarked } from "./mockAttendance";
 import { makeupItems } from "./mockMakeup";
@@ -227,6 +228,16 @@ function detect(orgId: string, now: number): Detection[] {
           evidence: `${n} sessions in the next 7 days (more than ${overload.params.sessionsPerWeek})`,
           teacherIds: [],
         });
+  const overdue = byKind.get("invoice_overdue");
+  if (overdue)
+    for (const inv of overdueInvoicesOf(orgId, overdue.params.days, now))
+      out.push({
+        rule: overdue,
+        key: inv.id,
+        subject: { type: "invoice", id: inv.id, label: `${inv.no} · ${inv.learnerName}` },
+        evidence: `${inv.daysOverdue} days overdue (due ${inv.dueDate}); balance ${inv.balanceVnd.toLocaleString("vi-VN")} ₫ at ${inv.centerName}`,
+        teacherIds: [],
+      });
   if (noTeacher)
     for (const c of cls)
       if (!classTeachers[c.id])

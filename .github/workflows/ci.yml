@@ -48,3 +48,4 @@ jobs:
           node e2e/access-journey.mjs || echo "access-policy journey E2E skipped/soft-failed (non-blocking)"
           node e2e/gamification-journey.mjs || echo "gamification journey E2E skipped/soft-failed (non-blocking)"
           node e2e/growth-journey.mjs || echo "growth journey E2E skipped/soft-failed (non-blocking)"
+          node e2e/billing-journey.mjs || echo "billing journey E2E skipped/soft-failed (non-blocking)"
