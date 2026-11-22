@@ -195,7 +195,14 @@ describe("billing — referrals and wallet credit", () => {
     expect(issued).toMatchObject({ ok: true, invoiceNo: expect.stringMatching(/^INV-2026-/) });
     expect(await B.issueFirstInvoice(as(S), leadId)).toMatchObject({ reason: "invalid_step" });
     const inv = (await B.listInvoices(as(S)))!.find((i) => i.learnerName === "Bao T.")!;
-    expect(inv).toMatchObject({ totalVnd: 6_900_000, payerName: null }); // Term 1 is running
+    // Term 1 ends in 8 days → the first invoice bills Term 2 (due 10/12), not overdue.
+    expect(inv).toMatchObject({
+      totalVnd: 6_900_000,
+      payerName: null,
+      dueDate: "2026-12-10",
+      daysOverdue: 0,
+    });
+    expect(inv.lines[0].description).toBe("ENG-A2 · Tuition · Term 2 2026-2027");
 
     await B.recordPayment(as(S), inv.id, 1_000_000, "cash");
     expect((await G.listLeads(as(S)))![0].status).toBe("placed"); // not paid in full yet
@@ -220,6 +227,23 @@ describe("billing — referrals and wallet credit", () => {
     // Voided → the credit goes back to the wallet.
     expect(await B.voidInvoice(as(S), linhT2.id, "issued by mistake")).toEqual({ ok: true });
     expect((await B.getMine(as(MAI)))!.walletVnd).toBe(345_000);
+  });
+
+  it("an invoice is never overdue when issued: due no earlier than 7 days after issue", async () => {
+    vi.setSystemTime(new Date("2026-10-01T05:00:00Z")); // Term 1 running, 60 days left, due 15/09 passed
+    __resetBillingForTests();
+    const code = (await G.getMine(as(MAI)))!.code;
+    await G.submitLead(code, { learnerName: "Dung K.", courseCode: "ENG-B1", centerName: D1.name });
+    const leadId = (await G.listLeads(as(S)))![0].id;
+    await G.markPlaced(as(S), leadId);
+    await B.issueFirstInvoice(as(S), leadId);
+    const inv = (await B.listInvoices(as(S)))!.find((i) => i.learnerName === "Dung K.")!;
+    expect(inv.lines[0].description).toBe("ENG-B1 · Tuition · Term 1 2026-2027");
+    expect(inv).toMatchObject({ dueDate: "2026-10-08", daysOverdue: 0 });
+    // Seeded Term 1 invoices (issued 25/08) keep their 15/09 due date.
+    expect((await B.listInvoices(as(S)))!.find((i) => i.learnerName === "Huy D.")!.dueDate).toBe(
+      "2026-09-15",
+    );
   });
 
   it("no approved fee line → the first invoice is refused, nothing changes", async () => {
