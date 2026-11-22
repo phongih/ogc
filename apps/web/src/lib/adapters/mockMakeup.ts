@@ -38,7 +38,7 @@ const classOrg = (id: string) => classes.find((c) => c.id === id)?.orgId;
 const learnerName = (classId: string, learnerId: string) =>
   rosters[classId]?.find((r) => r.learnerId === learnerId)?.displayName ?? "Learner";
 const sessionTeacher = (s: StoredSession) =>
-  teacherName(s.substituteId ?? classTeachers[s.classId]);
+  teacherName(s.substituteId ?? s.heldBy ?? classTeachers[s.classId] ?? undefined);
 
 function bookingOf(s: StoredSession, fromClassId: string): MakeupBooking {
   return {

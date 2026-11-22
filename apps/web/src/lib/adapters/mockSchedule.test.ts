@@ -9,6 +9,8 @@ import { mockSupport } from "./mockProfile";
 import { classes } from "../../fixtures/teaching";
 import { TEACHER_BEN, TEACHER_TARA } from "../../fixtures/personas";
 import { seedSessions } from "../../fixtures/attendance";
+import { sessionStore } from "./sessionStore";
+import { teacherOfSession } from "./clashes";
 
 const S = "demo-staff";
 const A2 = classes[0].id;
@@ -117,6 +119,29 @@ describe("mockSchedule — moving and cancelling", () => {
 });
 
 describe("mockSchedule — teachers", () => {
+  it("a new class teacher takes the sessions that have not started; a started one stays with its teacher (owner 22/11)", async () => {
+    const started = a2ToMark(); // A2 — Unit 6: started, not marked yet
+    const future = sessionStore
+      .forClass(A2)
+      .find((x) => x.state === "scheduled" && Date.parse(x.at) > Date.now())!;
+    expect((await mockSchedule.assignTeacher(as(S), A2, TEACHER_BEN)).ok).toBe(true);
+    expect(teacherOfSession(sessionStore.get(started)!)).toBe(TEACHER_TARA);
+    expect(teacherOfSession(sessionStore.get(future.id)!)).toBe(TEACHER_BEN);
+    const view = (await mockSchedule.getOverview(as(S)))!.classes
+      .find((c) => c.classId === A2)!
+      .sessions.find((x) => x.id === started)!;
+    expect(view.heldBy?.name).toBe("Tara");
+    // Tara still marks it; Ben (the new class teacher) does not.
+    expect((await mockAttendance.listToMark(as("demo-teacher"))).map((x) => x.id)).toContain(
+      started,
+    );
+    expect((await mockAttendance.listToMark(as("demo-teacher-2"))).map((x) => x.id)).not.toContain(
+      started,
+    );
+    expect(await mockAttendance.getSessionAttendance(as("demo-teacher-2"), started)).toBeNull();
+    expect(await mockAttendance.getSessionAttendance(as("demo-teacher"), started)).not.toBeNull();
+  });
+
   it("reassigning a class moves the dashboard, roster scope and support queue to the new teacher", async () => {
     expect((await mockSupport.listNeedsSupport(as("demo-teacher-2"))).length).toBe(0);
     expect((await mockSchedule.assignTeacher(as(S), A2, TEACHER_BEN)).ok).toBe(true);

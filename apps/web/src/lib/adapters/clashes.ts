@@ -25,7 +25,7 @@ const MAX_MESSAGES = 5;
 const className = (id: string) => classes.find((c) => c.id === id)?.name ?? "another class";
 const centerName = (id: string | null) => centers.find((c) => c.id === id)?.name ?? "this center";
 export const teacherOfSession = (s: StoredSession): string | null =>
-  s.substituteId ?? classTeachers[s.classId] ?? null;
+  s.substituteId ?? s.heldBy ?? classTeachers[s.classId] ?? null;
 
 export function slotOf(s: StoredSession, teacherId: string | null = teacherOfSession(s)): Slot {
   const meta = sessionStore.classMeta(s.classId);

@@ -50,6 +50,7 @@ function toScheduled(s: StoredSession, now: number): ScheduledSession {
     started: Date.parse(s.at) <= now,
     marked: isMarked(s.id),
     substitute: teacherRef(s.substituteId),
+    heldBy: teacherRef(s.heldBy),
     replacedBy: s.replacedBy,
     replaces: s.replaces,
   };
@@ -202,6 +203,14 @@ export const mockSchedule: SchedulePort = {
         new Set(taught.map((x) => x.id)),
       );
       if (reassign.length) return clash(reassign);
+      // Owner 22/11: the change applies to sessions that have not started. A session that has
+      // started (taught, or still to be marked) keeps the teacher who held it — attendance, load
+      // and history stay with them.
+      const previous = classTeachers[classId];
+      if (previous && previous !== teacherId)
+        for (const s of sessionStore.forClass(classId))
+          if (s.state === "scheduled" && Date.parse(s.at) <= now && !s.substituteId && !s.heldBy)
+            sessionStore.update(s.id, { heldBy: previous });
       classTeachers[classId] = teacherId;
       // A substitute who is now the class's own teacher is no longer a substitute.
       for (const s of sessionStore.forClass(classId))
