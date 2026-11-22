@@ -137,7 +137,14 @@ import type { PartnersPort } from "@ogc/contracts";
 import { mockPartners } from "../adapters/mockPartners";
 export const partners: PartnersPort = mockPartners;
 
-// Learning Studio links (owner 22/11). Mock — OGC keeps a course reference per class only.
+// Class courses (owner 22/11). Mock — which OGC-authored course a class follows.
 import type { StudioLinksPort } from "@ogc/contracts";
 import { mockStudioLinks } from "../adapters/mockStudioLinks";
 export const studio: StudioLinksPort = mockStudioLinks;
+
+// Course Studio (owner 22/11). Mock — OGC authors its own courses; learners take them in My Learning.
+import type { ClassCoursePlayerPort, CourseAuthoringPort } from "@ogc/contracts";
+import { mockCourseAuthoring } from "../adapters/mockCourseAuthoring";
+import { mockClassCoursePlayer } from "../adapters/mockClassCoursePlayer";
+export const courseStudio: CourseAuthoringPort = mockCourseAuthoring;
+export const classCourses: ClassCoursePlayerPort = mockClassCoursePlayer;

@@ -35,7 +35,7 @@ const KIND_LABEL = {
   class: "class teacher",
   substitute: "substitute",
   makeup: "make-up",
-  prep: "Learning Studio prep",
+  prep: "Course prep",
 } as const;
 const REFUSAL: Record<string, string> = {
   not_staff: "Only center staff can do this.",

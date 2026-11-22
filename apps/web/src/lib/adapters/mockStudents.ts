@@ -197,7 +197,6 @@ function cardFor(
     studio: studioOfLearner(
       learnerId,
       own.map((c) => c.id),
-      now,
     ),
     tuition: invoices
       ? {

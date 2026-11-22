@@ -1,21 +1,30 @@
 /*
- * Learning Studio links — MOCK adapter (SYNTHETIC). Owner decisions 22/11 (see
- * packages/contracts/src/studio.ts): OGC keeps only a course reference per class; the class
- * teacher proposes, staff (courses:link) link / reject / unlink; only completion comes back from
- * Learning Studio; weekly prep hours on a link count in Workforce. No EduOS code or content.
+ * Class courses — MOCK adapter (SYNTHETIC). Owner decisions 22/11 (see
+ * packages/contracts/src/studio.ts): a class follows one OGC-authored course (Course Studio); the
+ * class teacher proposes, staff (courses:link) link / reject / unlink; completion comes from the
+ * learners' own progress (courseProgress); weekly prep hours on a link count in Workforce.
  */
 import type {
   ClassCourseLink,
   IiosGrantedContext,
   LearnerStudioProgress,
   LinkStatus,
+  StudioCourse,
   StudioLinksPort,
   StudioResult,
 } from "@ogc/contracts";
 import { centers } from "../../fixtures/directory";
 import { classTeachers, classes, rosters } from "../../fixtures/teaching";
 import { teacherName } from "../../fixtures/personas";
-import { studioCourse, studioCourses, studioProgress } from "../integration/mockLearningStudio";
+import {
+  __setLinkedClassesLookup,
+  courseOf,
+  coursesOfOrg,
+  latestVersion,
+  statusOf,
+  type StoredCourse,
+} from "./mockCourseAuthoring";
+import { completionOf } from "./courseProgress";
 import { allows, centerScope, inScope } from "./accessPolicy";
 import { displayNameOf, staffOrgOf, teacherIdOf } from "./viewer";
 import { refill, registerPersistent } from "./persist";
@@ -54,11 +63,11 @@ function seed() {
     const id = `SL-${++seq}`;
     links.set(id, { ...l, id });
   };
-  // A2 Morning already follows a Learning Studio course; Tara proposed one for B1 Evening.
+  // A2 Morning already follows a course; Tara proposed one for B1 Evening.
   add({
     orgId: classes[0].orgId,
     classId: classes[0].id,
-    courseRef: "LS-A2-EVERYDAY",
+    courseRef: "CS-A2-EVERYDAY",
     status: "linked",
     prepHoursPerWeek: 0,
     proposedBy: null,
@@ -70,7 +79,7 @@ function seed() {
   add({
     orgId: classes[1].orgId,
     classId: classes[1].id,
-    courseRef: "LS-B1-SPEAK",
+    courseRef: "CS-B1-SPEAK",
     status: "proposed",
     prepHoursPerWeek: 0,
     proposedBy: "Tara (Teacher)",
@@ -96,10 +105,31 @@ registerPersistent("studioLinks", {
   },
 });
 reset();
+__setLinkedClassesLookup((ref) =>
+  [...links.values()]
+    .filter((l) => l.courseRef === ref && l.status === "linked")
+    .map((l) => classes.find((c) => c.id === l.classId)?.name ?? "a class"),
+);
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────
 const classOf = (id: string) => classes.find((c) => c.id === id);
 const centerName = (id: string) => centers.find((c) => c.id === id)?.name ?? "Center";
+function courseView(c: StoredCourse): StudioCourse {
+  const last = latestVersion(c);
+  return {
+    ref: c.ref,
+    title: last?.content.title ?? c.draft.title,
+    lessons: last?.content.lessons.length ?? 0,
+    version: last?.version ?? null,
+    status: statusOf(c),
+    updatedAt: c.updatedAt,
+    linkable: !!last,
+  };
+}
+const studioCourse = (ref: string, orgId: string): StudioCourse | null => {
+  const c = courseOf(ref, orgId);
+  return c ? courseView(c) : null;
+};
 const activeLinkOf = (classId: string) =>
   [...links.values()].find((l) => l.classId === classId && l.status === "linked") ?? null;
 
@@ -110,7 +140,7 @@ function canDecide(viewer: IiosGrantedContext, classId: string): boolean {
 
 function view(l: StoredLink, viewer: IiosGrantedContext): ClassCourseLink | null {
   const c = classOf(l.classId);
-  const course = studioCourse(l.courseRef);
+  const course = studioCourse(l.courseRef, l.orgId);
   if (!c || !course) return null;
   return {
     id: l.id,
@@ -152,6 +182,10 @@ function visibleClasses(viewer: IiosGrantedContext) {
 
 // ── read-only hooks for other modules ─────────────────────────────────────────────────────────
 
+/** My Learning: the course a class follows right now (linked), or null. */
+export const activeCourseRefOf = (classId: string): string | null =>
+  activeLinkOf(classId)?.courseRef ?? null;
+
 /** Workforce: weekly prep hours of linked courses whose class this teacher teaches. */
 export function prepHoursOf(
   teacherId: string,
@@ -168,11 +202,10 @@ export function prepHoursOf(
     }));
 }
 
-/** Current Students: Learning Studio completion of a learner in their linked classes. */
+/** Current Students: course completion of a learner in their linked classes. */
 export function studioOfLearner(
   learnerId: string,
   classIds: string[],
-  now = Date.now(),
 ): {
   title: string;
   completedLessons: number;
@@ -181,20 +214,19 @@ export function studioOfLearner(
 } | null {
   for (const id of classIds) {
     const l = activeLinkOf(id);
-    const course = l ? studioCourse(l.courseRef) : null;
-    if (!l || !course) continue;
-    const p = studioProgress(
-      l.courseRef,
-      learnerId,
-      Date.parse(l.decidedAt ?? new Date(now).toISOString()),
-      now,
-    );
-    return { title: course.title, ...p };
+    const p = l ? completionOf(l.courseRef, learnerId, l.orgId) : null;
+    if (!p) continue;
+    return {
+      title: p.title,
+      completedLessons: p.completedLessons,
+      totalLessons: p.totalLessons,
+      lastActivityAt: p.lastActivityAt,
+    };
   }
   return null;
 }
 
-/** Decision Engine: learners of linked classes with no Learning Studio activity for `days`. */
+/** Decision Engine: learners of linked classes with no course activity for `days`. */
 export function studioInactiveLearners(orgId: string, days: number, now = Date.now()) {
   const out: {
     learnerId: string;
@@ -208,17 +240,17 @@ export function studioInactiveLearners(orgId: string, days: number, now = Date.n
     if (l.orgId !== orgId || l.status !== "linked") continue;
     const linkedAt = Date.parse(l.decidedAt ?? "");
     if (!Number.isFinite(linkedAt) || now - linkedAt < days * DAY) continue; // give a new link time
-    const course = studioCourse(l.courseRef);
     for (const r of rosters[l.classId] ?? []) {
-      const p = studioProgress(l.courseRef, r.learnerId, linkedAt, now);
-      const last = p.lastActivityAt ? Date.parse(p.lastActivityAt) : linkedAt;
+      const p = completionOf(l.courseRef, r.learnerId, l.orgId);
+      if (!p) continue;
+      const last = p.lastActivityAt ? Math.max(Date.parse(p.lastActivityAt), linkedAt) : linkedAt;
       if (p.completedLessons < p.totalLessons && now - last >= days * DAY)
         out.push({
           learnerId: r.learnerId,
           name: r.displayName,
           classId: l.classId,
           className: classOf(l.classId)?.name ?? "a class",
-          course: course?.title ?? l.courseRef,
+          course: p.title,
           since: new Date(last).toISOString(),
         });
     }
@@ -255,7 +287,22 @@ export const mockStudioLinks: StudioLinksPort = {
   searchCourses: (viewer, query) =>
     withFault("studio.search", () => {
       if (!visibleClasses(viewer)) return latency(null);
-      return latency(studioCourses(query.slice(0, 60)));
+      const q = query.slice(0, 60).trim().toLowerCase();
+      return latency(
+        coursesOfOrg(viewer.orgId)
+          // A teacher finds published courses and their own; staff every course of the org.
+          .filter(
+            (c) =>
+              !teacherIdOf(viewer) ||
+              !!latestVersion(c) ||
+              c.ownerTeacherId === teacherIdOf(viewer),
+          )
+          .map(courseView)
+          .filter((c) => !q || `${c.ref} ${c.title}`.toLowerCase().includes(q))
+          .sort(
+            (a, b) => Number(b.linkable) - Number(a.linkable) || a.title.localeCompare(b.title),
+          ),
+      );
     }),
 
   propose: (viewer, classId, courseRef) =>
@@ -264,7 +311,7 @@ export const mockStudioLinks: StudioLinksPort = {
       const c = classOf(classId);
       if (!t || !c || c.orgId !== viewer.orgId || classTeachers[classId] !== t)
         return refuse("not_allowed", "only the class teacher proposes a course for the class");
-      const course = studioCourse(courseRef);
+      const course = studioCourse(courseRef, c.orgId);
       if (!course) return refuse("not_found");
       if (!course.linkable)
         return refuse("invalid_step", `${course.title} has no published version`);
@@ -299,7 +346,7 @@ export const mockStudioLinks: StudioLinksPort = {
       const org = staffOrgOf(viewer);
       if (!org || !c || c.orgId !== org) return refuse("not_allowed", "center staff link courses");
       if (!allows(viewer, "courses:link", { centerId: c.centerId })) return refuse("access_policy");
-      const course = studioCourse(courseRef);
+      const course = studioCourse(courseRef, org);
       if (!course) return refuse("not_found");
       if (!course.linkable)
         return refuse("invalid_step", `${course.title} has no published version`);
@@ -382,18 +429,19 @@ export const mockStudioLinks: StudioLinksPort = {
       const l = links.get(linkId);
       if (!v || !l || l.status !== "linked" || !v.list.some((c) => c.id === l.classId))
         return latency(null);
-      const now = Date.now();
-      const linkedAt = Date.parse(l.decidedAt ?? new Date(now).toISOString());
       return latency(
         (rosters[l.classId] ?? []).map((r): LearnerStudioProgress => {
-          const p = studioProgress(l.courseRef, r.learnerId, linkedAt, now);
+          const p = completionOf(l.courseRef, r.learnerId, l.orgId);
+          const done = p?.completedLessons ?? 0;
+          const total = p?.totalLessons ?? 0;
           return {
             learnerId: r.learnerId,
             name: r.displayName,
-            completedLessons: p.completedLessons,
-            totalLessons: p.totalLessons,
-            pct: p.totalLessons ? Math.round((p.completedLessons / p.totalLessons) * 100) : 0,
-            lastActivityAt: p.lastActivityAt,
+            completedLessons: done,
+            totalLessons: total,
+            pct: total ? Math.round((done / total) * 100) : 0,
+            lastActivityAt: p?.lastActivityAt ?? null,
+            version: p?.version ?? null,
           };
         }),
       );

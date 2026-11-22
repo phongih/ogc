@@ -14,6 +14,7 @@ import { ALL_SKILLS, skillLabel } from "../learning/intelligence/skills";
 import { confidenceWord, masteryWord } from "../learning/intelligence/friendly";
 import { TodaysMission } from "./TodaysMission";
 import { MyMakeups } from "./MyMakeups";
+import { MyClassCourses } from "./MyClassCourses";
 import { MyRewards } from "./MyRewards";
 
 export function LearnerHome() {
@@ -44,6 +45,8 @@ export function LearnerHome() {
       {liProfile.data && !next.isLoading ? <TodaysMission action={next.data} /> : null}
 
       <MyMakeups />
+
+      <MyClassCourses />
 
       {d.enrolled.length > 0 ? (
         <Card className="flex items-center gap-5">

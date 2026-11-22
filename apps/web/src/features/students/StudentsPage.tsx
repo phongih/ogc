@@ -170,8 +170,8 @@ function StudentCardView({
         </p>
         {c.studio ? (
           <p className="text-sm text-muted" data-testid={`studio-${c.name}`}>
-            Learning Studio · {c.studio.title}: {c.studio.completedLessons} of{" "}
-            {c.studio.totalLessons} lessons · last activity{" "}
+            Class course · {c.studio.title}: {c.studio.completedLessons} of {c.studio.totalLessons}{" "}
+            lessons · last activity{" "}
             {c.studio.lastActivityAt ? formatCenterDate(c.studio.lastActivityAt) : "—"}
           </p>
         ) : null}

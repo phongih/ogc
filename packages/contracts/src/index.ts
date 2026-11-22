@@ -39,3 +39,4 @@ export * from "./workforce.js";
 export * from "./forecast.js";
 export * from "./partners.js";
 export * from "./studio.js";
+export * from "./authoring.js";

@@ -1,8 +1,9 @@
 /*
- * Learning Studio courses (owner decisions 22/11). Teachers author courses in EduOS Learning
- * Studio; OGC keeps only a course reference per class. The class teacher proposes, center staff
- * link / reject / unlink and set weekly prep hours (they count in Workforce). Only completion
- * comes back. No EduOS code or content here. SYNTHETIC — Learning Studio is a mock.
+ * Course Studio (owner decisions 22/11). OGC authors its own courses (lessons of blocks; draft →
+ * review by a different person → immutable published version) and links a published course to a
+ * class: the class teacher proposes, center staff link / reject / unlink and set weekly prep
+ * hours (they count in Workforce). Completion comes from the learners' own progress in My
+ * Learning. SYNTHETIC — mock adapters only; EduOS is not involved.
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -20,13 +21,10 @@ import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDate } from "../../lib/centerTime";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { AccessBanner } from "../access/AccessBanner";
+import { AUTHORED_STATUS } from "./CourseEditorPage";
+import { CourseLibrary } from "./CourseLibrary";
 
-const STATUS: Record<StudioCourseStatus, string> = {
-  published: "Published",
-  unpublished_changes: "Published · unpublished changes",
-  draft: "Draft — not published",
-  archived: "Archived",
-};
+const STATUS: Record<StudioCourseStatus, string> = AUTHORED_STATUS;
 const REFUSAL: Record<string, string> = {
   not_allowed: "Not allowed",
   not_found: "Not found.",
@@ -52,37 +50,42 @@ function Refused({ r }: { r: StudioResult | undefined }) {
   );
 }
 
-export function StudioCoursesPage({ back }: { back: { to: string; label: string } }) {
+export function StudioCoursesPage({
+  back,
+  base,
+}: {
+  back: { to: string; label: string };
+  base: string;
+}) {
   const viewer = useViewer();
   const q = useQuery({ queryKey: ["studio", viewer], queryFn: () => studio.getOverview(viewer) });
-  if (q.isLoading) return <Spinner label="Loading Learning Studio courses" />;
+  if (q.isLoading) return <Spinner label="Loading Course Studio" />;
   if (q.isError)
-    return (
-      <ErrorState message="Could not load Learning Studio courses." onRetry={() => q.refetch()} />
-    );
-  if (!q.data)
-    return <EmptyState title="Learning Studio courses are for staff and class teachers" />;
+    return <ErrorState message="Could not load Course Studio." onRetry={() => q.refetch()} />;
+  if (!q.data) return <EmptyState title="Course Studio is for staff and class teachers" />;
   const o = q.data;
   return (
     <section className="space-y-4">
       <PageHeader
-        title="Learning Studio courses"
-        subtitle="Courses linked to classes · synthetic demo"
+        title="Course Studio"
+        subtitle="Courses OGC writes · class links · synthetic demo"
       />
       <p className="text-xs text-muted">
-        Courses are written and reviewed in EduOS Learning Studio. OGC only keeps which course a
-        class follows and shows each learner&apos;s completion (lessons done, last activity) — no
-        lesson content.{" "}
+        Write a course as lessons of blocks; someone else reviews it before it is published.
+        Learners take the course linked to their class in My Learning and stay on the version they
+        started.{" "}
         {o.role === "teacher"
-          ? "Propose a course for your class; center staff link it."
+          ? "Propose a published course for your class; center staff link it."
           : "Class teachers propose; you link, reject or unlink, and set weekly prep hours (they count in Workforce)."}
       </p>
       <AccessBanner />
+      <CourseLibrary base={base} />
+      <h2 className="pt-2 text-lg font-medium">Classes</h2>
       {o.classes.length === 0 ? <EmptyState title="No classes in your view" /> : null}
       <ul className="space-y-3">
         {o.classes.map((c) => (
           <li key={c.id}>
-            <ClassCard o={o} classId={c.id} />
+            <ClassCard o={o} classId={c.id} base={base} />
           </li>
         ))}
       </ul>
@@ -93,7 +96,7 @@ export function StudioCoursesPage({ back }: { back: { to: string; label: string 
   );
 }
 
-function ClassCard({ o, classId }: { o: StudioOverview; classId: string }) {
+function ClassCard({ o, classId, base }: { o: StudioOverview; classId: string; base: string }) {
   const c = o.classes.find((x) => x.id === classId)!;
   const mine = o.links.filter((l) => l.classId === classId);
   const active = mine.find((l) => l.status === "linked") ?? null;
@@ -110,14 +113,20 @@ function ClassCard({ o, classId }: { o: StudioOverview; classId: string }) {
           </span>
         </h2>
         {active ? (
-          <ActiveLink l={active} canLink={o.canLink} />
+          <ActiveLink l={active} canLink={o.canLink} base={base} />
         ) : (
-          <p className="text-muted">No Learning Studio course linked.</p>
+          <p className="text-muted">No course linked.</p>
         )}
         {proposals.map((p) => (
-          <Proposal key={p.id} p={p} canLink={o.canLink} hasActive={!!active} />
+          <Proposal key={p.id} p={p} canLink={o.canLink} hasActive={!!active} base={base} />
         ))}
-        <AddCourse classId={classId} className={c.name} role={o.role} hasActive={!!active} />
+        <AddCourse
+          classId={classId}
+          className={c.name}
+          role={o.role}
+          hasActive={!!active}
+          base={base}
+        />
         {past.length ? (
           <details>
             <summary className="cursor-pointer text-xs text-muted">Earlier ({past.length})</summary>
@@ -137,26 +146,23 @@ function ClassCard({ o, classId }: { o: StudioOverview; classId: string }) {
   );
 }
 
-function CourseLine({ course }: { course: StudioCourse }) {
+function CourseLine({ course, base }: { course: StudioCourse; base: string }) {
   return (
     <>
       <span className="font-medium">{course.title}</span>{" "}
       <span className="text-muted">
-        · {course.ref} · {course.lessons} lessons · {STATUS[course.status]} ·{" "}
-        <a
-          href={course.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-brand underline"
-        >
-          Open in Learning Studio ↗
-        </a>
+        · {course.ref}
+        {course.version ? ` · v${course.version}` : ""} · {course.lessons} lessons ·{" "}
+        {STATUS[course.status]} ·{" "}
+        <Link to={`${base}/${course.ref}`} className="text-brand underline">
+          Open {course.ref}
+        </Link>
       </span>
     </>
   );
 }
 
-function ActiveLink({ l, canLink }: { l: ClassCourseLink; canLink: boolean }) {
+function ActiveLink({ l, canLink, base }: { l: ClassCourseLink; canLink: boolean; base: string }) {
   const viewer = useViewer();
   const act = useAction();
   const [hours, setHours] = useState(String(l.prepHoursPerWeek));
@@ -171,7 +177,7 @@ function ActiveLink({ l, canLink }: { l: ClassCourseLink; canLink: boolean }) {
     <div className="rounded-ogc border border-brand p-2" data-testid={`linked-${l.className}`}>
       <p>
         <span className="text-xs uppercase text-muted">Linked</span>{" "}
-        <CourseLine course={l.course} />
+        <CourseLine course={l.course} base={base} />
       </p>
       <p className="text-xs text-muted">
         Linked by {l.decidedBy} {l.decidedAt ? formatCenterDate(l.decidedAt) : ""}
@@ -221,7 +227,7 @@ function ActiveLink({ l, canLink }: { l: ClassCourseLink; canLink: boolean }) {
         <table className="mt-2 w-full text-sm" aria-label={`Completion · ${l.className}`}>
           <thead>
             <tr className="text-left text-muted">
-              {["Learner", "Lessons completed", "Last activity"].map((h) => (
+              {["Learner", "Version", "Lessons completed", "Last activity"].map((h) => (
                 <th key={h} scope="col" className="py-1 pr-3 font-normal">
                   {h}
                 </th>
@@ -232,6 +238,7 @@ function ActiveLink({ l, canLink }: { l: ClassCourseLink; canLink: boolean }) {
             {p.data.map((r) => (
               <tr key={r.learnerId} className="border-t border-border">
                 <td className="py-1 pr-3">{r.name}</td>
+                <td className="py-1 pr-3">{r.version ? `v${r.version}` : "—"}</td>
                 <td className="py-1 pr-3">
                   {r.completedLessons} of {r.totalLessons} ({r.pct}%)
                 </td>
@@ -251,10 +258,12 @@ function Proposal({
   p,
   canLink,
   hasActive,
+  base,
 }: {
   p: ClassCourseLink;
   canLink: boolean;
   hasActive: boolean;
+  base: string;
 }) {
   const viewer = useViewer();
   const act = useAction();
@@ -264,7 +273,7 @@ function Proposal({
     <div className="rounded-ogc border border-border p-2" data-testid={`proposal-${p.course.ref}`}>
       <p>
         <span className="text-xs uppercase text-muted">Proposed</span>{" "}
-        <CourseLine course={p.course} />
+        <CourseLine course={p.course} base={base} />
       </p>
       <p className="text-xs text-muted">
         by {p.proposedBy} {p.proposedAt ? formatCenterDate(p.proposedAt) : ""}
@@ -318,11 +327,13 @@ function AddCourse({
   className,
   role,
   hasActive,
+  base,
 }: {
   classId: string;
   className: string;
   role: "staff" | "teacher";
   hasActive: boolean;
+  base: string;
 }) {
   const viewer = useViewer();
   const act = useAction();
@@ -343,16 +354,16 @@ function AddCourse({
   return (
     <div className="space-y-1 rounded-ogc border border-border p-2">
       <input
-        aria-label={`Search Learning Studio · ${className}`}
-        placeholder="Search Learning Studio courses"
+        aria-label={`Search courses · ${className}`}
+        placeholder="Search published courses"
         className="w-full rounded-ogc border border-border bg-surface p-1"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
-      <ul className="space-y-1" aria-label={`Learning Studio results · ${className}`}>
+      <ul className="space-y-1" aria-label={`Course results · ${className}`}>
         {(r.data ?? []).map((c) => (
           <li key={c.ref} className="flex flex-wrap items-center gap-2">
-            <CourseLine course={c} />
+            <CourseLine course={c} base={base} />
             {c.linkable ? (
               <Button
                 variant="ghost"

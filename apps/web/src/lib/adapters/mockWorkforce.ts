@@ -130,7 +130,7 @@ function loadOf(teacherId: string, org: string, now: number): TeacherLoad {
     g.hours = round(g.hours + hoursOf(x));
     groups.set(key, g);
   }
-  // Learning Studio: weekly prep hours staff set on a linked course count for the class teacher.
+  // Class courses: weekly prep hours staff set on a linked course count for the class teacher.
   const prep = prepHoursOf(teacherId).filter((p) =>
     classes.some((c) => c.id === p.classId && c.orgId === org),
   );

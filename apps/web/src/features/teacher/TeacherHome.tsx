@@ -43,7 +43,7 @@ export function TeacherHome() {
         to="/app/teaching/courses"
         className="inline-block rounded-ogc border border-border px-4 py-2 text-sm text-brand hover:bg-surface"
       >
-        Learning Studio courses
+        Course Studio
       </Link>
       <div className="grid gap-3 sm:grid-cols-3">
         <StatTile label="Classes" value={d.classes.length} />

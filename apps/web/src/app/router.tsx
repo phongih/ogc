@@ -36,6 +36,8 @@ const StudentsPage = page(() => import("../features/students/StudentsPage"), "St
 const ForecastPage = page(() => import("../features/forecast/ForecastPage"), "ForecastPage");
 const PartnersPage = page(() => import("../features/partners/PartnersPage"), "PartnersPage");
 const StudioCoursesPage = page(() => import("../features/studio/StudioCoursesPage"), "StudioCoursesPage");
+const CourseEditorPage = page(() => import("../features/studio/CourseEditorPage"), "CourseEditorPage");
+const ClassLessonPage = page(() => import("../features/learner/ClassLessonPage"), "ClassLessonPage");
 const AdmissionsPage = page(() => import("../features/admissions/AdmissionsPage"), "AdmissionsPage");
 const BillingPage = page(() => import("../features/billing/BillingPage"), "BillingPage");
 const TuitionPage = page(() => import("../features/billing/TuitionPage"), "TuitionPage");
@@ -69,8 +71,10 @@ export const routes = [
       { path: "operations/workforce", element: <RequireSection section="operations"><Lazy><WorkforcePage /></Lazy></RequireSection> },
       { path: "operations/forecast", element: <RequireSection section="operations"><Lazy><ForecastPage /></Lazy></RequireSection> },
       { path: "operations/partners", element: <RequireSection section="operations"><Lazy><PartnersPage /></Lazy></RequireSection> },
-      { path: "operations/courses", element: <RequireSection section="operations"><Lazy><StudioCoursesPage back={{ to: "/app/operations", label: "Center operations" }} /></Lazy></RequireSection> },
-      { path: "teaching/courses", element: <RequireSection section="teaching"><Lazy><StudioCoursesPage back={{ to: "/app/teaching", label: "Teaching" }} /></Lazy></RequireSection> },
+      { path: "operations/courses", element: <RequireSection section="operations"><Lazy><StudioCoursesPage back={{ to: "/app/operations", label: "Center operations" }} base="/app/operations/courses" /></Lazy></RequireSection> },
+      { path: "operations/courses/:ref", element: <RequireSection section="operations"><Lazy><CourseEditorPage base="/app/operations/courses" /></Lazy></RequireSection> },
+      { path: "teaching/courses", element: <RequireSection section="teaching"><Lazy><StudioCoursesPage back={{ to: "/app/teaching", label: "Teaching" }} base="/app/teaching/courses" /></Lazy></RequireSection> },
+      { path: "teaching/courses/:ref", element: <RequireSection section="teaching"><Lazy><CourseEditorPage base="/app/teaching/courses" /></Lazy></RequireSection> },
       { path: "operations/students", element: <RequireSection section="operations"><Lazy><StudentsPage back={{ to: "/app/operations", label: "Center operations" }} /></Lazy></RequireSection> },
       { path: "teaching/students", element: <RequireSection section="teaching"><Lazy><StudentsPage back={{ to: "/app/teaching", label: "Teaching" }} /></Lazy></RequireSection> },
       { path: "operations/admissions", element: <RequireSection section="operations"><Lazy><AdmissionsPage /></Lazy></RequireSection> },
@@ -84,6 +88,7 @@ export const routes = [
       { path: "operations", element: <RequireSection section="operations"><Lazy><OperationsHome /></Lazy></RequireSection> },
       { path: "learning", element: <RequireSection section="learning"><Lazy><LearnerHome /></Lazy></RequireSection> },
       { path: "learning/courses/:courseId", element: <RequireSection section="learning"><Lazy><CourseLearning /></Lazy></RequireSection> },
+      { path: "learning/class-courses/:ref/:lessonId", element: <RequireSection section="learning"><Lazy><ClassLessonPage /></Lazy></RequireSection> },
       { path: "learning/practice/:activityId", element: <RequireSection section="learning"><Lazy><PracticeView /></Lazy></RequireSection> },
       { path: "learning/speaking/:activityId", element: <RequireSection section="learning"><Lazy><SpeakingStudio /></Lazy></RequireSection> },
       { path: "teaching", element: <RequireSection section="teaching"><Lazy><TeacherHome /></Lazy></RequireSection> },

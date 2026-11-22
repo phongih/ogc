@@ -144,9 +144,9 @@ export const DEFAULT_RULES: Seed[] = [
   {
     kind: "studio_inactive",
     category: "engagement",
-    name: "No Learning Studio activity",
+    name: "No class course activity",
     description:
-      "A learner of a class linked to a Learning Studio course has not completed anything there for this many days (completion only).",
+      "A learner of a class linked to a course has not completed a lesson of it for this many days (completion only).",
     enabled: false,
     priority: "P3",
     cooldownMin: 4320,
