@@ -26,6 +26,12 @@ import { allows } from "./accessPolicy";
 import { ogcAccountOf, staffOrgOf } from "./viewer";
 import { listPricesOfOrg } from "./mockCenterSetup";
 import { withFault } from "./faults";
+import {
+  allLeads,
+  createReferralLead,
+  leadById,
+  type StoredLead as AdmissionsLead,
+} from "./mockAdmissions";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -97,31 +103,40 @@ const DEFAULT_PROGRAM: ReferralProgram = {
 
 interface StoredLead extends ReferralLead {
   orgId: string;
+  centerId: string;
   referrerPrincipalId: string;
+}
+
+// The reward decision per referral lead. The lead itself lives in Admissions (one pipeline, 22/11).
+interface Reward {
+  status: "confirmed" | "rejected";
+  rewardVnd: number | null;
+  at: string;
+  reason: string | null;
 }
 
 const programs = new Map<string, ReferralProgram>();
 const clicks = new Map<string, number>(); // code → count
-const leads = new Map<string, StoredLead>();
+const rewards = new Map<string, Reward>(); // admissions lead id → reward decision
 const wallets = new Map<string, WalletEntry[]>(); // principalId → entries
 let seq = 0;
 
 function resetGrowth() {
   programs.clear();
   clicks.clear();
-  leads.clear();
+  rewards.clear();
   wallets.clear();
   seq = 0;
 }
 sessionStore.onReset(resetGrowth);
 export const __resetGrowthForTests = resetGrowth;
 registerPersistent("growth", {
-  dump: () => ({ programs, clicks, leads, wallets, seq }),
+  dump: () => ({ programs, clicks, rewards, wallets, seq }),
   load: (raw) => {
     const r = raw as Record<string, unknown>;
     refill(programs, r.programs);
     refill(clicks, r.clicks);
-    refill(leads, r.leads);
+    refill(rewards, r.rewards); // saves from before 22/11 kept leads here — they are not carried over
     refill(wallets, r.wallets);
     seq = Number(r.seq) || 0;
   },
@@ -145,6 +160,59 @@ const nameOfLearner = (learnerId: string) => {
   return null;
 };
 
+/** A referral lead as Growth sees it: the Admissions lead + the reward decision. */
+function toStored(a: AdmissionsLead): StoredLead {
+  const r = rewards.get(a.id);
+  const ref = a.referral!;
+  const at = (stage: AdmissionsLead["stage"]) =>
+    a.history.find((h) => h.stage === stage)?.at ?? null;
+  const status: ReferralLead["status"] = r
+    ? r.status
+    : a.stage === "lost"
+      ? "rejected"
+      : a.stage === "enrolled"
+        ? "enrolled"
+        : a.stage === "placement" || a.stage === "offer"
+          ? "placed"
+          : "lead";
+  return {
+    id: a.id,
+    orgId: a.orgId,
+    centerId: a.centerId,
+    referrerPrincipalId: ref.principalId,
+    code: ref.code,
+    referrerName: ref.name,
+    learnerName: a.learnerName,
+    courseCode: a.courseCode,
+    centerName: centers.find((c) => c.id === a.centerId)?.name ?? "",
+    campaignId: ref.campaignId,
+    status,
+    stage: a.stage,
+    createdAt: a.createdAt,
+    placedAt: at("placement"),
+    enrolledAt: at("enrolled"),
+    invoiceNo: a.invoiceNo,
+    firstPaymentVnd: a.firstPaymentVnd,
+    rewardVnd: r?.status === "confirmed" ? r.rewardVnd : null,
+    confirmedAt: r?.status === "confirmed" ? r.at : null,
+    rejectedReason:
+      r?.status === "rejected"
+        ? r.reason
+        : a.stage === "lost"
+          ? `Lost: ${a.lostReason ?? ""}`
+          : null,
+    flags: [],
+  };
+}
+const referralLeads = (): StoredLead[] =>
+  allLeads()
+    .filter((a) => a.source === "referral" && a.referral)
+    .map(toStored);
+const leadOf = (id: string): StoredLead | null => {
+  const a = leadById(id);
+  return a && a.source === "referral" && a.referral ? toStored(a) : null;
+};
+
 /** Anti-fraud checks, recomputed every time a lead is shown or confirmed. */
 function flagsOf(l: StoredLead): FraudFlag[] {
   const ref = referrers().find((r) => r.principalId === l.referrerPrincipalId);
@@ -155,21 +223,22 @@ function flagsOf(l: StoredLead): FraudFlag[] {
   if (own && norm(nameOfLearner(own) ?? "") === name) f.push("self_referral");
   else if (ref?.household.some((id) => norm(nameOfLearner(id) ?? "") === name))
     f.push("same_household");
-  const center = centers.find((c) => c.name === l.centerName);
   const atCenter = classes
-    .filter((c) => c.centerId === center?.id)
+    .filter((c) => c.centerId === l.centerId)
     .flatMap((c) => rosters[c.id] ?? []);
-  const otherLead = [...leads.values()].some(
+  // Any other open lead of the pipeline (any source) for the same name at the same center.
+  const otherLead = allLeads().some(
     (o) =>
       o.id !== l.id &&
       o.orgId === l.orgId &&
       norm(o.learnerName) === name &&
-      o.centerName === l.centerName &&
-      o.status !== "rejected",
+      o.centerId === l.centerId &&
+      o.stage !== "lost" &&
+      rewards.get(o.id)?.status !== "rejected",
   );
   if (atCenter.some((r) => norm(r.displayName) === name) || otherLead) f.push("duplicate");
   if (
-    [...leads.values()].some(
+    referralLeads().some(
       (o) =>
         o.id !== l.id &&
         o.status === "confirmed" &&
@@ -182,9 +251,10 @@ function flagsOf(l: StoredLead): FraudFlag[] {
 }
 
 const view = (l: StoredLead): ReferralLead => {
-  const { orgId: _o, referrerPrincipalId: _r, ...rest } = l;
+  const { orgId: _o, referrerPrincipalId: _r, centerId: _c, ...rest } = l;
   void _o;
   void _r;
+  void _c;
   return { ...rest, flags: flagsOf(l) };
 };
 
@@ -220,42 +290,6 @@ export function refundCredit(principalId: string, amountVnd: number, note: strin
   wallets.set(principalId, list);
 }
 
-export interface LeadForBilling {
-  id: string;
-  orgId: string;
-  status: ReferralLead["status"];
-  learnerName: string;
-  courseCode: string;
-  centerName: string;
-  invoiceNo: string | null;
-}
-export function leadForBilling(leadId: string): LeadForBilling | null {
-  const l = leads.get(leadId);
-  return l
-    ? {
-        id: l.id,
-        orgId: l.orgId,
-        status: l.status,
-        learnerName: l.learnerName,
-        courseCode: l.courseCode,
-        centerName: l.centerName,
-        invoiceNo: l.invoiceNo ?? null,
-      }
-    : null;
-}
-export function attachFirstInvoice(leadId: string, invoiceNo: string | null): void {
-  const l = leads.get(leadId);
-  if (l) l.invoiceNo = invoiceNo;
-}
-/** The first invoice is paid in full: the lead is enrolled and paid, amount from the invoice. */
-export function markLeadPaid(leadId: string, amountVnd: number): void {
-  const l = leads.get(leadId);
-  if (!l || l.status !== "placed") return;
-  l.status = "enrolled";
-  l.enrolledAt = new Date().toISOString();
-  l.firstPaymentVnd = amountVnd;
-}
-
 const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
 const monthOf = (iso: string) =>
   new Date(Date.parse(iso) + 7 * 3600 * 1000).toISOString().slice(0, 7); // center time
@@ -264,7 +298,7 @@ function staffWrite(viewer: IiosGrantedContext, leadId: string): StoredLead | Gr
   const org = staffOrgOf(viewer);
   if (!org) return { ok: false, reason: "not_staff" };
   if (!allows(viewer, "growth:manage")) return { ok: false, reason: "access_policy" };
-  const l = leads.get(leadId);
+  const l = leadOf(leadId);
   if (!l || l.orgId !== org) return { ok: false, reason: "not_found" };
   return l;
 }
@@ -278,14 +312,14 @@ export const mockGrowth: GrowthPort = {
       const me = referrerOf(viewer);
       if (!me) return latency<MyReferrals | null>(null);
       const program = structuredClone(programOf(me.orgId));
-      const mine = [...leads.values()].filter((l) => l.referrerPrincipalId === me.principalId);
+      const mine = referralLeads().filter((l) => l.referrerPrincipalId === me.principalId);
       const conversions = mine.filter((l) => l.status === "confirmed").length;
       const c = clicks.get(me.code) ?? 0;
       const board = referrers()
         .filter((r) => r.orgId === me.orgId)
         .map((r) => ({
           r,
-          n: [...leads.values()].filter(
+          n: referralLeads().filter(
             (l) => l.referrerPrincipalId === r.principalId && l.status === "confirmed",
           ).length,
         }))
@@ -346,27 +380,18 @@ export const mockGrowth: GrowthPort = {
       const camp = input.campaignId
         ? programOf(r.orgId).campaigns.find((c) => c.id === input.campaignId && c.active)
         : undefined;
-      const id = `LEAD-${++seq}`;
-      leads.set(id, {
-        id,
+      const center = centers.find((c) => c.orgId === r.orgId && c.name === input.centerName)!;
+      createReferralLead({
         orgId: r.orgId,
-        referrerPrincipalId: r.principalId,
-        code: r.code,
-        referrerName: r.name,
         learnerName: name,
         courseCode: input.courseCode,
-        centerName: input.centerName,
-        campaignId: camp?.id ?? null,
-        status: "lead",
-        createdAt: new Date().toISOString(),
-        placedAt: null,
-        enrolledAt: null,
-        invoiceNo: null,
-        firstPaymentVnd: null,
-        rewardVnd: null,
-        confirmedAt: null,
-        rejectedReason: null,
-        flags: [],
+        centerId: center.id,
+        referral: {
+          code: r.code,
+          principalId: r.principalId,
+          name: r.name,
+          campaignId: camp?.id ?? null,
+        },
       });
       return ok();
     }),
@@ -376,21 +401,11 @@ export const mockGrowth: GrowthPort = {
       const org = staffOrgOf(viewer);
       if (!org) return latency<ReferralLead[] | null>(null);
       return latency(
-        [...leads.values()]
+        referralLeads()
           .filter((l) => l.orgId === org)
           .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
           .map(view),
       );
-    }),
-
-  markPlaced: (viewer, leadId) =>
-    withFault("growth.markPlaced", () => {
-      const l = staffWrite(viewer, leadId);
-      if (isResult(l)) return latency(l);
-      if (l.status !== "lead") return refuse("invalid_step", "only a new lead can be placed");
-      l.status = "placed";
-      l.placedAt = new Date().toISOString();
-      return ok();
     }),
 
   confirm: (viewer, leadId) =>
@@ -407,13 +422,12 @@ export const mockGrowth: GrowthPort = {
         Math.round((l.firstPaymentVnd * (program.rewardPct + bonus)) / 100),
         program.capVnd,
       );
-      l.status = "confirmed";
-      l.confirmedAt = new Date().toISOString();
-      l.rewardVnd = reward;
+      const at = new Date().toISOString();
+      rewards.set(l.id, { status: "confirmed", rewardVnd: reward, at, reason: null });
       const list = wallets.get(l.referrerPrincipalId) ?? [];
       list.push({
         id: `W-${++seq}`,
-        at: l.confirmedAt,
+        at,
         kind: "credit",
         amountVnd: reward,
         note: `Referral: ${l.learnerName} enrolled in ${l.courseCode} (${program.rewardPct + bonus}% of first payment${reward === program.capVnd ? ", capped" : ""}) — applied to your next invoice`,
@@ -429,8 +443,12 @@ export const mockGrowth: GrowthPort = {
       if (l.status === "confirmed" || l.status === "rejected")
         return refuse("invalid_step", "already decided");
       if (reason.trim().length < 3) return refuse("invalid", "give a reason");
-      l.status = "rejected";
-      l.rejectedReason = reason.trim();
+      rewards.set(l.id, {
+        status: "rejected",
+        rewardVnd: null,
+        at: new Date().toISOString(),
+        reason: reason.trim(),
+      });
       return ok();
     }),
 
@@ -439,7 +457,7 @@ export const mockGrowth: GrowthPort = {
       const org = staffOrgOf(viewer);
       if (!org) return latency<GrowthMetrics | null>(null);
       const refs = referrers().filter((r) => r.orgId === org);
-      const all = [...leads.values()].filter((l) => l.orgId === org);
+      const all = referralLeads().filter((l) => l.orgId === org);
       const confirmed = all.filter((l) => l.status === "confirmed");
       const thisMonth = monthOf(new Date().toISOString());
       const months = [...new Set(all.map((l) => monthOf(l.createdAt)))].sort();

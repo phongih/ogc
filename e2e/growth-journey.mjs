@@ -80,12 +80,19 @@ async function main() {
     await page.getByRole("link", { name: "Center operations" }).first().click();
     await page.getByRole("link", { name: "Growth Engine" }).click();
     await page.getByRole("tab", { name: "Funnel" }).click();
-    await page.getByRole("button", { name: "Placement done · Bao T." }).click();
-    // Billing (22/11): staff issue the first invoice; the lead moves on when it is paid in full.
-    await page.getByRole("button", { name: "Issue first invoice · Bao T." }).click();
-    await page.getByText(/First invoice INV-\d{4}-\d{4} — waiting for payment/).waitFor();
-    check("[sam] first invoice issued from the funnel", true);
-    await page.getByRole("link", { name: "Billing", exact: true }).click();
+    await page.getByText(/Admissions stage: new/).waitFor();
+    check("[sam] referral lead shows its Admissions stage in the funnel", true);
+    // One pipeline (22/11): placement and the first invoice are done in Admissions.
+    await page.getByRole("link", { name: "Admissions", exact: true }).click();
+    await page.getByRole("tab", { name: "Pipeline" }).click();
+    await page.getByRole("button", { name: "Open Bao T." }).click();
+    const panel = page.getByRole("region", { name: "Lead Bao T." });
+    await panel.getByLabel("Stage for Bao T.").selectOption("placement");
+    await panel.getByRole("button", { name: "Move · Bao T." }).click();
+    await page.getByRole("region", { name: "Lead Bao T." }).getByRole("button", { name: "Issue first invoice · Bao T." }).click();
+    await page.getByRole("region", { name: "Lead Bao T." }).getByText(/First invoice INV-\d{4}-\d{4} · waiting for payment/).waitFor();
+    check("[sam] first invoice issued from Admissions", true);
+    await page.getByRole("region", { name: "Lead Bao T." }).getByRole("link", { name: "Billing" }).click();
     await page.getByRole("tab", { name: "Invoices" }).click();
     const bao = page.locator("li", { hasText: "Bao T." });
     const no = ((await bao.locator("[data-invoice]").getAttribute("data-invoice")) ?? "").trim();
@@ -133,7 +140,7 @@ async function main() {
     await page.getByLabel("Learner name").fill("Cuong V.");
     await page.getByRole("button", { name: "Send enquiry" }).click();
     await page.getByText(/the center will be in touch/).waitFor();
-    await samTab.getByRole("button", { name: "Placement done · Cuong V." }).waitFor({ timeout: 5000 });
+    await samTab.locator("[data-lead=\"Cuong V.\"]").waitFor({ timeout: 5000 });
     check("[sam, other tab] the new lead appears without a reload", true);
     await page.close();
     await samTab.goto(`${base}/login`, { waitUntil: "networkidle" }); // sign-in is per tab load

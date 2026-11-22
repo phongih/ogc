@@ -30,6 +30,7 @@ export const PolicyAction = z.enum([
   "rewards:manage",
   "growth:manage",
   "billing:manage",
+  "admissions:manage",
 ]);
 export type PolicyAction = z.infer<typeof PolicyAction>;
 
@@ -99,6 +100,14 @@ export const POLICY_CATALOG: CatalogEntry[] = [
     action: "billing:manage",
     description:
       "Billing: propose fee lines, issue invoices, record payments, void unpaid invoices (an Org Admin approves fee lines)",
+    roles: ["staff"],
+    criteria: ["centerId"],
+    readonlyFields: [],
+  },
+  {
+    action: "admissions:manage",
+    description:
+      "Admissions: add leads, assign counselors, move stages, log activities, tune the lead score",
     roles: ["staff"],
     criteria: ["centerId"],
     readonlyFields: [],

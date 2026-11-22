@@ -2,7 +2,13 @@
 // wallet (mock); counts only after enrolment + first payment + staff confirmation, with anti-fraud.
 import { beforeEach, describe, expect, it } from "vitest";
 import { as } from "../../test/grants";
-import { __resetGrowthForTests, markLeadPaid, mockGrowth as G } from "./mockGrowth";
+import { __resetGrowthForTests, mockGrowth as G } from "./mockGrowth";
+import {
+  __resetAdmissionsForTests,
+  attachFirstInvoice,
+  markLeadPaid,
+  mockAdmissions as A,
+} from "./mockAdmissions";
 import { __attachForTests } from "../integration/mockIiosPolicy";
 import { centers } from "../../fixtures/directory";
 
@@ -11,7 +17,10 @@ const MAI = "demo-guardian";
 const MINH = "demo-learner-2"; // adult learner
 const S = "demo-staff";
 
-beforeEach(() => __resetGrowthForTests());
+beforeEach(() => {
+  __resetGrowthForTests();
+  __resetAdmissionsForTests();
+});
 
 const codeOf = async (p: string) => (await G.getMine(as(p)))!.code;
 async function lead(referrer: string, learnerName: string, opts: { campaignId?: string } = {}) {
@@ -25,10 +34,11 @@ async function lead(referrer: string, learnerName: string, opts: { campaignId?: 
   expect(r).toEqual({ ok: true });
   return (await G.listLeads(as(S)))!.find((l) => l.learnerName === learnerName)!.id;
 }
-// Billing moves a placed lead to "enrolled and paid" when its first invoice is paid (see
-// mockBilling.test.ts for that path); here the hook is called directly with any amount.
+// The referral lead lives in Admissions (one pipeline). Billing moves it to "offer" and
+// "enrolled" (see mockBilling.test.ts for that path); here the hooks are called with any amount.
 async function enrol(id: string, vnd: number) {
-  expect(await G.markPlaced(as(S), id)).toEqual({ ok: true });
+  expect(await A.moveStage(as(S), id, "placement")).toEqual({ ok: true });
+  attachFirstInvoice(id, "INV-TEST");
   markLeadPaid(id, vnd);
 }
 
@@ -52,7 +62,7 @@ describe("growth — funnel and reward", () => {
   it("lead → placement → enrolled + paid → staff confirm → tuition credit (5%)", async () => {
     const id = await lead(MAI, "Bao T.");
     expect(await G.confirm(as(S), id)).toMatchObject({ ok: false, reason: "invalid_step" });
-    markLeadPaid(id, 10_000_000); // not placed yet → ignored
+    markLeadPaid(id, 10_000_000); // no first invoice yet → ignored
     expect((await G.listLeads(as(S)))![0].status).toBe("lead");
     await enrol(id, 10_000_000);
     expect(await G.confirm(as(S), id)).toEqual({ ok: true });
@@ -118,14 +128,17 @@ describe("growth — anti-fraud blocks the reward", () => {
 });
 
 describe("growth — staff, access and metrics", () => {
-  it("only staff run the funnel; an access policy without growth:manage blocks writes", async () => {
+  it("only staff decide rewards; an access policy without growth:manage blocks writes", async () => {
     const id = await lead(MAI, "Bao T.");
     expect(await G.listLeads(as("demo-teacher"))).toBeNull();
-    expect(await G.markPlaced(as("demo-teacher"), id)).toEqual({ ok: false, reason: "not_staff" });
+    expect(await G.reject(as("demo-teacher"), id, "test")).toEqual({
+      ok: false,
+      reason: "not_staff",
+    });
     __attachForTests("iios-principal-staff-1", "policy-front-desk-d1");
-    expect(await G.markPlaced(as(S), id)).toEqual({ ok: false, reason: "access_policy" });
+    expect(await G.reject(as(S), id, "test")).toEqual({ ok: false, reason: "access_policy" });
     __attachForTests("iios-principal-staff-1", null);
-    expect(await G.markPlaced(as("demo-staff-org2"), id)).toEqual({
+    expect(await G.reject(as("demo-staff-org2"), id, "test")).toEqual({
       ok: false,
       reason: "not_found",
     });

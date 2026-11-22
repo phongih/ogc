@@ -109,8 +109,10 @@ import { mockGamification } from "../adapters/mockGamification";
 export const gamification: GamificationPort = mockGamification;
 
 // Growth Engine · referrals (owner 22/11). Mock, synthetic — no money moves.
-import type { BillingPort, GrowthPort } from "@ogc/contracts";
+import type { AdmissionsPort, BillingPort, GrowthPort } from "@ogc/contracts";
 import { mockBilling } from "../adapters/mockBilling";
+import { mockAdmissions } from "../adapters/mockAdmissions";
 import { mockGrowth } from "../adapters/mockGrowth";
 export const growth: GrowthPort = mockGrowth;
 export const billing: BillingPort = mockBilling;
+export const admissions: AdmissionsPort = mockAdmissions;

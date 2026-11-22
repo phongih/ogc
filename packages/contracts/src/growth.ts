@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { IiosGrantedContext } from "./iiosContext.js";
+import type { LeadStage } from "./admissions.js";
 
 /*
  * Growth Engine · referrals — ADDITIVE, SYNTHETIC, mock only (pattern from EduOS SGE).
@@ -38,6 +39,7 @@ export interface ReferralLead {
   centerName: string;
   campaignId: string | null;
   status: LeadStatus;
+  stage: LeadStage; // the lead's Admissions stage (one pipeline, 22/11)
   createdAt: string;
   placedAt: string | null;
   enrolledAt: string | null;
@@ -122,7 +124,7 @@ export interface GrowthPort {
   ): Promise<GrowthResult>;
   // Center staff of the organization.
   listLeads(viewer: IiosGrantedContext): Promise<ReferralLead[] | null>;
-  markPlaced(viewer: IiosGrantedContext, leadId: string): Promise<GrowthResult>;
+  // Placement and the first invoice happen in Admissions / Billing (one pipeline, 22/11).
   // "Enrolled and paid" is no longer a staff click: Billing moves the lead when its first invoice
   // is paid (BillingPort.issueFirstInvoice → recordPayment), with the amount from the invoice.
   confirm(viewer: IiosGrantedContext, leadId: string): Promise<GrowthResult>;

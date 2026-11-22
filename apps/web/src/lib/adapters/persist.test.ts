@@ -12,6 +12,7 @@ import {
   saveDemoState,
 } from "./persist";
 import { __resetGrowthForTests, mockGrowth } from "./mockGrowth";
+import { __resetAdmissionsForTests } from "./mockAdmissions";
 import { __resetAttendanceForTests, mockAttendance } from "./mockAttendance";
 import { mockCenterSetup } from "./mockCenterSetup";
 import { mockMakeup } from "./mockMakeup";
@@ -35,6 +36,7 @@ beforeEach(() => {
 describe("demo persistence", () => {
   it("every mock store is registered", () => {
     expect(registeredKeys().sort()).toEqual([
+      "admissions",
       "attendance",
       "billing",
       "centerSetup",
@@ -135,6 +137,7 @@ describe("demo persistence", () => {
 
   it("another tab's save reaches this tab's stores at once (owner 22/11: a /join referral never reached Sam's Funnel)", async () => {
     __resetGrowthForTests();
+    __resetAdmissionsForTests();
     const changed: number[] = [];
     const stop = followOtherTabs(() => changed.push(1));
     // "Other tab": the friend sends the enquiry and that tab saves.
@@ -148,8 +151,9 @@ describe("demo persistence", () => {
     ).toEqual({ ok: true });
     saveDemoState();
     const saved = window.localStorage.getItem(DEMO_STORAGE_KEY);
-    // "This tab" loaded earlier: its in-memory store has no lead.
+    // "This tab" loaded earlier: its in-memory stores have no lead (it lives in Admissions).
     __resetGrowthForTests();
+    __resetAdmissionsForTests();
     expect(await mockGrowth.listLeads(as(S))).toEqual([]);
     window.dispatchEvent(new StorageEvent("storage", { key: DEMO_STORAGE_KEY, newValue: saved }));
     expect((await mockGrowth.listLeads(as(S)))!.map((l) => l.learnerName)).toEqual(["Bao T."]);

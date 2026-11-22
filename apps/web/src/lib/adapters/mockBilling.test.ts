@@ -6,6 +6,7 @@ import type { FeeLineDraft } from "@ogc/contracts";
 import { as } from "../../test/grants";
 import { __resetBillingForTests, mockBilling as B, overdueInvoicesOf } from "./mockBilling";
 import { __resetGrowthForTests, mockGrowth as G } from "./mockGrowth";
+import { __resetAdmissionsForTests, mockAdmissions as A } from "./mockAdmissions";
 import { __attachForTests } from "../integration/mockIiosPolicy";
 import { centers, organizations } from "../../fixtures/directory";
 
@@ -21,6 +22,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date("2026-11-22T05:00:00Z"));
   __resetGrowthForTests();
+  __resetAdmissionsForTests();
   __resetBillingForTests();
 });
 afterEach(() => {
@@ -190,7 +192,7 @@ describe("billing — referrals and wallet credit", () => {
     ).toEqual({ ok: true });
     const leadId = (await G.listLeads(as(S)))![0].id;
     expect(await B.issueFirstInvoice(as(S), leadId)).toMatchObject({ reason: "invalid_step" });
-    await G.markPlaced(as(S), leadId);
+    await A.moveStage(as(S), leadId, "placement");
     const issued = await B.issueFirstInvoice(as(S), leadId);
     expect(issued).toMatchObject({ ok: true, invoiceNo: expect.stringMatching(/^INV-2026-/) });
     expect(await B.issueFirstInvoice(as(S), leadId)).toMatchObject({ reason: "invalid_step" });
@@ -235,7 +237,7 @@ describe("billing — referrals and wallet credit", () => {
     const code = (await G.getMine(as(MAI)))!.code;
     await G.submitLead(code, { learnerName: "Dung K.", courseCode: "ENG-B1", centerName: D1.name });
     const leadId = (await G.listLeads(as(S)))![0].id;
-    await G.markPlaced(as(S), leadId);
+    await A.moveStage(as(S), leadId, "placement");
     await B.issueFirstInvoice(as(S), leadId);
     const inv = (await B.listInvoices(as(S)))!.find((i) => i.learnerName === "Dung K.")!;
     expect(inv.lines[0].description).toBe("ENG-B1 · Tuition · Term 1 2026-2027");
@@ -254,7 +256,7 @@ describe("billing — referrals and wallet credit", () => {
       centerName: D1.name,
     });
     const leadId = (await G.listLeads(as(S)))![0].id;
-    await G.markPlaced(as(S), leadId);
+    await A.moveStage(as(S), leadId, "placement");
     // An Org Admin retires every A2 tuition line → nothing approved left to invoice.
     for (const l of (await B.listFeeLines(as(ADMIN), "2026-2027"))!)
       if (l.courseCode === "ENG-A2" && l.kind === "tuition" && l.status === "approved")
