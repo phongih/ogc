@@ -317,7 +317,11 @@ function SessionRow({
                   act.mutate(() => schedule.setSubstitute(viewer, s.id, teacherId));
                 }}
               >
-                <option value="">{cls.teacher?.name ?? "Class teacher"} (class teacher)</option>
+                <option value="">
+                  {s.heldBy
+                    ? `${s.heldBy.name} (class teacher when it started)`
+                    : `${cls.teacher?.name ?? "Class teacher"} (class teacher)`}
+                </option>
                 {teachers
                   .filter((t) => t.id !== cls.teacher?.id)
                   .map((t) => (

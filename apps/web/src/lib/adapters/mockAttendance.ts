@@ -46,10 +46,12 @@ function ownsClass(viewer: IiosGrantedContext, classId: string): boolean {
 // The owner of the class, or this session's substitute — same tenant either way.
 // An access policy can narrow this further (e.g. own classes only, not as a substitute).
 function canMarkSession(viewer: IiosGrantedContext, s: StoredSession): boolean {
-  if (ownsClass(viewer, s.classId))
-    return allows(viewer, "attendance:mark", { sessionRole: "owner" });
   const teacherId = teacherIdOf(viewer);
   const cls = classes.find((c) => c.id === s.classId);
+  // 22/11: a session that started before the class changed teacher stays with its teacher then.
+  const owner = s.heldBy ?? classTeachers[s.classId];
+  if (!!teacherId && owner === teacherId && cls?.orgId === viewer.orgId)
+    return allows(viewer, "attendance:mark", { sessionRole: "owner" });
   return (
     !!teacherId &&
     s.substituteId === teacherId &&

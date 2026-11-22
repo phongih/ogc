@@ -29,6 +29,8 @@ export const ScheduledSession = z.object({
   started: z.boolean(),
   marked: z.boolean(),
   substitute: TeacherRef.nullable(), // teaches (and marks) this one session instead of the owner
+  // 22/11: the class teacher when the session started, if the class has a new teacher since.
+  heldBy: TeacherRef.nullable(),
   replacedBy: z.string().nullable(), // cancelled → the replacement session id
   replaces: z.string().nullable(), // replacement → the cancelled session id
 });

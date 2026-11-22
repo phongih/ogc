@@ -16,6 +16,9 @@ export interface StoredSession {
   state: "scheduled" | "cancelled";
   kind: "regular" | "makeup"; // P2: a make-up session holds booked guests only
   substituteId: string | null;
+  // The class teacher when this session started, kept when the class gets a new teacher (owner
+  // 22/11: a change of class teacher applies to sessions that have not started yet).
+  heldBy?: string | null;
   replacedBy: string | null;
   replaces: string | null;
 }
