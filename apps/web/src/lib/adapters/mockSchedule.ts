@@ -9,7 +9,7 @@ import type {
   TeacherRef,
 } from "@ogc/contracts";
 import { teachers } from "../../fixtures/personas";
-import { classTeachers, classes } from "../../fixtures/teaching";
+import { classTeachers, classes, learnerCountOf } from "../../fixtures/teaching";
 import { centers } from "../../fixtures/directory";
 import { sessionStore, type StoredSession } from "./sessionStore";
 import { isMarked } from "./mockAttendance";
@@ -65,7 +65,7 @@ function classSchedule(classId: string): ClassSchedule {
     centerId: c.centerId,
     centerName: centers.find((x) => x.id === c.centerId)?.name ?? "Center",
     teacher: teacherRef(classTeachers[classId]),
-    learnerCount: c.learnerCount,
+    learnerCount: learnerCountOf(classId),
     sessions: sessionStore.forClass(classId).map((s) => toScheduled(s, now)),
   };
 }

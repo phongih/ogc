@@ -1,7 +1,7 @@
 import { viaGrant } from "./viewer";
 import type { TeacherPort, TeacherDashboard, LearnerRow, Session } from "@ogc/contracts";
 import { personaMap, teacherName } from "../../fixtures/personas";
-import { classes, classTeachers, rosters } from "../../fixtures/teaching";
+import { classes, classTeachers, learnerCountOf, rosters } from "../../fixtures/teaching";
 import { sessionStore } from "./sessionStore";
 
 const latency = <T>(v: T, ms = 100): Promise<T> =>
@@ -42,6 +42,7 @@ export const mockTeacher: TeacherPort = viaGrant<TeacherPort>({
       orgId: p.orgId,
       classes: owned.map((c) => ({
         ...c,
+        learnerCount: learnerCountOf(c.id), // from the roster, not the seed placeholder
         // The class's own next lesson — a make-up session is not the class's next session.
         nextSessionAt: future.find((s) => s.classId === c.id && s.kind === "regular")?.at ?? null,
       })),
