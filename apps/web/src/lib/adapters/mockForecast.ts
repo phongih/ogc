@@ -14,12 +14,14 @@ import type {
   ForecastMetric,
   ForecastOverview,
   ForecastPort,
+  ForecastResult,
+  ForecastSettings,
   ForecastUnit,
   IiosGrantedContext,
   LeadStage,
   MetricForecast,
 } from "@ogc/contracts";
-import { OPEN_STAGES } from "@ogc/contracts";
+import { OPEN_STAGES, SCENARIOS, settingsIssue } from "@ogc/contracts";
 import { centers } from "../../fixtures/directory";
 import { classes, rosters } from "../../fixtures/teaching";
 import {
@@ -35,6 +37,8 @@ import { centerToday, openBalancesOf } from "./mockBilling";
 import { leadsOfOrg } from "./mockAdmissions";
 import { capacityOf, weeklyHoursAt } from "./mockWorkforce";
 import { withFault } from "./faults";
+import { refill, registerPersistent } from "./persist";
+import { sessionStore } from "./sessionStore";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
@@ -49,6 +53,34 @@ export const STAGE_WEIGHT: Partial<Record<LeadStage, number>> = {
   placement: 0.45,
   offer: 0.7,
 };
+
+/** Synthetic default figures (slice 2), sized to the demo center — not real costs. */
+export const DEFAULT_FORECAST_SETTINGS: ForecastSettings = {
+  costs: { fixedMonthlyVnd: 10_000_000, variablePct: 10, teacherHourlyVnd: 150_000 },
+  scenarios: {
+    conservative: { growthAdjPct: -10, conversionAdjPct: -15, tuitionAdjPct: 0 },
+    base: { growthAdjPct: 0, conversionAdjPct: 0, tuitionAdjPct: 0 },
+    optimistic: { growthAdjPct: 5, conversionAdjPct: 10, tuitionAdjPct: 5 },
+  },
+};
+const settings = new Map<string, ForecastSettings>(); // orgId → saved figures
+const reset = () => settings.clear();
+sessionStore.onReset(reset);
+export const __resetForecastForTests = reset;
+registerPersistent("forecast", {
+  dump: () => ({ settings }),
+  load: (raw) => refill(settings, (raw as { settings?: unknown }).settings),
+});
+const settingsOf = (org: string): ForecastSettings =>
+  structuredClone(settings.get(org) ?? DEFAULT_FORECAST_SETTINGS);
+const refuse = (reason: Exclude<ForecastResult, { ok: true }>["reason"], detail?: string) =>
+  latency<ForecastResult>({ ok: false, reason, ...(detail ? { detail } : {}) });
+/** Slice 2 needs the whole organization in view (fixed costs are organization-wide) + money. */
+const wholeOrgWithMoney = (viewer: IiosGrantedContext, org: string) =>
+  centerScope(viewer, "forecast:view") === "any" &&
+  centers
+    .filter((c) => c.orgId === org)
+    .every((c) => allows(viewer, "billing:manage", { centerId: c.id }));
 
 const META: Record<ForecastMetric, { unit: ForecastUnit; aggregate: "sum" | "avg" }> = {
   leads: { unit: "people", aggregate: "sum" },
@@ -223,6 +255,37 @@ export const mockForecast: ForecastPort = {
           byStage,
         },
         maxGrowthPct: MAX_GROWTH_PCT,
+        planning:
+          histories.length > 0 && wholeOrgWithMoney(viewer, org)
+            ? { settings: settingsOf(org), canManage: allows(viewer, "forecast:manage") }
+            : null,
       });
+    }),
+  updateSettings: (viewer, next) =>
+    withFault("forecast.updateSettings", () => {
+      const org = staffOrgOf(viewer);
+      if (!org) return refuse("not_staff");
+      if (!allows(viewer, "forecast:manage") || !wholeOrgWithMoney(viewer, org))
+        return refuse("access_policy");
+      const bad = settingsIssue(next);
+      if (bad) return refuse("invalid", bad);
+      settings.set(org, {
+        costs: {
+          fixedMonthlyVnd: next.costs.fixedMonthlyVnd,
+          variablePct: next.costs.variablePct,
+          teacherHourlyVnd: next.costs.teacherHourlyVnd,
+        },
+        scenarios: Object.fromEntries(
+          SCENARIOS.map((k) => [
+            k,
+            {
+              growthAdjPct: next.scenarios[k].growthAdjPct,
+              conversionAdjPct: next.scenarios[k].conversionAdjPct,
+              tuitionAdjPct: next.scenarios[k].tuitionAdjPct,
+            },
+          ]),
+        ) as ForecastSettings["scenarios"],
+      });
+      return latency<ForecastResult>({ ok: true });
     }),
 };

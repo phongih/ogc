@@ -34,6 +34,7 @@ export const PolicyAction = z.enum([
   "students:view",
   "workforce:manage",
   "forecast:view",
+  "forecast:manage",
 ]);
 export type PolicyAction = z.infer<typeof PolicyAction>;
 
@@ -136,6 +137,14 @@ export const POLICY_CATALOG: CatalogEntry[] = [
       "Business forecast: 3 / 6 / 9 / 12 months vs last year (money figures need billing access too)",
     roles: ["staff"],
     criteria: ["centerId"],
+    readonlyFields: [],
+  },
+  {
+    action: "forecast:manage",
+    description:
+      "Business forecast: save the cost figures and the three scenarios (conservative / base / optimistic)",
+    roles: ["staff"],
+    criteria: [],
     readonlyFields: [],
   },
   {

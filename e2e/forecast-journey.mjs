@@ -2,7 +2,8 @@
  * Business Forecast — Playwright E2E (NON-PRODUCTION, MOCK; owner decisions 22/11). Sam sees four
  * horizons (3 / 6 / 9 / 12 months) next to last year, labelled synthetic history, students starting
  * from today's 7 learners, month-by-month detail per horizon, capacity from Workforce targets, the
- * pipeline cross-check and read-only assumptions; a teacher cannot open it.
+ * pipeline cross-check and read-only assumptions; slice 2: three scenarios with costs, cash flow
+ * and break-even, figures tried on screen and saved; a teacher cannot open it.
  */
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -114,6 +115,35 @@ async function main() {
       ((await page.getByTestId("pipeline").textContent()) ?? "").includes("not added"),
     );
     await shot(page, "02-forecast-12");
+
+    // Slice 2: scenarios side by side; trying a figure changes them; staff save.
+    const scen = page.getByRole("table", { name: "Scenarios compared" });
+    check(
+      "[sam] three scenarios: conservative / base / optimistic",
+      (await scen.locator("tbody tr").count()) === 3,
+    );
+    const before = await page.getByTestId("scenario-base").textContent();
+    await page.getByLabel(/Fixed costs \/ month/).fill("20000000");
+    await page
+      .getByTestId("scenario-base")
+      .filter({ hasNotText: before ?? "" })
+      .waitFor();
+    check(
+      "[sam] higher fixed costs → base scenario changes on screen",
+      (await page.getByTestId("scenario-base").textContent()) !== before,
+    );
+    await page.getByRole("button", { name: "Save figures" }).click();
+    await page.getByRole("status").filter({ hasText: "Saved." }).waitFor();
+    await page.reload({ waitUntil: "networkidle" });
+    await persona(/Sam \(Org Staff\)/);
+    await page.getByRole("link", { name: "Center operations" }).first().click();
+    await page.getByRole("link", { name: "Forecast", exact: true }).click();
+    await page.getByRole("table", { name: "Scenarios compared" }).waitFor();
+    check(
+      "[sam] saved figures survive a reload",
+      (await page.getByLabel(/Fixed costs \/ month/).inputValue()) === "20000000",
+    );
+    await shot(page, "03-scenarios");
     await signOut();
 
     await persona(/Tara \(Teacher\)/);
