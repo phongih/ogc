@@ -33,7 +33,9 @@ describe("Take attendance", () => {
 
     await user.click(screen.getByRole("link", { name: "← Back to the class" }));
     expect(await screen.findByText("last 2 in a row")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Edit attendance · A2 — Unit 6" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: "Edit attendance · A2 — Unit 6" }),
+    ).toBeInTheDocument(); // the sessions list may render after the flags
 
     await user.click(screen.getByRole("link", { name: "← Back to teaching" }));
     expect(
