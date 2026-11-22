@@ -126,8 +126,6 @@ describe("partners — ledger lifecycle (maker-checker)", () => {
       const q = await entry("Quan B.");
       expect(q.status).toBe("approved");
       expect(q.dueDate).not.toBeNull();
-      expect(await P.markPaid(as(S), q.id, "ST-LOTUS-02")).toEqual({ ok: true });
-      expect((await entry("Quan B.")).status).toBe("paid");
     } else expect(r).toMatchObject({ reason: "invalid_step" });
   });
 
@@ -231,5 +229,130 @@ describe("partners — seed data is consistent (22/11, live d3ba226)", () => {
         expect(Date.parse(e.enrolledAt)).toBeGreaterThanOrEqual(Date.parse(e.referredAt));
         expect(Date.parse(e.enrolledAt)).toBeLessThanOrEqual(Date.parse(e.expiresAt));
       }
+  });
+});
+
+describe("partners slice 2 — settlement batches", () => {
+  it("seed: paid batches for the paid entries; Trang N. (approved) is ready to batch", async () => {
+    const list = (await P.listBatches(as(S)))!;
+    expect(list.map((b) => [b.id, b.status])).toEqual(
+      expect.arrayContaining([
+        ["ST-LOTUS-01", "paid"],
+        ["ST-BRIDGE-01", "paid"],
+      ]),
+    );
+    const c = (await P.batchCandidates(as(S)))!;
+    expect(c).toEqual([
+      expect.objectContaining({ partnerId: "PTN-LOTUS", entries: 1, totalVnd: 1_000_000 }),
+    ]);
+  });
+
+  it("staff draft, an Org Admin who did not draft it sends (locked), the partner pays the whole batch", async () => {
+    const [c] = (await P.batchCandidates(as(S)))!;
+    expect(await P.draftBatch(as(S), c.partnerId, c.cycleLabel)).toEqual({ ok: true });
+    expect(await P.batchCandidates(as(S))).toEqual([]);
+    const draft = (await P.listBatches(as(S)))!.find((b) => b.status === "draft")!;
+    expect(draft).toMatchObject({ id: "ST-LOTUS-02", totalVnd: 1_000_000, mine: true });
+    expect(await P.sendBatch(as(S), draft.id)).toMatchObject({ reason: "not_org_admin" });
+    expect(await P.markBatchPaid(as(S), draft.id, "BANK-1")).toMatchObject({
+      reason: "invalid_step",
+    });
+    expect(await P.sendBatch(as(A), draft.id)).toEqual({ ok: true });
+    const sent = (await P.listBatches(as(S)))!.find((b) => b.id === draft.id)!;
+    expect(sent.status).toBe("sent");
+    expect(sent.dueDate).not.toBeNull();
+    expect(await P.sendBatch(as(A), draft.id)).toMatchObject({ reason: "invalid_step" });
+    expect(await P.markBatchPaid(as(S), draft.id, "BANK-7731")).toEqual({ ok: true });
+    const trang = await entry("Trang N.");
+    expect(trang).toMatchObject({ status: "paid", settledBatchId: "ST-LOTUS-02" });
+    expect((await P.getOverview(as(S)))!.signals.some((s) => s.rule === "overdue_settlement")).toBe(
+      false,
+    );
+  });
+
+  it("an Org Admin cannot send a batch they drafted; a cancelled batch releases its entries", async () => {
+    const [c] = (await P.batchCandidates(as(A)))!;
+    await P.draftBatch(as(A), c.partnerId, c.cycleLabel);
+    const b = (await P.listBatches(as(A)))!.find((x) => x.status === "draft")!;
+    expect(await P.sendBatch(as(A), b.id)).toMatchObject({ reason: "own_step" });
+    expect(await P.cancelBatch(as(S), b.id, "")).toMatchObject({ reason: "invalid" });
+    expect(await P.cancelBatch(as(S), b.id, "wrong cycle")).toEqual({ ok: true });
+    expect((await entry("Trang N.")).batchId).toBeNull();
+    expect((await P.batchCandidates(as(S)))!).toHaveLength(1);
+  });
+});
+
+describe("partners slice 2 — partner reports (preview, a person applies each row)", () => {
+  const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+  it("preview classifies rows and changes nothing", async () => {
+    const before = JSON.stringify(await P.listEntries(as(S)));
+    const mai = await entry("Mai L.");
+    const quan = await entry("Quan B.");
+    const csv = [
+      "lead,status,date,reason",
+      `${mai.leadRefCode},enrolled,${today}`,
+      `${quan.leadRefCode},enrolled,${today}`,
+      "LR-9999,enrolled,2026-11-01",
+      `${mai.leadRefCode},enrolled,2001-01-01`,
+      `${(await entry("Son K.")).leadRefCode},rejected,,`,
+      "hello",
+    ].join("\n");
+    const rows = (await P.previewReport(as(S), "PTN-LOTUS", csv))!;
+    expect(rows.map((r) => r.match)).toEqual([
+      "applicable",
+      "already",
+      "not_found",
+      "conflict",
+      "invalid",
+      "invalid",
+    ]);
+    expect(rows[3].explanation).toMatch(/before the referral/);
+    expect(JSON.stringify(await P.listEntries(as(S)))).toBe(before);
+  });
+
+  it("apply: one row at a time, re-checked, with the partner's date; logged", async () => {
+    const mai = await entry("Mai L.");
+    const row = {
+      leadRefCode: mai.leadRefCode,
+      reported: "enrolled" as const,
+      date: today,
+      reason: null,
+    };
+    expect(await P.applyReportRow(as(S), "PTN-LOTUS", row)).toEqual({ ok: true });
+    const e = await entry("Mai L.");
+    expect(e.status).toBe("enrolled");
+    expect(e.enrolledAt!.slice(0, 10) <= today).toBe(true);
+    expect(await P.applyReportRow(as(S), "PTN-LOTUS", row)).toMatchObject({ ok: false }); // already
+    expect((await P.listActivity(as(S)))![0].action).toBe("report applied: enrolled");
+    expect(await P.applyReportRow(as("demo-teacher"), "PTN-LOTUS", row)).toMatchObject({
+      reason: "not_staff",
+    });
+  });
+});
+
+describe("partners slice 2 — trends", () => {
+  it("six referral months per partner; conversion shows its counts and never exceeds 100%", async () => {
+    const t = (await P.getTrends(as(S)))!;
+    expect(t).toHaveLength(3);
+    for (const p of t) {
+      expect(p.months).toHaveLength(6);
+      for (const m of p.months) {
+        expect(m.referred).toBe(m.enrolled + m.rejected + m.open);
+        expect(m.conversion.d).toBe(m.enrolled + m.rejected);
+        if (m.conversion.pct !== null) expect(m.conversion.pct).toBeLessThanOrEqual(100);
+      }
+    }
+    const sao = t.find((p) => p.partnerId === "PTN-SAOMAI")!;
+    expect(sao.months.reduce((x, m) => x + m.rejected, 0)).toBe(2);
+  });
+});
+
+describe("partners slice 2 — seed batches are consistent", () => {
+  it("drafted → sent → paid in order, none in the future", async () => {
+    for (const b of (await P.listBatches(as(S)))!.filter((x) => x.status === "paid")) {
+      expect(Date.parse(b.createdAt)).toBeLessThanOrEqual(Date.parse(b.sentAt!));
+      expect(Date.parse(b.sentAt!)).toBeLessThanOrEqual(Date.parse(b.paidAt!));
+      expect(Date.parse(b.paidAt!)).toBeLessThanOrEqual(Date.now());
+    }
   });
 });

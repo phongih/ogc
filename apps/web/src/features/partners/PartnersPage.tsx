@@ -26,8 +26,17 @@ import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } f
 import { AccessBanner } from "../access/AccessBanner";
 import { vnd } from "../growth/format";
 import { Refused } from "./refused";
+import { ImportReport, Settlements, Trends } from "./PartnersSlice2";
 
-const TABS = ["Reconciliation", "Ledger", "Tiers & policy", "Activity"] as const;
+const TABS = [
+  "Reconciliation",
+  "Ledger",
+  "Settlements",
+  "Import report",
+  "Trends",
+  "Tiers & policy",
+  "Activity",
+] as const;
 type Tab = (typeof TABS)[number];
 const tabClass = (on: boolean) =>
   `px-3 py-2 text-sm ${on ? "border-b-2 border-brand font-medium text-brand" : "text-muted"}`;
@@ -94,6 +103,9 @@ export function PartnersPage() {
       </div>
       {tab === "Reconciliation" ? <Reconciliation onOpen={setTab} /> : null}
       {tab === "Ledger" ? <Ledger isAdmin={o.data.isOrgAdmin} /> : null}
+      {tab === "Settlements" ? <Settlements isAdmin={o.data.isOrgAdmin} /> : null}
+      {tab === "Import report" ? <ImportReport /> : null}
+      {tab === "Trends" ? <Trends /> : null}
       {tab === "Tiers & policy" ? <Tiers isAdmin={o.data.isOrgAdmin} /> : null}
       {tab === "Activity" ? <Activity /> : null}
       <Link to="/app/operations" className="inline-block text-sm text-brand">
@@ -351,7 +363,6 @@ function EntryRow({ e, isAdmin }: { e: CommissionEntry; isAdmin: boolean }) {
   const viewer = useViewer();
   const act = useAction();
   const [reason, setReason] = useState("");
-  const [batch, setBatch] = useState("");
   const now = Date.now();
   const expired = e.status === "referred" && Date.parse(e.expiresAt) < now;
   const overdue = e.status === "approved" && e.dueDate && Date.parse(e.dueDate) < now;
@@ -412,21 +423,11 @@ function EntryRow({ e, isAdmin }: { e: CommissionEntry; isAdmin: boolean }) {
           </>
         ) : null}
         {e.status === "approved" ? (
-          <>
-            <input
-              aria-label={`Settlement batch · ${e.learnerDisplayName}`}
-              placeholder="Batch, e.g. ST-LOTUS-02"
-              className="rounded-ogc border border-border bg-surface p-1"
-              value={batch}
-              onChange={(x) => setBatch(x.target.value)}
-            />
-            <Button
-              variant="ghost"
-              onClick={() => act.mutate(() => api.markPaid(viewer, e.id, batch))}
-            >
-              Partner paid · {e.learnerDisplayName}
-            </Button>
-          </>
+          <span className="text-xs text-muted">
+            {e.batchId
+              ? `In batch ${e.batchId} — paid with the whole batch (Settlements)`
+              : "Not in a batch yet — draft one under Settlements"}
+          </span>
         ) : null}
       </div>
       <Refused r={act.data} />

@@ -16,6 +16,14 @@ import type { IiosGrantedContext } from "./iiosContext.js";
  *  - Decision signals only suggest (near next tier, stale referral, high rejection rate, overdue
  *    settlement); a person follows, snoozes or dismisses with a reason; every step goes into an
  *    append-only activity log. Nothing changes status or money by itself.
+ * Slice 2 (owner 22/11):
+ *  - settlement batches per partner and cycle: staff draft one from approved entries, an Org Admin
+ *    (not the one who drafted it) sends it — then it is locked; the partner pays the WHOLE batch,
+ *    staff record it and every entry becomes paid. A wrong batch is cancelled with a reason and
+ *    drafted again. Payments are recorded per batch only;
+ *  - partner reports (pasted CSV) are previewed against the ledger — matches, already recorded,
+ *    conflicts, unknown codes — and a person applies each applicable row; nothing applies itself;
+ *  - trends per partner over six months by referral month, every rate with its counts.
  * Money here is a mock receivable — nothing is invoiced, collected or paid.
  */
 
@@ -85,7 +93,8 @@ export interface CommissionEntry {
   approvableFrom: string | null; // when it may be approved (clawback / cycle end)
   dueDate: string | null; // approved: the partner should pay by then
   rejectReason: string | null;
-  settledBatchId: string | null;
+  settledBatchId: string | null; // the paid batch
+  batchId: string | null; // the open (draft / sent) or paid batch holding the entry
   updatedBy: string;
   updatedAt: string;
   enrolledBy: string | null; // principal who recorded the enrolment (maker-checker)
@@ -212,6 +221,69 @@ export function tierRuleIssue(d: TierRuleDraft): string | null {
   return null;
 }
 
+// ── slice 2 ───────────────────────────────────────────────────────────────────────────────
+
+export type BatchStatus = "draft" | "sent" | "paid" | "cancelled";
+
+export interface SettlementBatch {
+  id: string; // e.g. ST-LOTUS-02
+  partnerId: string;
+  partnerName: string;
+  cycleLabel: string; // enrolment cycle the batch settles, e.g. "Oct 2026" / "Q4 2026"
+  entries: { id: string; leadRefCode: string; learnerDisplayName: string; amountVnd: number }[];
+  totalVnd: number;
+  status: BatchStatus;
+  createdBy: string;
+  createdAt: string;
+  sentBy: string | null;
+  sentAt: string | null;
+  dueDate: string | null; // sent + the partner's settlement days
+  paidBy: string | null;
+  paidAt: string | null;
+  paymentRef: string | null;
+  cancelReason: string | null;
+  mine: boolean; // drafted by the viewer (cannot send it)
+  overdue: boolean;
+}
+
+export interface BatchCandidate {
+  partnerId: string;
+  partnerName: string;
+  cycleLabel: string;
+  entries: number;
+  totalVnd: number;
+}
+
+export type ReportStatus = "enrolled" | "rejected";
+export type ReportMatch = "applicable" | "already" | "conflict" | "not_found" | "invalid";
+
+export interface ReportRow {
+  line: number;
+  leadRefCode: string | null;
+  reported: ReportStatus | null;
+  date: string | null; // YYYY-MM-DD, the partner's enrolment date
+  reason: string | null;
+  match: ReportMatch;
+  explanation: string;
+  learnerDisplayName: string | null;
+}
+
+export interface TrendMonth {
+  month: string; // YYYY-MM, by referral month
+  referred: number;
+  enrolled: number; // of those referred that month
+  rejected: number;
+  open: number;
+  conversion: { n: number; d: number; pct: number | null }; // enrolled / (enrolled + rejected)
+  medianDaysToEnrol: number | null;
+}
+
+export interface PartnerTrend {
+  partnerId: string;
+  partnerName: string;
+  months: TrendMonth[]; // six months, oldest first
+}
+
 export interface PartnersPort {
   // Center staff with partners:manage (and the Org Admin). Others: null.
   getOverview(viewer: IiosGrantedContext): Promise<PartnersOverview | null>;
@@ -224,7 +296,6 @@ export interface PartnersPort {
   // What the partner reports (staff) …
   markEnrolled(viewer: IiosGrantedContext, entryId: string): Promise<PartnersResult>;
   reject(viewer: IiosGrantedContext, entryId: string, reason: string): Promise<PartnersResult>;
-  markPaid(viewer: IiosGrantedContext, entryId: string, batchId: string): Promise<PartnersResult>;
   // … and what an Org Admin approves (never their own step).
   approve(viewer: IiosGrantedContext, entryId: string): Promise<PartnersResult>;
   proposeRule(
@@ -237,6 +308,34 @@ export interface PartnersPort {
     ruleId: string,
     decision: "activate" | "reject",
   ): Promise<PartnersResult>;
+  // Settlement batches (slice 2): staff draft, an Org Admin sends, the partner pays the whole batch.
+  listBatches(viewer: IiosGrantedContext): Promise<SettlementBatch[] | null>;
+  batchCandidates(viewer: IiosGrantedContext): Promise<BatchCandidate[] | null>;
+  draftBatch(
+    viewer: IiosGrantedContext,
+    partnerId: string,
+    cycleLabel: string,
+  ): Promise<PartnersResult>;
+  sendBatch(viewer: IiosGrantedContext, batchId: string): Promise<PartnersResult>;
+  markBatchPaid(
+    viewer: IiosGrantedContext,
+    batchId: string,
+    paymentRef: string,
+  ): Promise<PartnersResult>;
+  cancelBatch(viewer: IiosGrantedContext, batchId: string, reason: string): Promise<PartnersResult>;
+  // Partner reports (slice 2): preview, then a person applies one row at a time.
+  previewReport(
+    viewer: IiosGrantedContext,
+    partnerId: string,
+    csv: string,
+  ): Promise<ReportRow[] | null>;
+  applyReportRow(
+    viewer: IiosGrantedContext,
+    partnerId: string,
+    row: Pick<ReportRow, "leadRefCode" | "reported" | "date" | "reason">,
+  ): Promise<PartnersResult>;
+  // Trends (slice 2).
+  getTrends(viewer: IiosGrantedContext): Promise<PartnerTrend[] | null>;
   // Signals: a person decides.
   actOnSignal(
     viewer: IiosGrantedContext,

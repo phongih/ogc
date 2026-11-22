@@ -56,4 +56,32 @@ describe("Partner commissions page", () => {
       await screen.findByText("Lost: Referred to partner: Hanoi Bridge English — Dong Da"),
     ).toBeInTheDocument();
   });
+
+  it("settlements: staff draft a batch from the approved entry; only an Org Admin can send", async () => {
+    const user = userEvent.setup();
+    renderApp("/app/operations/partners", "staff");
+    await user.click(await screen.findByRole("tab", { name: "Settlements" }));
+    await user.click(await screen.findByRole("button", { name: /^Draft batch · Lotus English/ }));
+    const batch = await screen.findByRole("region", { name: "Batch ST-LOTUS-02" });
+    expect(within(batch).getByText("1.000.000 ₫ · 1 entry")).toBeInTheDocument();
+    expect(within(batch).queryByRole("button", { name: /^Send/ })).toBeNull();
+    expect(within(batch).getByText(/Waiting for an Org Admin/)).toBeInTheDocument();
+  });
+
+  it("import report: preview shows each row's result; apply one row", async () => {
+    const user = userEvent.setup();
+    renderApp("/app/operations/partners", "staff");
+    await user.click(await screen.findByRole("tab", { name: "Import report" }));
+    const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    await user.type(
+      await screen.findByLabelText("Report lines"),
+      `LR-1004,enrolled,${today}{enter}LR-9999,enrolled,${today}`,
+    );
+    await user.click(screen.getByRole("button", { name: "Preview" }));
+    const table = await screen.findByRole("table", { name: "Report preview" });
+    expect(within(table).getByTestId("report-LR-1004")).toHaveTextContent(/Can be applied/);
+    expect(within(table).getByTestId("report-LR-9999")).toHaveTextContent(/Unknown code/);
+    await user.click(within(table).getByRole("button", { name: "Apply · LR-1004" }));
+    expect(await within(table).findByText(/Already in the ledger/)).toBeInTheDocument();
+  });
 });
