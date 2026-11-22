@@ -136,7 +136,8 @@ Bundle splitting, unit planning per course, seat limits on joins, and editing a 
 1. ~~**F1:** A, B or C?~~ The owner chose the IIOS direction on 22/11 (§5).
 2. **F2:** does IIOS gain an "org admin" notion, or does OGC map `staff` + an OGC membership attribute? This is the existing open question, now with a concrete case.
 3. Should demo history (policy versions, engine log) survive "Reset demo data"? Today it does not.
-4. Retention of audit events — **not answered here.** It is part of the legal review (Track C) and outside Claude's scope.
+4. Under an IIOS `activeCenter`, an organization-level action with no center (e.g. `center:setup`) is **refused** by the contract evaluator (fail-closed, step 1 PR). Confirm with IIOS: should such actions require a grant without an active center?
+5. Retention of audit events — **not answered here.** It is part of the legal review (Track C) and outside Claude's scope.
 
 ---
 
@@ -173,3 +174,7 @@ Read as **Option C**: IIOS stores and decides; the OGC Access page stays as the 
 2. **Mock IIOS implements the contract:** the PR #38 policy store moves behind it; the Access page calls the port. Same behaviour, new owner.
 3. **Adapters take the granted context** instead of `personaId` for permissions. Olivia's grant carries the admin marker, which closes the F2 mismatch in the mock.
 4. Then items 2–5 of §3 (audit event contract, idempotency, tenant matrix, outbox), unchanged.
+
+### Progress
+
+- Step 1 (contract): `packages/contracts/src/authorize.ts` (`authorize`, `authorizeField`, `evaluateRules`); `iiosContext.ts` gains `orgAdmin`, `narrowing` (`GrantNarrowing`: none / policy / unavailable) and `IiosPolicyAdminPort`. Design-level tests in `lib/integration/authorize.test.ts`. The mock store from PR #38 already uses the same rule evaluator. Nothing is wired to adapters yet (steps 2–3).

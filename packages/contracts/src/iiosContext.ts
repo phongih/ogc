@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { Id } from "./common.js";
 import { ActorRole } from "./integration.js";
+import {
+  PolicyRule,
+  type AccessAdminView,
+  type PolicyInput,
+  type PolicyResult,
+} from "./accessPolicy.js";
 
 /*
  * OGC-AUTH-027 / Phase 1 DESIGN — IIOS-Granted Context (DESIGN-ONLY, SYNTHETIC, MOCK).
@@ -31,6 +37,9 @@ export const IiosGrantedContext = z
     role: ActorRole,
     purpose: z.string().min(1), // consent/purpose the grant was issued for
     activeCenter: z.string().optional(), // narrowing only (AZ7)
+    // OGC-ADR-039 §5 (PROPOSED grant change for OGC-IIOS-001 — IIOS decides, OGC only consumes):
+    orgAdmin: z.boolean().optional(), // IIOS says this principal administers the org's access policies
+    narrowing: z.lazy(() => GrantNarrowing).optional(), // absent = no narrowing (backward compatible)
     requestId: z.string().min(1), // for audit correlation with IIOS (OGC-IIOS-001 §8)
     grantRef: z.string().min(1), // opaque IIOS reference; OGC treats it as a token, never decodes it
     expiresAt: z.string().min(1), // informational; expiry is DECIDED by IIOS, not re-computed by OGC
@@ -71,4 +80,52 @@ export function requireValidContext(resolution: IiosContextResolution): IiosGran
     throw new IiosContextDenied(resolution.state);
   }
   return resolution.context;
+}
+
+/*
+ * OGC-ADR-039 §5 — narrowing DECIDED BY IIOS and carried with the grant (Option C: IIOS stores and
+ * decides; OGC enforces and never writes an authz relation). The policy itself lives in IIOS.
+ *   - "none":        the role's normal access;
+ *   - "policy":      only what one of `rules` allows (role ∩ policy — never more than the role);
+ *   - "unavailable": IIOS could not resolve the policy (missing / retired) → nothing is allowed.
+ */
+export const GrantNarrowing = z.discriminatedUnion("state", [
+  z.object({ state: z.literal("none") }),
+  z.object({
+    state: z.literal("policy"),
+    policyRef: z.string().min(1), // opaque IIOS reference
+    version: z.number().int().min(1),
+    name: z.string(), // display only
+    rules: z.array(PolicyRule).min(1),
+  }),
+  z.object({ state: z.literal("unavailable") }),
+]);
+export type GrantNarrowing = z.infer<typeof GrantNarrowing>;
+
+/*
+ * OGC-ADR-039 §5 — Option C: IIOS STORES and DECIDES access policies; the OGC Access page is only
+ * the editing UI and calls this port. OGC keeps no copy. Every call carries the caller's granted
+ * context; IIOS refuses unless `ctx.orgAdmin` is true for `ctx.orgId`, and never lets a principal
+ * change their own membership or a policy that narrows them (anti self-escalation).
+ * Members are identified by their IIOS principal id. Mocked in `lib/integration/` (synthetic).
+ */
+export interface IiosPolicyAdminPort {
+  getAdminView(ctx: IiosGrantedContext): Promise<AccessAdminView | null>;
+  createPolicy(ctx: IiosGrantedContext, input: PolicyInput): Promise<PolicyResult>;
+  revisePolicy(
+    ctx: IiosGrantedContext,
+    policyRef: string,
+    expectedVersion: number,
+    patch: { description?: string | null; rules?: PolicyRule[] },
+  ): Promise<PolicyResult>;
+  retirePolicy(
+    ctx: IiosGrantedContext,
+    policyRef: string,
+    expectedVersion: number,
+  ): Promise<PolicyResult>;
+  attachPolicy(
+    ctx: IiosGrantedContext,
+    memberPrincipalId: string,
+    policyRef: string | null,
+  ): Promise<PolicyResult>;
 }
