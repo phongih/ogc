@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { growth } from "../../lib/api";
+import { saveDemoState } from "../../lib/adapters/persist";
 import { Button, Card } from "../../ui";
 
 type Info = Awaited<ReturnType<typeof growth.recordClick>>;
@@ -25,6 +26,7 @@ export function JoinPage() {
     if (counted.current) return; // one click per visit (StrictMode runs effects twice)
     counted.current = true;
     void growth.recordClick(code).then((i) => {
+      saveDemoState(); // other open tabs (e.g. staff's Funnel) pick it up at once
       setInfo(i);
       setCourse(i.courses[0]?.code ?? "");
       setCenter(i.centerNames[0] ?? "");
@@ -99,6 +101,7 @@ export function JoinPage() {
                 centerName: center,
                 campaignId,
               });
+              if (r.ok) saveDemoState(); // save now — not only when this tab closes
               setResult(r.ok ? "ok" : (r.detail ?? r.reason));
             }}
           >

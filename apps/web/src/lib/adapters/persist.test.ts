@@ -7,9 +7,11 @@ import {
   SCHEMA,
   clearDemoState,
   registeredKeys,
+  followOtherTabs,
   restoreDemoState,
   saveDemoState,
 } from "./persist";
+import { __resetGrowthForTests, mockGrowth } from "./mockGrowth";
 import { __resetAttendanceForTests, mockAttendance } from "./mockAttendance";
 import { mockCenterSetup } from "./mockCenterSetup";
 import { mockMakeup } from "./mockMakeup";
@@ -37,6 +39,7 @@ describe("demo persistence", () => {
       "centerSetup",
       "engine",
       "engineRules",
+      "growth",
       "iiosPolicy",
       "intelligence",
       "learning",
@@ -127,5 +130,32 @@ describe("demo persistence", () => {
     expect(() => restoreDemoState()).not.toThrow();
     clearDemoState();
     expect(window.localStorage.getItem(DEMO_STORAGE_KEY)).toBeNull();
+  });
+
+  it("another tab's save reaches this tab's stores at once (owner 22/11: a /join referral never reached Sam's Funnel)", async () => {
+    __resetGrowthForTests();
+    const changed: number[] = [];
+    const stop = followOtherTabs(() => changed.push(1));
+    // "Other tab": the friend sends the enquiry and that tab saves.
+    const code = (await mockGrowth.getMine(as("demo-guardian")))!.code;
+    expect(
+      await mockGrowth.submitLead(code, {
+        learnerName: "Bao T.",
+        courseCode: "ENG-A2",
+        centerName: "Nova English — District 1",
+      }),
+    ).toEqual({ ok: true });
+    saveDemoState();
+    const saved = window.localStorage.getItem(DEMO_STORAGE_KEY);
+    // "This tab" loaded earlier: its in-memory store has no lead.
+    __resetGrowthForTests();
+    expect(await mockGrowth.listLeads(as(S))).toEqual([]);
+    window.dispatchEvent(new StorageEvent("storage", { key: DEMO_STORAGE_KEY, newValue: saved }));
+    expect((await mockGrowth.listLeads(as(S)))!.map((l) => l.learnerName)).toEqual(["Bao T."]);
+    expect(changed).toHaveLength(1);
+    // Other keys are ignored.
+    window.dispatchEvent(new StorageEvent("storage", { key: "unrelated", newValue: "x" }));
+    expect(changed).toHaveLength(1);
+    stop();
   });
 });

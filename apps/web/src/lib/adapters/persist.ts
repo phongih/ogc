@@ -2,8 +2,8 @@
  * Demo data that survives a page reload (owner, 21/11: "a new center did not stay"). NON-PRODUCTION:
  * the synthetic mock stores are saved to THIS browser's localStorage — no server, no real data.
  * Every in-memory store registers a dump / load pair here. Saved after each write (the UI's
- * refreshLearningState) and when the page is hidden; loaded once at startup. "Reset demo data"
- * clears it. Bump SCHEMA when a store's shape changes: older saves are then discarded.
+ * refreshLearningState) and when the page is hidden; loaded at startup and again whenever another
+ * tab of this browser saves (followOtherTabs). "Reset demo data" clears it. Bump SCHEMA when a store's shape changes: older saves are then discarded.
  */
 export const DEMO_STORAGE_KEY = "ogc.demo";
 export const SCHEMA = 1;
@@ -113,4 +113,26 @@ export function resetDemoAndReload(): void {
   saving = false;
   clearDemoState();
   window.location.reload();
+}
+
+/*
+ * Several tabs of one browser share the save but each holds its own in-memory stores. Without this,
+ * a tab opened earlier never sees another tab's writes, and its next save (any write, or pagehide)
+ * overwrites them (owner, 22/11: a referral sent from /join in one tab never reached Sam's Funnel
+ * in another). The browser fires "storage" only in the OTHER tabs, so there is no echo loop.
+ * Another tab reset the demo (key removed) → reload this one too, without saving the old state.
+ */
+export function followOtherTabs(onChange: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  const handler = (e: StorageEvent) => {
+    if (e.key !== null && e.key !== DEMO_STORAGE_KEY) return;
+    if (e.newValue === null) {
+      saving = false;
+      window.location.reload();
+      return;
+    }
+    if (restoreDemoState()) onChange();
+  };
+  window.addEventListener("storage", handler);
+  return () => window.removeEventListener("storage", handler);
 }
