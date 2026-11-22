@@ -2,8 +2,9 @@
  * Partner Commissions — Playwright E2E (NON-PRODUCTION, MOCK; owner decisions 22/11). Sam refers a
  * lead from Admissions (partners ranked by fit for the learner), records an enrolment at the next
  * tier, sees a refused dismissal without a reason; Olivia activates a pending tier rule proposed by
- * Sam and cannot approve a provisional (retroactive) entry; the activity log keeps every step; a
- * teacher cannot open the page.
+ * Sam and cannot approve a provisional (retroactive) entry; slice 2: Sam imports a partner report
+ * (preview, apply one row) and drafts a settlement batch, Olivia sends it; six-month trends; the
+ * activity log keeps every step; a teacher cannot open the page.
  */
 import http from "node:http";
 import { readFile } from "node:fs/promises";
@@ -135,6 +136,33 @@ async function main() {
       (await page.getByRole("button", { name: /^Approve/ }).count()) === 0,
     );
     await shot(page, "03-ledger");
+
+    // Slice 2 — import a partner report, draft a settlement batch.
+    await page.getByRole("tab", { name: "Import report" }).click();
+    const today = new Date(Date.now() + 7 * 3_600_000).toISOString().slice(0, 10);
+    await page
+      .getByLabel("Report lines")
+      .fill(`LR-1005,enrolled,${today}\nLR-9999,enrolled,${today}`);
+    await page.getByRole("button", { name: "Preview" }).click();
+    const prev = page.getByRole("table", { name: "Report preview" });
+    await prev.waitFor();
+    check(
+      "[sam] report preview: LR-1005 can be applied, LR-9999 unknown",
+      /Can be applied/.test((await page.getByTestId("report-LR-1005").textContent()) ?? "") &&
+        /Unknown code/.test((await page.getByTestId("report-LR-9999").textContent()) ?? ""),
+    );
+    await prev.getByRole("button", { name: "Apply · LR-1005" }).click();
+    await page.getByTestId("report-LR-1005").filter({ hasText: "Already in the ledger" }).waitFor();
+    check("[sam] applying one row records it (then 'already in the ledger')", true);
+    await page.getByRole("tab", { name: "Settlements" }).click();
+    await page.getByRole("button", { name: /^Draft batch · Lotus English/ }).click();
+    const batch = page.getByRole("region", { name: "Batch ST-LOTUS-02" });
+    await batch.waitFor();
+    check(
+      "[sam] drafts ST-LOTUS-02 but cannot send it",
+      (await batch.getByRole("button", { name: /^Send/ }).count()) === 0,
+    );
+    await shot(page, "05-settlements");
     await signOut();
 
     await persona(/Olivia \(Org Admin\)/);
@@ -150,6 +178,22 @@ async function main() {
       /Not at this step/.test(
         (await page.getByTestId("entry-Khanh D.").getByRole("alert").textContent()) ?? "",
       ),
+    );
+    await page.getByRole("tab", { name: "Settlements" }).click();
+    await page.getByRole("button", { name: "Send · ST-LOTUS-02" }).click();
+    await page
+      .getByTestId("batch-status-ST-LOTUS-02")
+      .filter({ hasText: "Sent · locked" })
+      .waitFor();
+    check("[olivia] sends the batch Sam drafted — locked", true);
+    await page.getByRole("tab", { name: "Trends" }).click();
+    await page.getByRole("table", { name: /^Trend · Lotus/ }).waitFor();
+    check(
+      "[olivia] trends: six referral months per partner",
+      (await page
+        .getByRole("table", { name: /^Trend · Lotus/ })
+        .locator("tbody tr")
+        .count()) === 6,
     );
     await page.getByRole("tab", { name: "Activity" }).click();
     await page
