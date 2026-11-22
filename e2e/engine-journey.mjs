@@ -63,7 +63,7 @@ async function main() {
     await persona(/Sam \(Org Staff\)/);
     await page.getByRole("link", { name: "Center operations" }).first().click();
     await page.getByRole("link", { name: "Decision Engine" }).click();
-    await page.getByText("12 rules · 11 active").waitFor();
+    await page.getByText("13 rules · 11 active").waitFor();
     check("[engine] 11 rules, 10 active (no-practice off by default)", true);
     await shot(page, "01-engine-rules");
 

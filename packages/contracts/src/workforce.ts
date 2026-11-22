@@ -35,7 +35,7 @@ export interface TeacherLoad extends LoadPoint {
   classes: number; // classes where they are the class teacher
   breakdown: {
     label: string; // class name
-    kind: "class" | "substitute" | "makeup";
+    kind: "class" | "substitute" | "makeup" | "prep"; // prep: Learning Studio course prep (22/11)
     sessions: number;
     hours: number;
   }[];

@@ -136,3 +136,8 @@ export const forecast: ForecastPort = mockForecast;
 import type { PartnersPort } from "@ogc/contracts";
 import { mockPartners } from "../adapters/mockPartners";
 export const partners: PartnersPort = mockPartners;
+
+// Learning Studio links (owner 22/11). Mock — OGC keeps a course reference per class only.
+import type { StudioLinksPort } from "@ogc/contracts";
+import { mockStudioLinks } from "../adapters/mockStudioLinks";
+export const studio: StudioLinksPort = mockStudioLinks;

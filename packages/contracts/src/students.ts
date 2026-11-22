@@ -57,6 +57,13 @@ export interface StudentCard {
   lastPracticeAt: string | null;
   makeups: { open: number; overdue: number };
   tuition: { balanceVnd: number; overdueVnd: number } | null; // staff with billing access only
+  // Learning Studio completion (22/11): lessons completed in the course linked to their class.
+  studio: {
+    title: string;
+    completedLessons: number;
+    totalLessons: number;
+    lastActivityAt: string | null;
+  } | null;
   care: { level: CareLevel; evidence: CareEvidence[] };
   recommendations: CareRecommendation[];
 }

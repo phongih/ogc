@@ -35,6 +35,7 @@ const WorkforcePage = page(() => import("../features/workforce/WorkforcePage"), 
 const StudentsPage = page(() => import("../features/students/StudentsPage"), "StudentsPage");
 const ForecastPage = page(() => import("../features/forecast/ForecastPage"), "ForecastPage");
 const PartnersPage = page(() => import("../features/partners/PartnersPage"), "PartnersPage");
+const StudioCoursesPage = page(() => import("../features/studio/StudioCoursesPage"), "StudioCoursesPage");
 const AdmissionsPage = page(() => import("../features/admissions/AdmissionsPage"), "AdmissionsPage");
 const BillingPage = page(() => import("../features/billing/BillingPage"), "BillingPage");
 const TuitionPage = page(() => import("../features/billing/TuitionPage"), "TuitionPage");
@@ -68,6 +69,8 @@ export const routes = [
       { path: "operations/workforce", element: <RequireSection section="operations"><Lazy><WorkforcePage /></Lazy></RequireSection> },
       { path: "operations/forecast", element: <RequireSection section="operations"><Lazy><ForecastPage /></Lazy></RequireSection> },
       { path: "operations/partners", element: <RequireSection section="operations"><Lazy><PartnersPage /></Lazy></RequireSection> },
+      { path: "operations/courses", element: <RequireSection section="operations"><Lazy><StudioCoursesPage back={{ to: "/app/operations", label: "Center operations" }} /></Lazy></RequireSection> },
+      { path: "teaching/courses", element: <RequireSection section="teaching"><Lazy><StudioCoursesPage back={{ to: "/app/teaching", label: "Teaching" }} /></Lazy></RequireSection> },
       { path: "operations/students", element: <RequireSection section="operations"><Lazy><StudentsPage back={{ to: "/app/operations", label: "Center operations" }} /></Lazy></RequireSection> },
       { path: "teaching/students", element: <RequireSection section="teaching"><Lazy><StudentsPage back={{ to: "/app/teaching", label: "Teaching" }} /></Lazy></RequireSection> },
       { path: "operations/admissions", element: <RequireSection section="operations"><Lazy><AdmissionsPage /></Lazy></RequireSection> },

@@ -47,6 +47,7 @@ describe("demo persistence", () => {
       "intelligence",
       "learning",
       "schedule",
+      "studioLinks",
     ]);
   });
 

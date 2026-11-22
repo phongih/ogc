@@ -14,14 +14,14 @@ describe("Decision Engine page", () => {
   it("staff pause a rule, tune a threshold, see events and run the job", async () => {
     const user = userEvent.setup();
     renderApp("/app/operations/engine", "staff");
-    expect(await screen.findByText("12 rules · 11 active")).toBeInTheDocument();
+    expect(await screen.findByText("13 rules · 11 active")).toBeInTheDocument();
     for (const c of ["Learning", "Attendance & make-up", "Operations", "Engagement"])
       expect(screen.getByRole("region", { name: c })).toBeInTheDocument();
 
     await user.click(
       screen.getByRole("button", { name: "Pause Absent several sessions in a row" }),
     );
-    expect(await screen.findByText("12 rules · 10 active")).toBeInTheDocument();
+    expect(await screen.findByText("13 rules · 10 active")).toBeInTheDocument();
 
     const t = screen.getByLabelText("Skill below threshold: skill below");
     await user.clear(t);
