@@ -280,13 +280,11 @@ export function registerWorkforce(app: Api): void {
           .insertInto("workforce_settings")
           .values({ org_id: caller.ctx.orgId, ...v, updated_by: caller.ctx.principalId })
           .onConflict((oc) =>
-            oc
-              .column("org_id")
-              .doUpdateSet({
-                ...v,
-                updated_by: caller.ctx.principalId,
-                updated_at: new Date(caller.now()),
-              }),
+            oc.column("org_id").doUpdateSet({
+              ...v,
+              updated_by: caller.ctx.principalId,
+              updated_at: new Date(caller.now()),
+            }),
           )
           .execute();
         return { ok: true };
