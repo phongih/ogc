@@ -131,6 +131,64 @@ export interface WorkforceSettingsTable {
   updated_at: Generated<Date>;
 }
 
+export interface CourseTable {
+  org_id: string;
+  id: string;
+  code: string;
+  name: string;
+}
+export interface StaffMemberTable {
+  org_id: string;
+  principal_id: string;
+  display_name: string;
+  role: "staff" | "admin";
+}
+export interface LeadTable {
+  org_id: string;
+  id: string;
+  learner_name: string;
+  course_code: string;
+  center_id: string;
+  source: "referral" | "walk_in" | "website" | "event" | "phone";
+  referrer_name: string | null;
+  campaign_id: string | null;
+  channel: "zalo" | "phone" | "email" | "in_person" | null;
+  needs: Generated<string[]>;
+  note: Generated<string>;
+  stage: "new" | "assigned" | "contacted" | "placement" | "offer" | "enrolled" | "lost";
+  assigned_to: string | null;
+  invoice_no: string | null;
+  first_payment_vnd: string | number | null; // bigint: pg returns a string
+  lost_reason: string | null;
+  created_at: Date;
+}
+export interface LeadHistoryTable {
+  org_id: string;
+  lead_id: string;
+  seq: number;
+  stage: LeadTable["stage"];
+  at: Date;
+  by_name: string;
+}
+export interface LeadActivityTable {
+  org_id: string;
+  lead_id: string;
+  seq: number;
+  kind: "call" | "message" | "meeting" | "note";
+  text: string;
+  at: Date;
+  by_name: string;
+}
+export interface AdmissionsSettingsTable {
+  org_id: string;
+  max: unknown;
+  hot_at: number;
+  warm_at: number;
+  stale_days: number;
+  updated_by: string;
+  updated_at: Generated<Date>;
+}
+
 export interface DB {
   center: CenterTable;
   teacher: TeacherTable;
@@ -144,6 +202,12 @@ export interface DB {
   makeup_selfstudy: MakeupSelfStudyTable;
   teacher_target: TeacherTargetTable;
   workforce_settings: WorkforceSettingsTable;
+  course: CourseTable;
+  staff_member: StaffMemberTable;
+  lead: LeadTable;
+  lead_history: LeadHistoryTable;
+  lead_activity: LeadActivityTable;
+  admissions_settings: AdmissionsSettingsTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

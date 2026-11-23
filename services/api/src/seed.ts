@@ -74,6 +74,283 @@ export const SYNTHETIC_ORGS = [
   "00000000-0000-4000-8000-000000000002",
 ] as const;
 
+type Stage = "new" | "assigned" | "contacted" | "placement" | "offer" | "enrolled" | "lost";
+type LeadSeed = {
+  name: string;
+  course: string;
+  center: string;
+  source: "walk_in" | "website" | "event" | "phone";
+  channel: "zalo" | "phone" | "email" | "in_person" | null;
+  needs: string[];
+  created: number; // days ago
+  path: [Stage, number][]; // stage changes, days ago
+  who?: "sam" | "olivia";
+  acts?: [number, "call" | "message" | "meeting" | "note", string][];
+  lost?: string;
+};
+const CENTER_CAU_GIAY = "00000000-0000-4000-8000-000000000c03";
+const STAFF = {
+  sam: { principal: "iios-principal-staff-1", name: "Sam (Org Staff)" },
+  olivia: { principal: "iios-principal-admin-1", name: "Olivia (Org Admin)" },
+};
+/** The demo's synthetic leads (apps/web/src/lib/adapters/mockAdmissions.ts): same names and paths. */
+export const LEAD_SEEDS: LeadSeed[] = [
+  {
+    name: "Hoa P.",
+    course: "ENG-A2",
+    center: D1,
+    source: "walk_in",
+    channel: "zalo",
+    needs: ["speaking_confidence"],
+    created: 1,
+    path: [],
+  },
+  {
+    name: "Quan T.",
+    course: "IELTS-B2",
+    center: D1,
+    source: "website",
+    channel: "email",
+    needs: ["exam_prep"],
+    created: 0,
+    path: [],
+  },
+  {
+    name: "Lan H.",
+    course: "ENG-B1",
+    center: THU_DUC,
+    source: "event",
+    channel: "phone",
+    needs: ["work_english"],
+    created: 3,
+    path: [["assigned", 3]],
+    who: "sam",
+  },
+  {
+    name: "Tuan K.",
+    course: "ENG-A2",
+    center: D1,
+    source: "phone",
+    channel: "phone",
+    needs: ["school_support"],
+    created: 20,
+    path: [["assigned", 19]],
+    who: "sam",
+  },
+  {
+    name: "Ngoc D.",
+    course: "ENG-A2",
+    center: D1,
+    source: "walk_in",
+    channel: "in_person",
+    needs: ["young_learner", "speaking_confidence"],
+    created: 6,
+    path: [
+      ["assigned", 6],
+      ["contacted", 5],
+    ],
+    who: "sam",
+    acts: [
+      [5, "call", "Talked about the A2 timetable"],
+      [2, "message", "Sent the trial-lesson times"],
+    ],
+  },
+  {
+    name: "Bich L.",
+    course: "ENG-B1",
+    center: THU_DUC,
+    source: "website",
+    channel: "zalo",
+    needs: ["work_english"],
+    created: 12,
+    path: [
+      ["assigned", 12],
+      ["contacted", 11],
+    ],
+    who: "olivia",
+    acts: [[11, "call", "Wants evening classes"]],
+  },
+  {
+    name: "Son V.",
+    course: "IELTS-B2",
+    center: D1,
+    source: "event",
+    channel: "email",
+    needs: ["exam_prep"],
+    created: 9,
+    path: [
+      ["assigned", 9],
+      ["contacted", 8],
+      ["placement", 4],
+    ],
+    who: "olivia",
+    acts: [
+      [8, "call", "Booked a placement test"],
+      [4, "meeting", "Placement test: B1+, aiming for IELTS 6.5"],
+    ],
+  },
+  {
+    name: "Yen T.",
+    course: "ENG-A2",
+    center: D1,
+    source: "walk_in",
+    channel: "in_person",
+    needs: ["travel"],
+    created: 15,
+    path: [
+      ["assigned", 15],
+      ["contacted", 14],
+      ["placement", 13],
+    ],
+    who: "sam",
+    acts: [
+      [14, "call", "Placement booked"],
+      [13, "meeting", "Placement test done: A2"],
+    ],
+  },
+  {
+    name: "Khanh M.",
+    course: "ENG-B1",
+    center: THU_DUC,
+    source: "phone",
+    channel: "phone",
+    needs: ["school_support"],
+    created: 2,
+    path: [
+      ["assigned", 2],
+      ["contacted", 1],
+    ],
+    who: "olivia",
+    acts: [[1, "call", "Parent asked about class size"]],
+  },
+  {
+    name: "Duc A.",
+    course: "ENG-A2",
+    center: CENTER_CAU_GIAY,
+    source: "website",
+    channel: "zalo",
+    needs: ["young_learner"],
+    created: 25,
+    path: [
+      ["assigned", 24],
+      ["contacted", 23],
+    ],
+    who: "sam",
+    acts: [[23, "message", "No reply yet"]],
+  },
+  {
+    name: "Trang B.",
+    course: "ENG-A2",
+    center: D1,
+    source: "event",
+    channel: "zalo",
+    needs: ["speaking_confidence"],
+    created: 40,
+    path: [
+      ["assigned", 40],
+      ["contacted", 39],
+      ["placement", 35],
+      ["enrolled", 30],
+    ],
+    who: "sam",
+    acts: [
+      [39, "call", "Interested in mornings"],
+      [35, "meeting", "Placement test: A2"],
+    ],
+  },
+  {
+    name: "Long H.",
+    course: "ENG-B1",
+    center: THU_DUC,
+    source: "walk_in",
+    channel: "in_person",
+    needs: ["work_english"],
+    created: 50,
+    path: [
+      ["assigned", 50],
+      ["contacted", 49],
+      ["placement", 47],
+      ["enrolled", 44],
+    ],
+    who: "olivia",
+    acts: [[49, "call", "Booked placement"]],
+  },
+  {
+    name: "Nhi C.",
+    course: "IELTS-B2",
+    center: D1,
+    source: "website",
+    channel: "email",
+    needs: ["exam_prep"],
+    created: 30,
+    path: [
+      ["assigned", 30],
+      ["contacted", 28],
+      ["lost", 20],
+    ],
+    who: "olivia",
+    acts: [[28, "call", "Comparing with another center"]],
+    lost: "Chose another center",
+  },
+  {
+    name: "Vinh S.",
+    course: "ENG-A2",
+    center: CENTER_CAU_GIAY,
+    source: "phone",
+    channel: "phone",
+    needs: ["young_learner"],
+    created: 18,
+    path: [
+      ["assigned", 18],
+      ["lost", 10],
+    ],
+    who: "sam",
+    lost: "Timetable does not fit",
+  },
+];
+
+async function seedLeads(c: pg.Client, now: number): Promise<void> {
+  const ago = (d: number, h = 0) => new Date(now - d * DAY - h * 3_600_000);
+  for (const [i, s] of LEAD_SEEDS.entries()) {
+    const id = `ADM-${i + 1}`;
+    const who = s.who ? STAFF[s.who] : null;
+    const stage = s.path.length ? s.path[s.path.length - 1][0] : "new";
+    await c.query(
+      `insert into lead (org_id, id, learner_name, course_code, center_id, source, channel, needs, stage,
+         assigned_to, lost_reason, created_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        NOVA,
+        id,
+        s.name,
+        s.course,
+        s.center,
+        s.source,
+        s.channel,
+        s.needs,
+        stage,
+        who?.principal ?? null,
+        s.lost ?? null,
+        ago(s.created),
+      ],
+    );
+    const history: [Stage, Date, string][] = [
+      ["new", ago(s.created), "Website form"],
+      ...s.path.map(([st, d]) => [st, ago(d, 1), (who ?? STAFF.sam).name] as [Stage, Date, string]),
+    ];
+    for (const [n, [st, at, by]] of history.entries())
+      await c.query(
+        "insert into lead_history (org_id, lead_id, seq, stage, at, by_name) values ($1, $2, $3, $4, $5, $6)",
+        [NOVA, id, n + 1, st, at, by],
+      );
+    for (const [n, [d, kind, text]] of (s.acts ?? []).entries())
+      await c.query(
+        "insert into lead_activity (org_id, lead_id, seq, kind, text, at, by_name) values ($1, $2, $3, $4, $5, $6, $7)",
+        [NOVA, id, n + 1, kind, text, ago(d), (who ?? STAFF.sam).name],
+      );
+  }
+}
+
 export async function seedDev(
   ownerUrl: string,
   now = Date.now(),
@@ -89,6 +366,11 @@ export async function seedDev(
       for (const org of SYNTHETIC_ORGS) {
         await scope(org);
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        await c.query("delete from lead_activity");
+        await c.query("delete from lead_history");
+        await c.query("delete from lead");
+        await c.query("delete from admissions_settings");
+        await c.query("delete from staff_member");
         await c.query("delete from teacher_target");
         await c.query("delete from workforce_settings");
         await c.query("delete from makeup_booking");
@@ -99,6 +381,7 @@ export async function seedDev(
           "session",
           "roster",
           "class",
+          "course",
           "guardian_link",
           "learner",
           "teacher",
@@ -214,6 +497,23 @@ export async function seedDev(
         [NOVA, s, L(l), m],
       );
 
+    // Admissions: the course catalog, the staff leads go to, and the demo's 14 synthetic leads
+    // (dated relative to now, so the dashboard always has fresh and stale ones).
+    await c.query(
+      `insert into course (org_id, id, code, name) values
+        ($1, 'course-a2', 'ENG-A2', 'Everyday English A2'),
+        ($1, 'course-b1', 'ENG-B1', 'Conversational English B1'),
+        ($1, 'course-ielts', 'IELTS-B2', 'IELTS Foundation B2')`,
+      [NOVA],
+    );
+    await c.query(
+      `insert into staff_member (org_id, principal_id, display_name, role) values
+        ($1, 'iios-principal-admin-1', 'Olivia (Org Admin)', 'admin'),
+        ($1, 'iios-principal-staff-1', 'Sam (Org Staff)', 'staff')`,
+      [NOVA],
+    );
+    await seedLeads(c, now);
+
     // ── Lumen Edu (a second tenant, for isolation) ────────────────────────────────────────
     await scope(LUMEN);
     await c.query(
@@ -222,6 +522,10 @@ export async function seedDev(
     );
     await c.query(
       "insert into teacher (org_id, id, principal_id, name) values ($1, 'lumen-t1', null, 'Lan')",
+      [LUMEN],
+    );
+    await c.query(
+      "insert into staff_member (org_id, principal_id, display_name, role) values ($1, 'iios-principal-staff-org2', 'Staff (Lumen)', 'staff')",
       [LUMEN],
     );
     await c.query(

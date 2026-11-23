@@ -58,6 +58,13 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 | `PUT /v1/workforce/teachers/:id/target`                   | staff with `workforce:manage`                          | `setTarget`                                 |
 | `PUT /v1/workforce/settings` `{underPct, overPct}`        | staff with `workforce:manage`                          | `updateSettings`                            |
 | `GET /v1/workforce/suggest/class/:id` · `…/session/:id`   | staff (suggest only, nothing assigned)                 | `suggestForClass` / `suggestForSession`     |
+| `GET /v1/admissions/leads` · `…/dashboard` · `…/options`  | staff (leads at centers `admissions:manage` allows)    | `AdmissionsPort.listLeads` / `getDashboard` |
+| `GET /v1/admissions/counselors` · `…/settings`            | staff                                                  | `counselors` / `getSettings`                |
+| `POST /v1/admissions/leads` (a `LeadDraft`)               | staff with `admissions:manage` at the center           | `createLead`                                |
+| `PUT /v1/admissions/leads/:id/assign` `{principalId}`     | staff with `admissions:manage` at the lead's center    | `assign`                                    |
+| `PUT /v1/admissions/leads/:id/stage` `{stage, reason?}`   | staff with `admissions:manage` at the lead's center    | `moveStage`                                 |
+| `POST /v1/admissions/leads/:id/activities` `{kind, text}` | staff with `admissions:manage` at the lead's center    | `logActivity`                               |
+| `PUT /v1/admissions/settings` (a `ScoringSettings`)       | staff with `admissions:manage` (no center limit)       | `updateSettings`                            |
 | `GET /v1/access/admin`                                    | Org Admin (IIOS decides)                               | `IiosPolicyAdminPort.getAdminView` → IIOS   |
 | `POST /v1/access/policies` `{name, description, rules}`   | Org Admin                                              | `createPolicy` → IIOS                       |
 | `PUT /v1/access/policies/:ref` `{expectedVersion, …}`     | Org Admin, not a policy that restricts them            | `revisePolicy` → IIOS                       |
@@ -86,6 +93,18 @@ Load is the teaching hours in the next 7 days, computed on read from the schedul
 - make-up sessions count.
 
 Each teacher has a target in hours per week (`teacher_target`, migration 0004). Bands are a percentage of that target, with thresholds staff tune (`workforce_settings`, default 60 / 100). Suggestions rank candidates by fit, with any clash last. They assign nobody, and going over the target only warns. Not on the Platform yet: course-prep hours and the new-center wizard's hint.
+
+## Admissions
+
+One pipeline for every lead (migration 0005: `course`, `staff_member`, `lead`, `lead_history`, `lead_activity`, `admissions_settings`), with the demo's rules:
+
+- a minimal synthetic profile: name, course, center, source, channel, needs and a short note. Phone numbers and e-mail addresses are refused;
+- the score is five parts, each with its reason, and staff tune the points (they must add up to 100), the hot / warm thresholds and the stale days;
+- a dashboard rate shows its numerator and denominator. "Reached" counts the furthest stage a lead ever reached, so a rate never exceeds 100%;
+- staff move a lead by hand through new → assigned → contacted → placement → lost. "Offer" (first invoice issued) and "enrolled" (paid) are set only by Billing, through `attachFirstInvoice` / `markLeadPaid` in `domains/admissions.ts`, for the Billing slice;
+- `ogc_app` may only insert into stage history and activities. Writes for an organization are serialised, so ADM numbers do not collide.
+
+Not on the Platform yet: the first invoice (Billing) and "Refer to partner" (Partner Commissions).
 
 ## Access policies
 
