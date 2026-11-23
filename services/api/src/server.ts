@@ -24,6 +24,7 @@ import { withTenant, type Db, type TenantTx } from "./db.js";
 import { idempotent, KEY_FORMAT } from "./idempotency.js";
 import type { IiosClient } from "./iios.js";
 import { registerAccess } from "./domains/access.js";
+import { registerAdmissions } from "./domains/admissions.js";
 import { registerAttendance } from "./domains/attendance.js";
 import { registerMakeup } from "./domains/makeup.js";
 import { registerWorkforce } from "./domains/workforce.js";
@@ -241,6 +242,7 @@ export function buildApi(deps: ApiDeps): Api {
   registerAttendance(app);
   registerMakeup(app);
   registerWorkforce(app);
+  registerAdmissions(app);
   registerAccess(app, deps.iios);
   return app;
 }

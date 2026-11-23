@@ -6,6 +6,13 @@
  */
 import type {
   AccessAdminView,
+  AdmissionsDashboard,
+  AdmissionsResult,
+  Lead,
+  LeadActivityKind,
+  LeadDraft,
+  LeadStage,
+  ScoringSettings,
   Employment,
   LoadCandidate,
   WorkforceOverview,
@@ -102,6 +109,14 @@ async function result<T extends { ok: boolean }>(
   const b = r.body as T | null;
   if (b && typeof b === "object" && "ok" in b) return b;
   throw new ApiError(r.status, r.body);
+}
+
+/** A staff-only read: 403 (not staff) is "nothing to show", not an error. */
+async function staffRead<T>(s: PlatformSession, path: string): Promise<T | null> {
+  const r = await send(s, "GET", path);
+  if (r.status === 403) return null;
+  if (r.status !== 200) throw new ApiError(r.status, r.body);
+  return r.body as T;
 }
 
 export const platformApi = {
@@ -225,6 +240,40 @@ export const platformApi = {
     read<LoadCandidate[]>(s, `/v1/workforce/suggest/class/${encodeURIComponent(classId)}`),
   suggestForSession: (s: PlatformSession, sessionId: string) =>
     read<LoadCandidate[]>(s, `/v1/workforce/suggest/session/${encodeURIComponent(sessionId)}`),
+
+  // Admissions (staff; admissions:manage by center) — offer/enrolled follow Billing only
+  admissionsDashboard: (s: PlatformSession) =>
+    staffRead<AdmissionsDashboard>(s, "/v1/admissions/dashboard"),
+  admissionsOptions: (s: PlatformSession) =>
+    staffRead<{ centers: { id: string; name: string }[]; courseCodes: string[] }>(
+      s,
+      "/v1/admissions/options",
+    ),
+  leads: (s: PlatformSession) => staffRead<Lead[]>(s, "/v1/admissions/leads"),
+  counselors: (s: PlatformSession) =>
+    staffRead<{ principalId: string; name: string }[]>(s, "/v1/admissions/counselors"),
+  admissionsSettings: (s: PlatformSession) =>
+    staffRead<ScoringSettings>(s, "/v1/admissions/settings"),
+  createLead: (s: PlatformSession, d: LeadDraft) =>
+    result<AdmissionsResult>(s, "POST", "/v1/admissions/leads", d),
+  assignLead: (s: PlatformSession, id: string, principalId: string) =>
+    result<AdmissionsResult>(s, "PUT", `/v1/admissions/leads/${encodeURIComponent(id)}/assign`, {
+      principalId,
+    }),
+  moveLead: (s: PlatformSession, id: string, stage: LeadStage, reason?: string) =>
+    result<AdmissionsResult>(s, "PUT", `/v1/admissions/leads/${encodeURIComponent(id)}/stage`, {
+      stage,
+      ...(reason ? { reason } : {}),
+    }),
+  logLeadActivity: (s: PlatformSession, id: string, kind: LeadActivityKind, text: string) =>
+    result<AdmissionsResult>(
+      s,
+      "POST",
+      `/v1/admissions/leads/${encodeURIComponent(id)}/activities`,
+      { kind, text },
+    ),
+  updateAdmissionsSettings: (s: PlatformSession, next: ScoringSettings) =>
+    result<AdmissionsResult>(s, "PUT", "/v1/admissions/settings", next),
 
   // Attendance (teachers)
   myClasses: (s: PlatformSession) => read<MyClass[]>(s, "/v1/me/classes"),
