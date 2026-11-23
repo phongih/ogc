@@ -35,7 +35,67 @@ export interface IdempotencyKeyTable {
 
 // Kysely table typing: columns with database defaults are optional on insert.
 type Generated<T> = import("kysely").Generated<T>;
+export interface CenterTable {
+  org_id: string;
+  id: string;
+  name: string;
+}
+export interface TeacherTable {
+  org_id: string;
+  id: string;
+  principal_id: string | null;
+  name: string;
+}
+export interface LearnerTable {
+  org_id: string;
+  id: string;
+  principal_id: string | null;
+  display_name: string;
+}
+export interface ClassTable {
+  org_id: string;
+  id: string;
+  center_id: string;
+  name: string;
+  teacher_id: string | null;
+  room: string | null;
+  duration_min: Generated<number>;
+}
+export interface RosterTable {
+  org_id: string;
+  class_id: string;
+  learner_id: string;
+}
+export interface SessionTable {
+  org_id: string;
+  id: string;
+  class_id: string;
+  title: string;
+  at: Date;
+  state: Generated<"scheduled" | "cancelled">;
+  kind: Generated<"regular" | "makeup">;
+  substitute_id: string | null;
+  held_by: string | null;
+  replaced_by: string | null;
+  replaces: string | null;
+}
+export interface AttendanceTable {
+  org_id: string;
+  session_id: string;
+  learner_id: string;
+  mark: "present" | "late" | "absent";
+  marked_by: string;
+  marked_at: Generated<Date>;
+}
+
 export interface DB {
+  center: CenterTable;
+  teacher: TeacherTable;
+  learner: LearnerTable;
+  class: ClassTable;
+  roster: RosterTable;
+  session: SessionTable;
+  attendance: AttendanceTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;
