@@ -33,10 +33,10 @@ const fmt = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
   hour12: false,
 });
-const centerTime = (d: Date) => fmt.format(d);
+export const centerTime = (d: Date) => fmt.format(d);
 const HISTORY_WINDOW_MS = 4 * 3600_000; // a session that started < 4 h ago still occupies its slot
 
-interface Snapshot {
+export interface Snapshot {
   centers: Map<string, string>;
   teachers: Map<string, string>;
   classes: Map<
@@ -66,7 +66,7 @@ interface Snapshot {
   learners: Map<string, number>;
 }
 
-async function snapshot(tx: TenantTx): Promise<Snapshot> {
+export async function snapshot(tx: TenantTx): Promise<Snapshot> {
   const [centers, teachers, classes, sessions, marked, roster] = await Promise.all([
     tx.selectFrom("center").select(["id", "name"]).execute(),
     tx.selectFrom("teacher").select(["id", "name"]).orderBy("name").execute(),
@@ -144,7 +144,7 @@ function classSchedule(snap: Snapshot, classId: string, now: number): ClassSched
 }
 
 // ── clashes (same rules and words as apps/web/src/lib/adapters/clashes.ts) ─────────────────
-interface Slot {
+export interface Slot {
   label: string;
   at: Date;
   durationMin: number;
@@ -176,7 +176,7 @@ function why(snap: Snapshot, cand: Slot, other: Slot): string | null {
     return `${cand.room} at ${snap.centers.get(cand.centerId) ?? "this center"} is already used by ${other.label} on ${centerTime(other.at)}`;
   return null;
 }
-function clashes(
+export function clashes(
   snap: Snapshot,
   now: number,
   cands: Slot[],

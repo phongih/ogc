@@ -13,6 +13,8 @@ import { TeachingPage } from "./pages/TeachingPage";
 import { ClassPage } from "./pages/ClassPage";
 import { SessionPage } from "./pages/SessionPage";
 import { AccessPage } from "./pages/AccessPage";
+import { MakeupsPage } from "./pages/MakeupsPage";
+import { MyMakeupsPage } from "./pages/MyMakeupsPage";
 
 interface Ctx {
   session: PlatformSession | null;
@@ -28,7 +30,13 @@ export const useSignedIn = (): PlatformSession => {
 };
 
 export const homeFor = (role: string) =>
-  role === "staff" ? "/schedule" : role === "teacher" ? "/teaching" : "/none";
+  role === "staff"
+    ? "/schedule"
+    : role === "teacher"
+      ? "/teaching"
+      : role === "learner" || role === "guardian"
+        ? "/my-makeups"
+        : "/none";
 
 function Protected({ children }: { children: ReactNode }) {
   return useSession().session ? <>{children}</> : <Navigate to="/login" replace />;
@@ -49,6 +57,10 @@ function Shell({ children }: { children: ReactNode }) {
         {session ? (
           <nav aria-label="Platform" className="flex gap-4 text-sm">
             {session.role === "staff" ? <Link to="/schedule">Schedule</Link> : null}
+            {session.role === "staff" ? <Link to="/makeups">Make-ups</Link> : null}
+            {session.role === "learner" || session.role === "guardian" ? (
+              <Link to="/my-makeups">Make-ups</Link>
+            ) : null}
             {session.role === "teacher" ? <Link to="/teaching">Teaching</Link> : null}
             {session.orgAdmin ? <Link to="/access">Access</Link> : null}
           </nav>
@@ -133,6 +145,22 @@ export function App() {
                 element={
                   <Protected>
                     <SessionPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/makeups"
+                element={
+                  <Protected>
+                    <MakeupsPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/my-makeups"
+                element={
+                  <Protected>
+                    <MyMakeupsPage />
                   </Protected>
                 }
               />

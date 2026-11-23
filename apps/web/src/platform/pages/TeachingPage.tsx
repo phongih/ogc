@@ -5,6 +5,8 @@ import { Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { formatCenterDateTime } from "../../lib/centerTime";
 import { platformApi } from "../client";
 import { useSignedIn } from "../App";
+import { SelfStudyToConfirmView } from "../../features/makeup/SelfStudyToConfirmView";
+import { PlatformMakeupApi } from "../makeup";
 
 export function TeachingPage() {
   const session = useSignedIn();
@@ -27,6 +29,11 @@ export function TeachingPage() {
   return (
     <section>
       <PageHeader title="Teaching" subtitle="Times are center time (Asia/Ho_Chi_Minh)." />
+      <div className="mb-4">
+        <PlatformMakeupApi>
+          <SelfStudyToConfirmView />
+        </PlatformMakeupApi>
+      </div>
       <Card className="mb-4">
         <h2 className="mb-2 font-medium">To mark</h2>
         {toMark.data?.length ? (

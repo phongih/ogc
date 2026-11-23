@@ -8,7 +8,9 @@
  *    save replaces the earlier one; the summary counts marked sessions only.
  * Which teacher a principal is comes from OGC's own records (teacher.principal_id) — data, not
  * authority: the grant's role and narrowing decide what they may do.
- * Make-up guests stay in the demo for now (their own PR).
+ * Make-up guests (owner decisions 21/11): a learner booked into a session to make up a missed unit
+ * is on that session's sheet with "make-up for <class>"; a make-up session lists only its guests.
+ * Marking a guest present / late closes their make-up item (see domains/makeup.ts).
  */
 import { authorize } from "@ogc/contracts";
 import type {
@@ -33,6 +35,7 @@ const MarksBody = z
   .strict();
 import type { TenantTx } from "../db.js";
 import type { Api, Caller } from "../server.js";
+import { guestsOf, loadLedger } from "./makeup.js";
 
 type SessRow = {
   id: string;
@@ -97,7 +100,7 @@ async function ownsClass(tx: TenantTx, caller: Caller, classId: string): Promise
 }
 
 async function view(tx: TenantTx, s: SessRow, now: number): Promise<SessionAttendance> {
-  const [cls, rows, marks] = await Promise.all([
+  const [cls, roster, marks, ledger] = await Promise.all([
     tx.selectFrom("class").select("name").where("id", "=", s.class_id).executeTakeFirstOrThrow(),
     s.kind === "makeup"
       ? Promise.resolve([])
@@ -113,17 +116,25 @@ async function view(tx: TenantTx, s: SessRow, now: number): Promise<SessionAtten
       .select(["learner_id", "mark"])
       .where("session_id", "=", s.id)
       .execute(),
+    loadLedger(tx),
   ]);
   const m = new Map(marks.map((x) => [x.learner_id, x.mark]));
+  const onRoster = new Set(roster.map((r) => r.id));
+  const guests = guestsOf(ledger, s.id)
+    .filter((g) => !onRoster.has(g.learnerId))
+    .map((g) => ({
+      id: g.learnerId,
+      name: ledger.learners.get(g.learnerId)?.name ?? "Learner",
+      makeupFor: ledger.classes.get(g.fromClassId)?.name ?? null,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
   return {
     session: toSession(s, marks.length > 0, now),
     className: cls.name,
-    rows: rows.map((r) => ({
-      learnerId: r.id,
-      displayName: r.name,
-      mark: m.get(r.id) ?? null,
-      makeupFor: null,
-    })),
+    rows: [
+      ...roster.map((r) => ({ learnerId: r.id, displayName: r.name, makeupFor: null })),
+      ...guests.map((g) => ({ learnerId: g.id, displayName: g.name, makeupFor: g.makeupFor })),
+    ].map((r) => ({ ...r, mark: m.get(r.learnerId) ?? null })),
   };
 }
 

@@ -60,6 +60,7 @@ export interface ClassTable {
   teacher_id: string | null;
   room: string | null;
   duration_min: Generated<number>;
+  course_id: string | null;
 }
 export interface RosterTable {
   org_id: string;
@@ -88,6 +89,32 @@ export interface AttendanceTable {
   marked_at: Generated<Date>;
 }
 
+export interface GuardianLinkTable {
+  org_id: string;
+  guardian_principal_id: string;
+  learner_id: string;
+}
+export interface MakeupBookingTable {
+  org_id: string;
+  missed_session_id: string;
+  learner_id: string;
+  session_id: string;
+  booked_by: string;
+  booked_at: Generated<Date>;
+}
+export interface MakeupSelfStudyTable {
+  org_id: string;
+  missed_session_id: string;
+  learner_id: string;
+  assigned_by: string;
+  assigned_at: Generated<Date>;
+  submitted_at: Date | null;
+  note: string | null;
+  returned_note: string | null;
+  confirmed_at: Date | null;
+  confirmed_by: string | null;
+}
+
 export interface DB {
   center: CenterTable;
   teacher: TeacherTable;
@@ -96,6 +123,9 @@ export interface DB {
   roster: RosterTable;
   session: SessionTable;
   attendance: AttendanceTable;
+  guardian_link: GuardianLinkTable;
+  makeup_booking: MakeupBookingTable;
+  makeup_selfstudy: MakeupSelfStudyTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;
