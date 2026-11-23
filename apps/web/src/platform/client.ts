@@ -5,6 +5,10 @@
  * contract's result shapes (ScheduleResult, RecordAttendanceResult) whatever the HTTP status.
  */
 import type {
+  AuthoredCourseDetail,
+  AuthoredCourseSummary,
+  AuthoringResult,
+  CourseContent,
   AccessAdminView,
   ActivityEntry,
   BatchCandidate,
@@ -376,6 +380,40 @@ export const platformApi = {
       row,
     ),
   partnerTrends: (s: PlatformSession) => staffRead<PartnerTrend[]>(s, "/v1/partners/trends"),
+
+  // Course Studio (teachers and staff, courses:author) — synthetic courses
+  courses: (s: PlatformSession) =>
+    staffRead<{ courses: AuthoredCourseSummary[]; canCreate: boolean }>(s, "/v1/courses"),
+  course: async (s: PlatformSession, ref: string) => {
+    const r = await send(s, "GET", `/v1/courses/${encodeURIComponent(ref)}`);
+    if (r.status === 404 || r.status === 403) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as AuthoredCourseDetail;
+  },
+  createCourse: (s: PlatformSession, title: string, level: string) =>
+    result<AuthoringResult>(s, "POST", "/v1/courses", { title, level }),
+  saveCourseDraft: (
+    s: PlatformSession,
+    ref: string,
+    content: CourseContent,
+    baseRevision: number,
+  ) =>
+    result<AuthoringResult>(s, "POST", `/v1/courses/${encodeURIComponent(ref)}/draft`, {
+      content,
+      baseRevision,
+    }),
+  courseStep: (
+    s: PlatformSession,
+    ref: string,
+    step: "submit" | "withdraw" | "approve" | "return",
+    note?: string,
+  ) =>
+    result<AuthoringResult>(
+      s,
+      "POST",
+      `/v1/courses/${encodeURIComponent(ref)}/${step}`,
+      note === undefined ? {} : { note },
+    ),
 
   // Billing (staff; billing:manage by center; an Org Admin decides fee lines) — synthetic, nothing is charged
   billingOptions: (s: PlatformSession) =>

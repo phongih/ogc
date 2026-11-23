@@ -315,6 +315,42 @@ export interface PartnerSignalMarkTable {
   at: Date;
 }
 
+export interface AuthoredCourseTable {
+  org_id: string;
+  ref: string;
+  owner_teacher_id: string | null;
+  owner_principal_id: string;
+  owner_name: string;
+  draft: unknown; // jsonb: CourseContent
+  revision: number;
+  editors: unknown; // jsonb: { id, name }[]
+  pending_content: unknown | null;
+  pending_by: string | null;
+  pending_by_name: string | null;
+  pending_at: Date | null;
+  updated_at: Date;
+}
+export interface CourseVersionTable {
+  org_id: string;
+  course_ref: string;
+  version: number;
+  content: unknown; // jsonb: CourseContent, immutable
+  submitted_by: string;
+  approved_by: string;
+  published_at: Date;
+  note: string | null;
+}
+export interface CourseReviewTable {
+  org_id: string;
+  course_ref: string;
+  seq: number;
+  at: Date;
+  by_name: string;
+  action: "submitted" | "withdrawn" | "approved" | "returned";
+  version: number | null;
+  note: string | null;
+}
+
 export interface SettlementBatchTable {
   org_id: string;
   id: string;
@@ -369,6 +405,9 @@ export interface DB {
   partner_signal_mark: PartnerSignalMarkTable;
   settlement_batch: SettlementBatchTable;
   settlement_batch_entry: SettlementBatchEntryTable;
+  authored_course: AuthoredCourseTable;
+  course_version: CourseVersionTable;
+  course_review: CourseReviewTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

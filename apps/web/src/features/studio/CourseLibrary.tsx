@@ -5,27 +5,25 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { courseStudio } from "../../lib/api";
-import { useViewer } from "../../app/iiosGate";
-import { refreshLearningState } from "../../lib/invalidate";
+import { useCourseStudioApi } from "./courseStudioApi";
 import { formatCenterDate } from "../../lib/centerTime";
 import { Button, Card } from "../../ui";
-import { AUTHORED_STATUS, Refused } from "./CourseEditorPage";
+import { AUTHORED_STATUS, Refused } from "./CourseEditorView";
 
 export function CourseLibrary({ base }: { base: string }) {
-  const viewer = useViewer();
+  const api = useCourseStudioApi();
   const qc = useQueryClient();
   const nav = useNavigate();
   const q = useQuery({
-    queryKey: ["course-studio-list", viewer],
-    queryFn: () => courseStudio.list(viewer),
+    queryKey: [...api.key, "list"],
+    queryFn: () => api.list(),
   });
   const [title, setTitle] = useState("");
   const [level, setLevel] = useState("");
   const create = useMutation({
-    mutationFn: () => courseStudio.create(viewer, title, level),
+    mutationFn: () => api.create(title, level),
     onSuccess: (r) => {
-      void refreshLearningState(qc);
+      void api.onChanged(qc);
       if (r.ok && r.ref) nav(`${base}/${r.ref}`);
     },
   });
