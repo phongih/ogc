@@ -78,3 +78,4 @@ jobs:
           node e2e/platform-makeup-journey.mjs || echo "platform make-up E2E skipped/soft-failed (non-blocking)"
           node e2e/platform-workforce-journey.mjs || echo "platform workforce E2E skipped/soft-failed (non-blocking)"
           node e2e/platform-admissions-journey.mjs || echo "platform admissions E2E skipped/soft-failed (non-blocking)"
+          node e2e/platform-billing-journey.mjs || echo "platform billing E2E skipped/soft-failed (non-blocking)"

@@ -309,6 +309,132 @@ export const LEAD_SEEDS: LeadSeed[] = [
   },
 ];
 
+/** The school year running at the center (from August): 2026 for "2026-2027". */
+export function schoolYearStart(now: number): number {
+  const t = new Date(now + 7 * 3_600_000).toISOString();
+  return Number(t.slice(5, 7)) >= 8 ? Number(t.slice(0, 4)) : Number(t.slice(0, 4)) - 1;
+}
+
+/**
+ * The demo's fee plan for the CURRENT school year (so a period is always running) — tuition for
+ * every course × term, approved by Olivia; a materials fee for A2 Term 2 waiting for an Org Admin —
+ * and Term 1 invoices issued 25/08: paid 10/09, except An P. (part-paid) and Huy D., Vy H. (unpaid).
+ */
+async function seedBilling(c: pg.Client, now: number): Promise<void> {
+  const y = schoolYearStart(now);
+  const yr = `${y}-${y + 1}`;
+  const terms = [
+    ["Term 1", `${y}-09-01`, `${y}-11-30`, `${y}-09-15`],
+    ["Term 2", `${y}-12-01`, `${y + 1}-02-28`, `${y}-12-10`],
+    ["Term 3", `${y + 1}-03-01`, `${y + 1}-05-31`, `${y + 1}-03-10`],
+    ["Summer", `${y + 1}-06-01`, `${y + 1}-08-31`, `${y + 1}-06-10`],
+  ];
+  const tuition: [string, number][] = [
+    ["ENG-A2", 6_900_000],
+    ["ENG-B1", 8_400_000],
+    ["IELTS-B2", 12_000_000],
+  ];
+  const line = async (
+    id: number,
+    course: string,
+    kind: string,
+    t: string[],
+    amount: number,
+    approved: boolean,
+  ) =>
+    c.query(
+      `insert into fee_line (org_id, id, year, course_code, center_id, kind, period, from_date, to_date, due_date,
+         amount_vnd, status, proposed_by, proposed_by_name, proposed_at, decided_by_name, decided_at)
+       values ($1, $2, $3, $4, null, $5, $6, $7, $8, $9, $10, $11, 'iios-principal-staff-1', 'Sam (Org Staff)', $12, $13, $14)`,
+      [
+        NOVA,
+        `FL-${id}`,
+        yr,
+        course,
+        kind,
+        ...t,
+        amount,
+        approved ? "approved" : "pending",
+        approved ? `${y}-08-01T02:00:00Z` : new Date(now),
+        approved ? "Olivia (Org Admin)" : null,
+        approved ? `${y}-08-02T02:00:00Z` : null,
+      ],
+    );
+  let n = 0;
+  const term1: Record<string, string> = {};
+  for (const [course, amount] of tuition)
+    for (const t of terms) {
+      await line(++n, course, "tuition", t, amount, true);
+      if (t[0] === "Term 1") term1[course] = `FL-${n}`;
+    }
+  await line(++n, "ENG-A2", "materials", terms[1], 450_000, false);
+
+  // Term 1 invoices: one per learner of each class, payer = guardian or a learner who pays.
+  const ls = await c.query<{
+    learner_id: string;
+    name: string;
+    center_id: string;
+    code: string;
+    pays: boolean;
+    principal_id: string | null;
+    guardian: string | null;
+    guardian_name: string | null;
+  }>(
+    `select l.id as learner_id, l.display_name as name, k.center_id, co.code, l.pays_own_tuition as pays,
+            l.principal_id, g.guardian_principal_id as guardian, g.guardian_name
+       from roster r join class k on k.id = r.class_id join learner l on l.id = r.learner_id
+       join course co on co.id = k.course_id
+       left join guardian_link g on g.learner_id = l.id
+      order by k.id, l.id`,
+  );
+  let inv = 0;
+  let rc = 0;
+  const issued = `${y}-08-25T02:00:00Z`;
+  for (const r of ls.rows) {
+    const amount = tuition.find(([code]) => code === r.code)![1];
+    const id = `I-${++inv}`;
+    const payer = r.guardian
+      ? [r.guardian, r.guardian_name]
+      : r.pays
+        ? [r.principal_id, r.name]
+        : [null, null];
+    await c.query(
+      `insert into invoice (org_id, id, no, center_id, learner_name, learner_id, payer_principal_id, payer_name,
+         subtotal_vnd, issued_at, due_date)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [
+        NOVA,
+        id,
+        `INV-${y}-${String(inv).padStart(4, "0")}`,
+        r.center_id,
+        r.name,
+        r.learner_id,
+        ...payer,
+        amount,
+        issued,
+        `${y}-09-15`,
+      ],
+    );
+    await c.query(
+      "insert into invoice_line (org_id, invoice_id, fee_line_id, description, amount_vnd) values ($1, $2, $3, $4, $5)",
+      [NOVA, id, term1[r.code], `${r.code} · Tuition · Term 1 ${yr}`, amount],
+    );
+    if (r.name === "Huy D." || r.name === "Vy H.") continue;
+    await c.query(
+      `insert into payment (org_id, id, invoice_id, amount_vnd, method, receipt_no, at, recorded_by)
+       values ($1, $2, $3, $4, 'bank_transfer', $5, $6, 'Sam (Org Staff)')`,
+      [
+        NOVA,
+        `P-${++rc}`,
+        id,
+        r.name === "An P." ? 3_000_000 : amount,
+        `RC-${y}-${String(rc).padStart(4, "0")}`,
+        `${y}-09-10T03:00:00Z`,
+      ],
+    );
+  }
+}
+
 async function seedLeads(c: pg.Client, now: number): Promise<void> {
   const ago = (d: number, h = 0) => new Date(now - d * DAY - h * 3_600_000);
   for (const [i, s] of LEAD_SEEDS.entries()) {
@@ -366,6 +492,10 @@ export async function seedDev(
       for (const org of SYNTHETIC_ORGS) {
         await scope(org);
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        await c.query("delete from payment");
+        await c.query("delete from invoice_line");
+        await c.query("delete from invoice");
+        await c.query("delete from fee_line");
         await c.query("delete from lead_activity");
         await c.query("delete from lead_history");
         await c.query("delete from lead");
@@ -415,12 +545,12 @@ export async function seedDev(
     };
     for (const [i, n] of names.entries())
       await c.query(
-        "insert into learner (org_id, id, principal_id, display_name) values ($1, $2, $3, $4)",
-        [NOVA, L(i + 1), principals[i + 1] ?? null, n],
+        "insert into learner (org_id, id, principal_id, display_name, pays_own_tuition) values ($1, $2, $3, $4, $5)",
+        [NOVA, L(i + 1), principals[i + 1] ?? null, n, i + 1 === 2], // Minh is an adult who pays
       );
     // Mai (guardian) is linked to Linh — synthetic, pre-established (no link-creation path).
     await c.query(
-      "insert into guardian_link (org_id, guardian_principal_id, learner_id) values ($1, 'iios-principal-guardian-1', $2)",
+      "insert into guardian_link (org_id, guardian_principal_id, learner_id, guardian_name) values ($1, 'iios-principal-guardian-1', $2, 'Mai (Guardian)')",
       [NOVA, L(1)],
     );
     await c.query(
@@ -513,6 +643,7 @@ export async function seedDev(
       [NOVA],
     );
     await seedLeads(c, now);
+    await seedBilling(c, now);
 
     // ── Lumen Edu (a second tenant, for isolation) ────────────────────────────────────────
     await scope(LUMEN);
