@@ -166,6 +166,22 @@ export interface LeadTable {
   created_at: Date;
   referrer_principal_id?: string | null;
   referral_code?: string | null;
+  origin?: string | null;
+}
+export interface PublicOrgTable {
+  slug: string;
+  org_id: string;
+  name: string;
+}
+export interface CourseShowcaseTable {
+  org_id: string;
+  course_ref: string;
+  is_public: boolean;
+  offer: string;
+  catalog_code: string | null;
+  needs: string[];
+  updated_by: string;
+  updated_at: Date;
 }
 export interface LeadHistoryTable {
   org_id: string;
@@ -588,6 +604,8 @@ export interface DB {
   referral_click: ReferralClickTable;
   referral_reward: ReferralRewardTable;
   wallet_entry: WalletEntryTable;
+  public_org: PublicOrgTable;
+  course_showcase: CourseShowcaseTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

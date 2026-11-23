@@ -41,3 +41,4 @@ export * from "./partners.js";
 export * from "./studio.js";
 export * from "./authoring.js";
 export * from "./mastery.js";
+export * from "./showcase.js";

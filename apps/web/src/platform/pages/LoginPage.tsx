@@ -1,6 +1,6 @@
 // Dev sign-in (staging): pick a synthetic persona; the API asks the mock IIOS for a grant.
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button, Card, ErrorState, PageHeader, Spinner } from "../../ui";
 import { platformApi, type Persona } from "../client";
 import { homeFor, useSession } from "../App";
@@ -50,6 +50,12 @@ export function LoginPage() {
           </ul>
         </Card>
       ))}
+      <p className="mb-4 text-sm">
+        Not signed in?{" "}
+        <Link to="/showcase" className="text-brand underline">
+          Browse public courses
+        </Link>
+      </p>
       {login.isError ? (
         <p role="alert" className="text-sm text-danger">
           Sign-in refused.

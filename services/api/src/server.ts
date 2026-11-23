@@ -32,6 +32,7 @@ import { registerClassCourses } from "./domains/classCourses.js";
 import { registerStudents } from "./domains/students.js";
 import { registerEngine } from "./domains/engine.js";
 import { registerGrowth } from "./domains/growth.js";
+import { registerShowcase } from "./domains/showcase.js";
 import { registerAttendance } from "./domains/attendance.js";
 import { registerMakeup } from "./domains/makeup.js";
 import { registerWorkforce } from "./domains/workforce.js";
@@ -44,7 +45,7 @@ declare module "fastify" {
     grant: IiosGrantedContext | null;
   }
   interface FastifyContextConfig {
-    public?: boolean; // no grant needed (health, dev login, the /join page)
+    public?: boolean; // no grant needed (health, dev login, /join, the public showcase)
   }
 }
 
@@ -260,6 +261,7 @@ export function buildApi(deps: ApiDeps): Api {
   registerStudents(app);
   registerEngine(app);
   registerGrowth(app, deps.db, deps.now ?? Date.now);
+  registerShowcase(app, deps.db, deps.now ?? Date.now);
   registerAccess(app, deps.iios);
   return app;
 }

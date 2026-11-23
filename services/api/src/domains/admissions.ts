@@ -59,6 +59,7 @@ interface StoredLead {
   source: LeadSource;
   referrerName: string | null;
   campaignId: string | null;
+  origin: string | null;
   channel: ContactChannel | null;
   needs: LearningNeed[];
   note: string;
@@ -102,6 +103,7 @@ async function loadBook(tx: TenantTx): Promise<Book> {
       source: l.source,
       referrerName: l.referrer_name,
       campaignId: l.campaign_id,
+      origin: l.origin ?? null,
       channel: l.channel,
       needs: l.needs as LearningNeed[],
       note: l.note,
@@ -236,6 +238,7 @@ function view(b: Book, l: StoredLead, now: number): Lead {
     centerName: b.centers.get(l.centerId) ?? "Unknown center",
     source: l.source,
     referredBy: l.referrerName,
+    origin: l.origin,
     campaignId: l.campaignId,
     channel: l.channel,
     needs: [...l.needs],
@@ -450,6 +453,52 @@ export async function createReferralLead(
     })
     .execute();
   await addHistory(tx, orgId, id, "new", at, `Referral (${input.code})`);
+  return id;
+}
+
+/** The public course showcase: an enquiry enters the pipeline at "new" (source "website") with its
+ *  origin. The caller holds the admissions lock of the organization. */
+export async function createWebsiteLead(
+  tx: TenantTx,
+  orgId: string,
+  input: {
+    learnerName: string;
+    courseCode: string;
+    centerId: string;
+    needs: LearningNeed[];
+    origin: string;
+  },
+  at: Date,
+): Promise<string> {
+  const { rows } = await sql<{ n: number }>`
+    select coalesce(max((substring(id from 5))::int), 0)::int as n from lead where id ~ '^ADM-[0-9]+$'`.execute(
+    tx,
+  );
+  const id = `ADM-${rows[0].n + 1}`;
+  await tx
+    .insertInto("lead")
+    .values({
+      org_id: orgId,
+      id,
+      learner_name: input.learnerName,
+      course_code: input.courseCode,
+      center_id: input.centerId,
+      source: "website",
+      referrer_name: null,
+      campaign_id: null,
+      channel: null,
+      needs: input.needs,
+      note: "",
+      stage: "new",
+      assigned_to: null,
+      invoice_no: null,
+      first_payment_vnd: null,
+      lost_reason: null,
+      created_at: at,
+      origin: input.origin.slice(0, 200),
+    })
+    .execute();
+  await addHistory(tx, orgId, id, "new", at, "Public showcase");
   return id;
 }
 

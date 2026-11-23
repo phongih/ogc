@@ -22,6 +22,7 @@ import { PlatformPartnersPage } from "./pages/PartnersPage";
 import { PlatformStudentsPage } from "./pages/StudentsPage";
 import { PlatformEnginePage } from "./pages/EnginePage";
 import { PlatformGrowthPage, PlatformJoinPage, PlatformReferralsPage } from "./pages/GrowthPage";
+import { ShowcaseCoursePage, ShowcaseHomePage, ShowcaseOrgPage } from "./showcase";
 import {
   PlatformClassLessonPage,
   PlatformCoursePage,
@@ -149,6 +150,9 @@ export function App() {
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/join" element={<PlatformJoinPage />} />
+              <Route path="/showcase" element={<ShowcaseHomePage />} />
+              <Route path="/showcase/:org" element={<ShowcaseOrgPage />} />
+              <Route path="/showcase/:org/:ref" element={<ShowcaseCoursePage />} />
               <Route
                 path="/referrals"
                 element={
