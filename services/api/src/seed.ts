@@ -15,6 +15,7 @@
 import pg from "pg";
 import { commissionFor } from "@ogc/contracts";
 import { cycleOf } from "./domains/partners.js";
+import { seedCourses, seedLumenCourse } from "./seedCourses.js";
 
 export const NOVA = "00000000-0000-4000-8000-000000000001";
 export const LUMEN = "00000000-0000-4000-8000-000000000002";
@@ -845,6 +846,9 @@ export async function seedDev(
       for (const org of SYNTHETIC_ORGS) {
         await scope(org);
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        await c.query("delete from course_review");
+        await c.query("delete from course_version");
+        await c.query("delete from authored_course");
         await c.query("delete from partner_signal_mark");
         await c.query("delete from partner_activity");
         await c.query("delete from settlement_batch_entry");
@@ -1005,6 +1009,7 @@ export async function seedDev(
     await seedLeads(c, now);
     await seedBilling(c, now);
     await seedPartners(c, now);
+    await seedCourses(c, now, { tara: TARA, ben: BEN });
 
     // ── Lumen Edu (a second tenant, for isolation) ────────────────────────────────────────
     await scope(LUMEN);
@@ -1020,6 +1025,7 @@ export async function seedDev(
       "insert into staff_member (org_id, principal_id, display_name, role) values ($1, 'iios-principal-staff-org2', 'Staff (Lumen)', 'staff')",
       [LUMEN],
     );
+    await seedLumenCourse(c, now);
     await c.query(
       "insert into learner (org_id, id, display_name) values ($1, '00000000-0000-4000-8000-0000000Lo201', 'Learner (Lumen)')",
       [LUMEN],

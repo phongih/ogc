@@ -27,6 +27,7 @@ import { registerAccess } from "./domains/access.js";
 import { registerAdmissions } from "./domains/admissions.js";
 import { registerBilling } from "./domains/billing.js";
 import { registerPartners } from "./domains/partners.js";
+import { registerCourses } from "./domains/courses.js";
 import { registerAttendance } from "./domains/attendance.js";
 import { registerMakeup } from "./domains/makeup.js";
 import { registerWorkforce } from "./domains/workforce.js";
@@ -83,7 +84,7 @@ export type Handler = (
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export type Api = FastifyInstance & {
   /** Register a route that needs a decided grant; the handler gets a `Caller`. */
-  secured: (method: Method, url: string, h: Handler) => void;
+  secured: (method: Method, url: string, h: Handler, opts?: { bodyLimit?: number }) => void;
 };
 
 export function buildApi(deps: ApiDeps): Api {
@@ -123,10 +124,11 @@ export function buildApi(deps: ApiDeps): Api {
     return reply.code(status).send({ error: status === 500 ? "internal" : "bad_request" });
   });
 
-  app.secured = (method, url, h) => {
+  app.secured = (method, url, h, opts) => {
     app.route({
       method,
       url,
+      ...(opts?.bodyLimit ? { bodyLimit: opts.bodyLimit } : {}),
       handler: async (req, reply) => {
         const ctx = req.grant;
         if (!ctx) return reply.code(401).send({ error: "iios_denied", state: "missing" });
@@ -247,6 +249,7 @@ export function buildApi(deps: ApiDeps): Api {
   registerAdmissions(app);
   registerBilling(app);
   registerPartners(app);
+  registerCourses(app);
   registerAccess(app, deps.iios);
   return app;
 }

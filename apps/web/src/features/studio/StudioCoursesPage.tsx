@@ -21,8 +21,9 @@ import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDate } from "../../lib/centerTime";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
 import { AccessBanner } from "../access/AccessBanner";
-import { AUTHORED_STATUS } from "./CourseEditorPage";
+import { AUTHORED_STATUS } from "./CourseEditorView";
 import { CourseLibrary } from "./CourseLibrary";
+import { DemoCourseStudioApi } from "./demoCourseStudioApi";
 
 const STATUS: Record<StudioCourseStatus, string> = AUTHORED_STATUS;
 const REFUSAL: Record<string, string> = {
@@ -79,7 +80,9 @@ export function StudioCoursesPage({
           : "Class teachers propose; you link, reject or unlink, and set weekly prep hours (they count in Workforce)."}
       </p>
       <AccessBanner />
-      <CourseLibrary base={base} />
+      <DemoCourseStudioApi>
+        <CourseLibrary base={base} />
+      </DemoCourseStudioApi>
       <h2 className="pt-2 text-lg font-medium">Classes</h2>
       {o.classes.length === 0 ? <EmptyState title="No classes in your view" /> : null}
       <ul className="space-y-3">

@@ -85,6 +85,11 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 | `POST /v1/partners/batches/:id/send`                                             | Org Admin who did not draft it                                    | `sendBatch`                                          |
 | `POST /v1/partners/batches/:id/paid` `{paymentRef}` · `…/cancel` `{reason}`      | staff (a sent batch: an Org Admin cancels)                        | `markBatchPaid` / `cancelBatch`                      |
 | `POST /v1/partners/:partnerId/report/preview` `{csv}` · `…/apply` (one row)      | staff with `partners:manage` (preview changes nothing)            | `previewReport` / `applyReportRow`                   |
+| `GET /v1/courses` · `GET /v1/courses/:ref`                                       | teachers (own + published) and staff (every course of the org)    | `CourseAuthoringPort.list` / `get`                   |
+| `POST /v1/courses` `{title, level}`                                              | teachers and staff with `courses:author`                          | `create`                                             |
+| `POST /v1/courses/:ref/draft` `{content, baseRevision}`                          | a teacher their own course, staff any (`courses:author`)          | `saveDraft`                                          |
+| `POST /v1/courses/:ref/submit` · `…/withdraw`                                    | who may edit it                                                   | `submit` / `withdraw`                                |
+| `POST /v1/courses/:ref/approve` `{note?}` · `…/return` `{note}`                  | staff with `courses:author`, not the submitter nor a draft editor | `approve` / `returnForChanges`                       |
 | `GET /v1/access/admin`                                                           | Org Admin (IIOS decides)                                          | `IiosPolicyAdminPort.getAdminView` → IIOS            |
 | `POST /v1/access/policies` `{name, description, rules}`                          | Org Admin                                                         | `createPolicy` → IIOS                                |
 | `PUT /v1/access/policies/:ref` `{expectedVersion, …}`                            | Org Admin, not a policy that restricts them                       | `revisePolicy` → IIOS                                |
@@ -153,6 +158,15 @@ Part B (migration 0008: `settlement_batch`, `settlement_batch_entry`):
 - Staff draft a settlement batch from the approved entries of one partner and enrolment cycle. An Org Admin who did not draft it sends it; it is then locked, and its due date replaces the approvals'. The partner pays the whole batch: staff record the payment reference and every entry becomes paid. A wrong batch is cancelled with a reason (a sent one only by an Org Admin), and its entries go back to "approved".
 - A partner report (pasted `code,status,date,reason` lines) is previewed against the ledger: can be applied, already in the ledger, conflict (before the referral, after the attribution window, in the future, already approved / paid), unknown code, not valid. The preview changes nothing; a person applies one applicable row at a time, and it is checked again when applied.
 - Trends: six months per partner by referral month — referred, enrolled, rejected, open, conversion with its counts, median days to enrol.
+
+## Course Studio
+
+Courses OGC writes itself (migration 0009: `authored_course`, `course_version`, `course_review`), with the demo's rules. SYNTHETIC content; no EduOS code or content. Part B links courses to classes and adds My Learning.
+
+- A course is lessons, a lesson an ordered list of typed blocks (heading, text, callout, divider, vocabulary card, multiple-choice quiz, video link, reflection). The contracts' validator checks every save and refuses unknown kinds and fields; what is stored is rebuilt from the known fields only. A draft may be incomplete; a submission must be complete. A course is at most 200,000 characters (the draft route accepts bodies up to 512 KB).
+- Saves carry the revision they started from; an older revision is refused (`conflict`). The same content in another key order is not a change.
+- Draft → submit → a different person approves → a new published version. A teacher edits their own courses and reads the org's published ones (the published version, never someone else's draft). Staff edit every course of their org and approve, but never a course they submitted or a draft they edited since the last publication. A return needs a note.
+- Published versions and review events are insert-only for `ogc_app`, and a trigger refuses any update to them, even by the owner role.
 
 ## Access policies
 
