@@ -14,6 +14,7 @@ import {
   POLICY_CATALOG,
   authorize,
   roleHolds,
+  type AuthzDecision,
   type AuthzResource,
   type IiosGrantedContext,
   type PolicyAction,
@@ -22,6 +23,8 @@ import { audit, type AuditEntry } from "./audit.js";
 import { withTenant, type Db, type TenantTx } from "./db.js";
 import { idempotent, KEY_FORMAT } from "./idempotency.js";
 import type { IiosClient } from "./iios.js";
+import { registerAttendance } from "./domains/attendance.js";
+import { registerSchedule } from "./domains/schedule.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,12 +41,16 @@ export interface ApiDeps {
   db: Db;
   iios: IiosClient;
   logger?: boolean;
+  now?: () => number; // ms; injectable for tests
 }
 
 /** What a route handler gets: the decided grant and helpers bound to it. */
 export interface Caller {
   ctx: IiosGrantedContext;
   requestId: string;
+  now: () => number;
+  /** The decision, without replying: a denial is audited. */
+  decide(action: PolicyAction, res: Omit<AuthzResource, "orgId">): Promise<AuthzDecision>;
   /** Allowed → the read-only fields; denied → audited and a 403 is sent (returns null). */
   authorize(action: PolicyAction, res: Omit<AuthzResource, "orgId">): Promise<string[] | null>;
   /** One tenant-scoped transaction (RLS on `ctx.orgId`). */
@@ -116,18 +123,24 @@ export function buildApi(deps: ApiDeps): Api {
         const caller: Caller = {
           ctx,
           requestId: req.id,
+          now: deps.now ?? Date.now,
           tenant: (fn) => withTenant(deps.db, scope, fn),
-          async authorize(action, res) {
+          async decide(action, res) {
             const d = authorize(ctx, action, { orgId: ctx.orgId, ...res });
+            if (!d.allow)
+              await withTenant(deps.db, scope, (tx) =>
+                audit(tx, ctx, req.id, {
+                  action,
+                  resource: { ...res },
+                  outcome: "denied",
+                  reason: d.reason,
+                }),
+              );
+            return d;
+          },
+          async authorize(action, res) {
+            const d = await caller.decide(action, res);
             if (d.allow) return d.readonly;
-            await withTenant(deps.db, scope, (tx) =>
-              audit(tx, ctx, req.id, {
-                action,
-                resource: { ...res },
-                outcome: "denied",
-                reason: d.reason,
-              }),
-            );
             await reply.code(403).send({ error: "forbidden", reason: d.reason });
             return null;
           },
@@ -200,5 +213,7 @@ export function buildApi(deps: ApiDeps): Api {
     };
   });
 
+  registerSchedule(app);
+  registerAttendance(app);
   return app;
 }

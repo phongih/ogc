@@ -26,6 +26,29 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 - `X-OGC-Org: <organization id>`
 - Writes also need `Idempotency-Key` (8–128 characters).
 
+## Routes (slice 1)
+
+| Route                                                   | Who                                                    | Port it serves                              |
+| ------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------- |
+| `GET /v1/health`                                        | public                                                 | —                                           |
+| `GET /v1/me/access`                                     | any grant                                              | `MyAccessPort`                              |
+| `GET /v1/schedule`                                      | staff (`schedule:manage`, narrowed by center)          | `SchedulePort.getOverview`                  |
+| `POST /v1/sessions/:id/reschedule` `{at}`               | staff                                                  | `reschedule`                                |
+| `POST /v1/sessions/:id/cancel` `{replacementAt}`        | staff                                                  | `cancelWithReplacement`                     |
+| `POST /v1/classes/:id/sessions` `{title, at}`           | staff                                                  | `addSession`                                |
+| `PUT /v1/classes/:id/teacher` `{teacherId}`             | staff (not if `classTeacher` is read-only)             | `assignTeacher`                             |
+| `PUT /v1/sessions/:id/substitute` `{teacherId \| null}` | staff (not if `substitute` is read-only)               | `setSubstitute`                             |
+| `GET /v1/classes/:id/sessions`                          | the class teacher                                      | `AttendancePort.listClassSessions`          |
+| `GET` / `PUT /v1/sessions/:id/attendance`               | owner or that session's substitute (`attendance:mark`) | `getSessionAttendance` / `recordAttendance` |
+| `GET /v1/classes/:id/attendance-summary`                | the class teacher                                      | `getClassSummary`                           |
+| `GET /v1/me/to-mark`                                    | teachers                                               | `listToMark`                                |
+
+Schedule writes return the contract's `ScheduleResult` and attendance writes return `RecordAttendanceResult`; the HTTP status matches the outcome (404, 403, 409, 422).
+
+## Synthetic data
+
+`DATABASE_URL_MIGRATE=… node dist/seed.mjs` loads the demo's organizations, centers, teachers, learners, classes, sessions and marks, run as the owner role. It refuses a database that already has data.
+
 ## Migrations
 
 `migrations/NNNN_name.sql` files are forward-only. Never edit one after it is merged: the runner refuses a changed file. The `ogc_app` role must exist before the first migration runs.

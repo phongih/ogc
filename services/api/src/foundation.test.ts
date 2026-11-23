@@ -39,7 +39,7 @@ describe.skipIf(!hasPg)("foundation — PostgreSQL", () => {
     it("a second run applies nothing", async () => {
       expect(await migrate(t.ownerUrl, MIGRATIONS_DIR)).toEqual({
         applied: [],
-        already: ["0001_foundation.sql"],
+        already: ["0001_foundation.sql", "0002_schedule_attendance.sql"],
       });
     });
     it("a migration edited after it was applied stops the run", async () => {
