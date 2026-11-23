@@ -80,6 +80,11 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 | `POST /v1/partners/entries/:id/approve`                                          | Org Admin, not the one who recorded the enrolment                 | `approve`                                            |
 | `POST /v1/partners/:partnerId/rules` · `/v1/partners/rules/:id/activate\|reject` | staff propose; another Org Admin decides                          | `proposeRule` / `decideRule`                         |
 | `POST /v1/partners/signals/act` `{signalId, action, note?}`                      | staff with `partners:manage`                                      | `actOnSignal`                                        |
+| `GET /v1/partners/batches` · `…/batch-candidates` · `…/trends`                   | staff with `partners:manage`                                      | `listBatches` / `batchCandidates` / `getTrends`      |
+| `POST /v1/partners/batches` `{partnerId, cycleLabel}`                            | staff with `partners:manage`                                      | `draftBatch`                                         |
+| `POST /v1/partners/batches/:id/send`                                             | Org Admin who did not draft it                                    | `sendBatch`                                          |
+| `POST /v1/partners/batches/:id/paid` `{paymentRef}` · `…/cancel` `{reason}`      | staff (a sent batch: an Org Admin cancels)                        | `markBatchPaid` / `cancelBatch`                      |
+| `POST /v1/partners/:partnerId/report/preview` `{csv}` · `…/apply` (one row)      | staff with `partners:manage` (preview changes nothing)            | `previewReport` / `applyReportRow`                   |
 | `GET /v1/access/admin`                                                           | Org Admin (IIOS decides)                                          | `IiosPolicyAdminPort.getAdminView` → IIOS            |
 | `POST /v1/access/policies` `{name, description, rules}`                          | Org Admin                                                         | `createPolicy` → IIOS                                |
 | `PUT /v1/access/policies/:ref` `{expectedVersion, …}`                            | Org Admin, not a policy that restricts them                       | `revisePolicy` → IIOS                                |
@@ -133,7 +138,7 @@ Fee plans, invoices, payments and receivables (migration 0006: `fee_line`, `invo
 
 Not on the Platform yet: the referral wallet (Growth), reminders, refunds, tax invoices.
 
-## Partner Commissions (core)
+## Partner Commissions
 
 Leads handed to partner centers, tiered commissions, signals and an activity log (migration 0007: `partner`, `partner_rule`, `commission_entry`, `partner_activity`, `partner_signal_mark`), with the demo's rules. SYNTHETIC: a mock receivable, nothing is invoiced or paid.
 
@@ -143,7 +148,11 @@ Leads handed to partner centers, tiered commissions, signals and an activity log
 - Staff propose a tier rule version; another Org Admin activates or rejects it. An enrolment keeps the version in force when it was recorded.
 - Signals (near the next tier, stale referral, high rejection rate, overdue settlement) only suggest: follow, snooze for 7 days, or dismiss with a reason. Every step is appended to the activity log.
 
-Next: settlement batches, partner report import, trends.
+Part B (migration 0008: `settlement_batch`, `settlement_batch_entry`):
+
+- Staff draft a settlement batch from the approved entries of one partner and enrolment cycle. An Org Admin who did not draft it sends it; it is then locked, and its due date replaces the approvals'. The partner pays the whole batch: staff record the payment reference and every entry becomes paid. A wrong batch is cancelled with a reason (a sent one only by an Org Admin), and its entries go back to "approved".
+- A partner report (pasted `code,status,date,reason` lines) is previewed against the ledger: can be applied, already in the ledger, conflict (before the referral, after the attribution window, in the future, already approved / paid), unknown code, not valid. The preview changes nothing; a person applies one applicable row at a time, and it is checked again when applied.
+- Trends: six months per partner by referral month — referred, enrolled, rejected, open, conversion with its counts, median days to enrol.
 
 ## Access policies
 

@@ -2,24 +2,24 @@
  * Partner Commissions slice 2 (owner decisions 22/11): settlement batches (staff draft, an Org
  * Admin sends — then locked — the partner pays the whole batch), partner reports previewed and
  * applied one row at a time by a person, and six-month trends per partner with their counts.
- * Mock receivable — nothing is invoiced or paid. SYNTHETIC.
+ * Mock receivable — nothing is invoiced or paid. SYNTHETIC. Shared by the demo and the Platform
+ * through `PartnersApiContext`.
  */
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PartnersResult, ReportMatch, ReportRow, SettlementBatch } from "@ogc/contracts";
-import { partners as api } from "../../lib/api";
-import { useViewer } from "../../app/iiosGate";
-import { refreshLearningState } from "../../lib/invalidate";
 import { formatCenterDate } from "../../lib/centerTime";
 import { Button, Card } from "../../ui";
 import { vnd } from "../growth/format";
 import { Refused } from "./refused";
+import { usePartnersApi } from "./partnersApi";
 
 function useAction() {
+  const api = usePartnersApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (run: () => Promise<PartnersResult>) => run(),
-    onSuccess: () => refreshLearningState(qc),
+    onSuccess: () => api.onChanged(qc),
   });
 }
 
@@ -33,15 +33,15 @@ const BATCH_LABEL = {
 // ── Settlements ─────────────────────────────────────────────────────────────────────────────
 
 export function Settlements({ isAdmin }: { isAdmin: boolean }) {
-  const viewer = useViewer();
+  const api = usePartnersApi();
   const act = useAction();
   const cand = useQuery({
-    queryKey: ["partners-candidates", viewer],
-    queryFn: () => api.batchCandidates(viewer),
+    queryKey: [...api.key, "partners-candidates"],
+    queryFn: () => api.batchCandidates(),
   });
   const list = useQuery({
-    queryKey: ["partners-batches", viewer],
-    queryFn: () => api.listBatches(viewer),
+    queryKey: [...api.key, "partners-batches"],
+    queryFn: () => api.listBatches(),
   });
   return (
     <div className="space-y-4">
@@ -68,7 +68,7 @@ export function Settlements({ isAdmin }: { isAdmin: boolean }) {
               </span>
               <Button
                 variant="ghost"
-                onClick={() => act.mutate(() => api.draftBatch(viewer, c.partnerId, c.cycleLabel))}
+                onClick={() => act.mutate(() => api.draftBatch(c.partnerId, c.cycleLabel))}
               >
                 Draft batch · {c.partnerName} · {c.cycleLabel}
               </Button>
@@ -89,7 +89,7 @@ export function Settlements({ isAdmin }: { isAdmin: boolean }) {
 }
 
 function BatchCard({ b, isAdmin }: { b: SettlementBatch; isAdmin: boolean }) {
-  const viewer = useViewer();
+  const api = usePartnersApi();
   const act = useAction();
   const [ref, setRef] = useState("");
   const [reason, setReason] = useState("");
@@ -131,9 +131,7 @@ function BatchCard({ b, isAdmin }: { b: SettlementBatch; isAdmin: boolean }) {
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {b.status === "draft" && isAdmin && !b.mine ? (
-            <Button onClick={() => act.mutate(() => api.sendBatch(viewer, b.id))}>
-              Send · {b.id}
-            </Button>
+            <Button onClick={() => act.mutate(() => api.sendBatch(b.id))}>Send · {b.id}</Button>
           ) : null}
           {b.status === "draft" && (!isAdmin || b.mine) ? (
             <span className="text-xs text-muted">
@@ -151,7 +149,7 @@ function BatchCard({ b, isAdmin }: { b: SettlementBatch; isAdmin: boolean }) {
               />
               <Button
                 variant="ghost"
-                onClick={() => act.mutate(() => api.markBatchPaid(viewer, b.id, ref))}
+                onClick={() => act.mutate(() => api.markBatchPaid(b.id, ref))}
               >
                 Partner paid the whole batch · {b.id}
               </Button>
@@ -168,7 +166,7 @@ function BatchCard({ b, isAdmin }: { b: SettlementBatch; isAdmin: boolean }) {
               />
               <Button
                 variant="ghost"
-                onClick={() => act.mutate(() => api.cancelBatch(viewer, b.id, reason))}
+                onClick={() => act.mutate(() => api.cancelBatch(b.id, reason))}
               >
                 Cancel · {b.id}
               </Button>
@@ -192,16 +190,16 @@ const MATCH_LABEL: Record<ReportMatch, string> = {
 };
 
 export function ImportReport() {
-  const viewer = useViewer();
+  const api = usePartnersApi();
   const plist = useQuery({
-    queryKey: ["partners-list", viewer],
-    queryFn: () => api.listPartners(viewer),
+    queryKey: [...api.key, "partners-list"],
+    queryFn: () => api.listPartners(),
   });
   const [partnerId, setPartnerId] = useState("");
   const [csv, setCsv] = useState("");
   const [rows, setRows] = useState<ReportRow[] | null>(null);
   const pid = partnerId || plist.data?.[0]?.id || "";
-  const preview = async () => setRows(await api.previewReport(viewer, pid, csv));
+  const preview = async () => setRows(await api.previewReport(pid, csv));
   return (
     <Card>
       <h2 className="mb-1 font-semibold">Import a partner report</h2>
@@ -275,7 +273,7 @@ function PreviewRow({
   partnerId: string;
   onApplied: () => void;
 }) {
-  const viewer = useViewer();
+  const api = usePartnersApi();
   const act = useAction();
   return (
     <tr
@@ -299,7 +297,7 @@ function PreviewRow({
           <Button
             variant="ghost"
             onClick={() =>
-              act.mutate(() => api.applyReportRow(viewer, partnerId, r), {
+              act.mutate(() => api.applyReportRow(partnerId, r), {
                 onSuccess: (x) => x.ok && onApplied(),
               })
             }
@@ -319,10 +317,10 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 const monthLabel = (ym: string) => `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}`;
 
 export function Trends() {
-  const viewer = useViewer();
+  const api = usePartnersApi();
   const q = useQuery({
-    queryKey: ["partners-trends", viewer],
-    queryFn: () => api.getTrends(viewer),
+    queryKey: [...api.key, "partners-trends"],
+    queryFn: () => api.getTrends(),
   });
   return (
     <div className="space-y-3">

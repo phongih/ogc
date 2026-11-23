@@ -7,11 +7,15 @@
 import type {
   AccessAdminView,
   ActivityEntry,
+  BatchCandidate,
   CommissionEntry,
   Partner,
   PartnerFit,
   PartnersOverview,
   PartnersResult,
+  PartnerTrend,
+  ReportRow,
+  SettlementBatch,
   TierRuleDraft,
   BillingResult,
   FeeLine,
@@ -331,6 +335,47 @@ export const platformApi = {
       action,
       ...(note ? { note } : {}),
     }),
+
+  partnerBatches: (s: PlatformSession) => staffRead<SettlementBatch[]>(s, "/v1/partners/batches"),
+  partnerBatchCandidates: (s: PlatformSession) =>
+    staffRead<BatchCandidate[]>(s, "/v1/partners/batch-candidates"),
+  draftPartnerBatch: (s: PlatformSession, partnerId: string, cycleLabel: string) =>
+    result<PartnersResult>(s, "POST", "/v1/partners/batches", { partnerId, cycleLabel }),
+  partnerBatchStep: (
+    s: PlatformSession,
+    id: string,
+    step: "send" | "paid" | "cancel",
+    body: object = {},
+  ) =>
+    result<PartnersResult>(
+      s,
+      "POST",
+      `/v1/partners/batches/${encodeURIComponent(id)}/${step}`,
+      body,
+    ),
+  previewPartnerReport: async (s: PlatformSession, partnerId: string, csv: string) => {
+    const r = await send(
+      s,
+      "POST",
+      `/v1/partners/${encodeURIComponent(partnerId)}/report/preview`,
+      { csv },
+    );
+    if (r.status === 403 || r.status === 404 || r.status === 422) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as ReportRow[];
+  },
+  applyPartnerReportRow: (
+    s: PlatformSession,
+    partnerId: string,
+    row: Pick<ReportRow, "leadRefCode" | "reported" | "date" | "reason">,
+  ) =>
+    result<PartnersResult>(
+      s,
+      "POST",
+      `/v1/partners/${encodeURIComponent(partnerId)}/report/apply`,
+      row,
+    ),
+  partnerTrends: (s: PlatformSession) => staffRead<PartnerTrend[]>(s, "/v1/partners/trends"),
 
   // Billing (staff; billing:manage by center; an Org Admin decides fee lines) — synthetic, nothing is charged
   billingOptions: (s: PlatformSession) =>

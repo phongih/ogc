@@ -441,7 +441,7 @@ async function seedBilling(c: pg.Client, now: number): Promise<void> {
  * The demo's partner sample (Lotus, Sao Mai with v2 waiting, Hanoi Bridge) and its 15 ledger
  * entries, dated from `now`: Lotus has 3 enrolments this month and one approved entry past its due
  * date; Sao Mai a stale referral and two rejections; last month's paid entries were settled in
- * ST-LOTUS-01 and ST-BRIDGE-01 (the batches themselves arrive with the settlements slice).
+ * ST-LOTUS-01 and ST-BRIDGE-01 — sent the day after the last approval in them, paid 8 days later.
  */
 async function seedPartners(c: pg.Client, now: number): Promise<void> {
   const D1_ = D1;
@@ -690,6 +690,10 @@ async function seedPartners(c: pg.Client, now: number): Promise<void> {
     },
   ];
   const settle = Object.fromEntries(partners.map(([id, , , , , days]) => [id, days]));
+  const inBatch = new Map<
+    string,
+    { partner: string; ids: string[]; approved: number[]; cycle: { key: string; label: string } }
+  >();
   for (const [i, s] of S.entries()) {
     const rule = ruleOf(s.p);
     const locked = s.status === "approved" || s.status === "paid";
@@ -716,6 +720,17 @@ async function seedPartners(c: pg.Client, now: number): Promise<void> {
     const approvedAt = s.approvedAgo
       ? Math.max(now - s.approvedAgo * DAY, (s.enrolled ?? now) + DAY)
       : null;
+    if (s.batch && approvedAt && s.enrolled) {
+      const g = inBatch.get(s.batch) ?? {
+        partner: s.p,
+        ids: [],
+        approved: [],
+        cycle: cycleOf(rule.cycle, s.enrolled),
+      };
+      g.ids.push(`CE-${i + 1}`);
+      g.approved.push(approvedAt);
+      inBatch.set(s.batch, g);
+    }
     await c.query(
       `insert into commission_entry (org_id, id, partner_id, lead_id, lead_ref_code, learner_display_name, course_code,
          referred_at, expires_at, enrolled_at, enrolled_by, status, applied_rule_id, locked_amount_vnd, locked_tier_index,
@@ -744,6 +759,32 @@ async function seedPartners(c: pg.Client, now: number): Promise<void> {
         new Date(now - DAY),
       ],
     );
+  }
+  for (const [id, g] of inBatch) {
+    const sentAt = Math.max(...g.approved) + DAY;
+    await c.query(
+      `insert into settlement_batch (org_id, id, partner_id, cycle_key, cycle_label, status, created_by, created_by_name,
+         created_at, sent_by_name, sent_at, due_date, paid_by_name, paid_at, payment_ref)
+       values ($1, $2, $3, $4, $5, 'paid', 'iios-principal-staff-1', 'Sam (Org Staff)', $6, 'Olivia (Org Admin)', $7, $8,
+         'Sam (Org Staff)', $9, $10)`,
+      [
+        NOVA,
+        id,
+        g.partner,
+        g.cycle.key,
+        g.cycle.label,
+        new Date(sentAt - DAY),
+        new Date(sentAt),
+        new Date(sentAt + settle[g.partner] * DAY),
+        new Date(Math.min(now - DAY, sentAt + 8 * DAY)),
+        `BANK-${id.slice(3)}`,
+      ],
+    );
+    for (const e of g.ids)
+      await c.query(
+        "insert into settlement_batch_entry (org_id, batch_id, entry_id) values ($1, $2, $3)",
+        [NOVA, id, e],
+      );
   }
 }
 
@@ -806,6 +847,8 @@ export async function seedDev(
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
         await c.query("delete from partner_signal_mark");
         await c.query("delete from partner_activity");
+        await c.query("delete from settlement_batch_entry");
+        await c.query("delete from settlement_batch");
         await c.query("delete from commission_entry");
         await c.query("delete from partner_rule");
         await c.query("delete from partner");

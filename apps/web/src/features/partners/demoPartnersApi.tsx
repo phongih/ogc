@@ -4,7 +4,6 @@ import { partners } from "../../lib/api";
 import { useViewer } from "../../app/iiosGate";
 import { refreshLearningState } from "../../lib/invalidate";
 import { AccessBanner } from "../access/AccessBanner";
-import { ImportReport, Settlements, Trends } from "./PartnersSlice2";
 import { PartnersApiContext, type PartnersApi, type ReferApi } from "./partnersApi";
 
 export function DemoPartnersApi({ children }: { children: ReactNode }) {
@@ -15,7 +14,6 @@ export function DemoPartnersApi({ children }: { children: ReactNode }) {
       subtitle: "Leads handed to partner centers · tiered commissions · synthetic demo",
       back: { to: "/app/operations", label: "← Center operations" },
       Banner: AccessBanner,
-      Slice2: { Settlements, ImportReport, Trends },
       getOverview: () => partners.getOverview(viewer),
       listPartners: () => partners.listPartners(viewer),
       listEntries: () => partners.listEntries(viewer),
@@ -26,6 +24,15 @@ export function DemoPartnersApi({ children }: { children: ReactNode }) {
       proposeRule: (pid, d) => partners.proposeRule(viewer, pid, d),
       decideRule: (rid, decision) => partners.decideRule(viewer, rid, decision),
       actOnSignal: (sid, action, note) => partners.actOnSignal(viewer, sid, action, note),
+      listBatches: () => partners.listBatches(viewer),
+      batchCandidates: () => partners.batchCandidates(viewer),
+      draftBatch: (pid, label) => partners.draftBatch(viewer, pid, label),
+      sendBatch: (id) => partners.sendBatch(viewer, id),
+      markBatchPaid: (id, ref) => partners.markBatchPaid(viewer, id, ref),
+      cancelBatch: (id, reason) => partners.cancelBatch(viewer, id, reason),
+      previewReport: (pid, csv) => partners.previewReport(viewer, pid, csv),
+      applyReportRow: (pid, row) => partners.applyReportRow(viewer, pid, row),
+      getTrends: () => partners.getTrends(viewer),
       onChanged: (qc) => refreshLearningState(qc),
     }),
     [viewer],
