@@ -115,6 +115,22 @@ export interface MakeupSelfStudyTable {
   confirmed_by: string | null;
 }
 
+export interface TeacherTargetTable {
+  org_id: string;
+  teacher_id: string;
+  employment: "full_time" | "part_time";
+  target_hours: string | number; // numeric: pg returns a string
+  updated_by: string;
+  updated_at: Generated<Date>;
+}
+export interface WorkforceSettingsTable {
+  org_id: string;
+  under_pct: number;
+  over_pct: number;
+  updated_by: string;
+  updated_at: Generated<Date>;
+}
+
 export interface DB {
   center: CenterTable;
   teacher: TeacherTable;
@@ -126,6 +142,8 @@ export interface DB {
   guardian_link: GuardianLinkTable;
   makeup_booking: MakeupBookingTable;
   makeup_selfstudy: MakeupSelfStudyTable;
+  teacher_target: TeacherTargetTable;
+  workforce_settings: WorkforceSettingsTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

@@ -6,6 +6,11 @@
  */
 import type {
   AccessAdminView,
+  Employment,
+  LoadCandidate,
+  WorkforceOverview,
+  WorkforceResult,
+  WorkforceSettings,
   MakeupBoard,
   MakeupItem,
   MakeupItemResult,
@@ -196,6 +201,30 @@ export const platformApi = {
     result<MakeupItemResult>(s, "POST", `/v1/makeups/${encodeURIComponent(item)}/confirm`, {}),
   returnSelfStudy: (s: PlatformSession, item: string, note: string) =>
     result<MakeupItemResult>(s, "POST", `/v1/makeups/${encodeURIComponent(item)}/return`, { note }),
+
+  // Workforce (staff; workforce:manage for targets and thresholds) — suggestions never assign
+  workforce: async (s: PlatformSession): Promise<WorkforceOverview | null> => {
+    const r = await send(s, "GET", "/v1/workforce");
+    if (r.status === 403) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as WorkforceOverview;
+  },
+  setTarget: (s: PlatformSession, teacherId: string, employment: Employment, targetHours: number) =>
+    result<WorkforceResult>(
+      s,
+      "PUT",
+      `/v1/workforce/teachers/${encodeURIComponent(teacherId)}/target`,
+      {
+        employment,
+        targetHours,
+      },
+    ),
+  updateWorkforceSettings: (s: PlatformSession, next: WorkforceSettings) =>
+    result<WorkforceResult>(s, "PUT", "/v1/workforce/settings", next),
+  suggestForClass: (s: PlatformSession, classId: string) =>
+    read<LoadCandidate[]>(s, `/v1/workforce/suggest/class/${encodeURIComponent(classId)}`),
+  suggestForSession: (s: PlatformSession, sessionId: string) =>
+    read<LoadCandidate[]>(s, `/v1/workforce/suggest/session/${encodeURIComponent(sessionId)}`),
 
   // Attendance (teachers)
   myClasses: (s: PlatformSession) => read<MyClass[]>(s, "/v1/me/classes"),
