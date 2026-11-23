@@ -71,7 +71,7 @@ runPlatformJourney("platform billing E2E", async ({ browser, base, check }) => {
   await page.getByRole("button", { name: `Record payment · ${huy.no}` }).click();
   await page
     .getByRole("status")
-    .filter({ hasText: /Receipt RC-\d{4}-0006/ })
+    .filter({ hasText: /Receipt RC-\d{4}-0007/ })
     .waitFor();
   check(
     "[sam] part payment recorded: balance 4.400.000 ₫",
@@ -130,9 +130,11 @@ runPlatformJourney("platform billing E2E", async ({ browser, base, check }) => {
     (await page.getByTestId("to-pay").textContent()) === vnd(7_350_000),
   );
   check(
-    "[mai] two invoices, both Linh's; no referral wallet on the Platform",
+    "[mai] two invoices, both Linh's; no referral credit waiting (no reward confirmed yet)",
     (await page.getByRole("list", { name: "My invoices" }).locator("li").count()) === 2 &&
-      (await page.getByText("Referral credit waiting").count()) === 0,
+      (
+        (await page.getByText("Referral credit waiting").locator("..").textContent()) ?? ""
+      ).includes("0 ₫"),
   );
   await signIn("Linh (Learner)", "My make-ups");
   await nav().getByRole("link", { name: "Tuition" }).click();

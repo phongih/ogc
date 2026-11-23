@@ -21,6 +21,7 @@ import { PlatformBillingPage, PlatformTuitionPage } from "./pages/BillingPage";
 import { PlatformPartnersPage } from "./pages/PartnersPage";
 import { PlatformStudentsPage } from "./pages/StudentsPage";
 import { PlatformEnginePage } from "./pages/EnginePage";
+import { PlatformGrowthPage, PlatformJoinPage, PlatformReferralsPage } from "./pages/GrowthPage";
 import {
   PlatformClassLessonPage,
   PlatformCoursePage,
@@ -81,6 +82,7 @@ function Shell({ children }: { children: ReactNode }) {
               <Link to="/students">Students</Link>
             ) : null}
             {session.role === "staff" ? <Link to="/engine">Engine</Link> : null}
+            {session.role === "staff" ? <Link to="/growth">Growth</Link> : null}
             {session.role === "learner" || session.role === "guardian" ? (
               <Link to="/my-makeups">Make-ups</Link>
             ) : null}
@@ -88,6 +90,9 @@ function Shell({ children }: { children: ReactNode }) {
               <Link to="/tuition">Tuition</Link>
             ) : null}
             {session.role === "learner" ? <Link to="/my-courses">My courses</Link> : null}
+            {session.role === "learner" || session.role === "guardian" ? (
+              <Link to="/referrals">Refer a friend</Link>
+            ) : null}
             {session.role === "teacher" ? <Link to="/teaching">Teaching</Link> : null}
             {session.orgAdmin ? <Link to="/access">Access</Link> : null}
           </nav>
@@ -143,6 +148,23 @@ export function App() {
           <Shell>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/join" element={<PlatformJoinPage />} />
+              <Route
+                path="/referrals"
+                element={
+                  <Protected>
+                    <PlatformReferralsPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/growth"
+                element={
+                  <Protected>
+                    <PlatformGrowthPage />
+                  </Protected>
+                }
+              />
               <Route
                 path="/schedule"
                 element={

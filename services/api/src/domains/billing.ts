@@ -1,7 +1,7 @@
 /*
  * Billing on the Platform API — the rules of the demo's mock adapter
  * (apps/web/src/lib/adapters/mockBilling.ts, owner decisions 22/11), on PostgreSQL (owner 23/11:
- * "đủ như demo"; no referral wallet yet; a paid first invoice moves the lead only). SYNTHETIC:
+ * "đủ như demo"; a paid first invoice moves the lead only). SYNTHETIC:
  * nothing is charged, paid, invoiced or sent for real.
  *  - fee lines: staff with billing:manage propose; an Org Admin approves / rejects / retires, never
  *    their own proposal; only approved lines are invoiced; an approved line is never edited;
@@ -10,7 +10,9 @@
  *  - a lead's first invoice (stage "placement") moves it to "offer"; paid in full → "enrolled";
  *    voided → back to "placement" (domains/admissions.ts hooks);
  *  - payments are append-only; an invoice with a payment is never voided;
- *  - overdue never blocks learning: it shows in Receivables only.
+ *  - overdue never blocks learning: it shows in Receivables only;
+ *  - referral wallet credit (domains/growth.ts) is applied to the payer's invoices issued after it,
+ *    never more than the invoice; voiding the invoice gives it back (owner 22/11, Growth 23/11).
  * Staff act within the centers their policy allows for billing:manage (IIOS-decided).
  */
 import { sql } from "kysely";
@@ -29,6 +31,7 @@ import type {
 import type { TenantTx } from "../db.js";
 import type { Api, Caller } from "../server.js";
 import { attachFirstInvoice, markLeadPaid } from "./admissions.js";
+import { addWalletEntry, walletOf } from "./growth.js";
 
 const DAY = 86_400_000;
 /** An invoice is never due before this many days after it is issued (owner 22/11). */
@@ -79,6 +82,7 @@ interface Inv {
   payerName: string | null;
   lines: InvoiceLine[];
   subtotalVnd: number;
+  creditAppliedVnd: number;
   issuedAt: string;
   dueDate: string;
   voidReason: string | null;
@@ -118,7 +122,7 @@ async function loadInvoices(tx: TenantTx): Promise<Inv[]> {
   const [inv, lines, pays] = await Promise.all([
     sql<Record<string, unknown>>`
       select id, no, center_id, learner_name, learner_id, lead_id, payer_principal_id, payer_name,
-             subtotal_vnd, issued_at, due_date::text as d, void_reason
+             subtotal_vnd, credit_applied_vnd, issued_at, due_date::text as d, void_reason
         from invoice order by (substring(id from 3))::int`.execute(tx),
     tx.selectFrom("invoice_line").selectAll().orderBy("fee_line_id").execute(),
     tx.selectFrom("payment").selectAll().execute(),
@@ -142,6 +146,7 @@ async function loadInvoices(tx: TenantTx): Promise<Inv[]> {
           amountVnd: Number(l.amount_vnd),
         })),
       subtotalVnd: Number(x.subtotal_vnd),
+      creditAppliedVnd: Number(x.credit_applied_vnd),
       issuedAt: iso(x.issued_at as Date)!,
       dueDate: x.d as string,
       voidReason: x.void_reason as string | null,
@@ -166,10 +171,12 @@ async function loadInvoices(tx: TenantTx): Promise<Inv[]> {
 }
 
 const paidOf = (i: Inv) => i.payments.reduce((t, p) => t + p.amountVnd, 0);
+/** What the payer owes: the subtotal less the wallet credit applied when it was issued. */
+const totalOf = (i: Inv) => i.subtotalVnd - i.creditAppliedVnd;
 function statusOf(i: Inv): Invoice["status"] {
   if (i.voidReason) return "void";
   const paid = paidOf(i);
-  if (paid >= i.subtotalVnd) return "paid";
+  if (paid >= totalOf(i)) return "paid";
   return paid > 0 ? "partially_paid" : "issued";
 }
 
@@ -189,10 +196,10 @@ function view(i: Inv, centers: Map<string, string>, now: number): Invoice {
     payerName: i.payerName,
     lines: i.lines.map((l) => ({ ...l })),
     subtotalVnd: i.subtotalVnd,
-    creditAppliedVnd: 0,
-    totalVnd: i.subtotalVnd,
+    creditAppliedVnd: i.creditAppliedVnd,
+    totalVnd: totalOf(i),
     paidVnd: paid,
-    balanceVnd: status === "void" ? 0 : Math.max(0, i.subtotalVnd - paid),
+    balanceVnd: status === "void" ? 0 : Math.max(0, totalOf(i) - paid),
     status,
     issuedAt: i.issuedAt,
     dueDate: i.dueDate,
@@ -276,6 +283,10 @@ async function createInvoice(
     }
   }
   const subtotal = fee.reduce((t, l) => t + l.amountVnd, 0);
+  // Referral credit waiting in the payer's wallet goes to this invoice (never more than it).
+  const credit = payer
+    ? Math.max(0, Math.min((await walletOf(tx, payer.principal)).balanceVnd, subtotal))
+    : 0;
   await tx
     .insertInto("invoice")
     .values({
@@ -289,6 +300,7 @@ async function createInvoice(
       payer_principal_id: payer?.principal ?? null,
       payer_name: payer?.name ?? null,
       subtotal_vnd: subtotal,
+      credit_applied_vnd: credit,
       issued_at: at,
       due_date: dueDateFor(
         fee.map((l) => l.dueDate),
@@ -310,6 +322,15 @@ async function createInvoice(
       })),
     )
     .execute();
+  if (payer && credit > 0)
+    await addWalletEntry(tx, orgId, {
+      principalId: payer.principal,
+      at,
+      kind: "applied",
+      amountVnd: -credit,
+      note: `Applied to ${invNo} (${bill.learnerName})`,
+      invoiceId: id,
+    });
   return { id, no: invNo, subtotal };
 }
 
@@ -746,7 +767,7 @@ export function registerBilling(app: Api): void {
     if (st === "void" || st === "paid")
       return no("invalid_step", `invoice is ${st === "void" ? "void" : "already paid"}`);
     if (!METHODS.includes(d.method as PaymentMethod)) return no("invalid", "unknown method");
-    const balance = inv.subtotalVnd - paidOf(inv);
+    const balance = totalOf(inv) - paidOf(inv);
     const amount = d.amountVnd;
     if (typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0 || amount > balance)
       return no("invalid", `amount must be 1–${fmt(balance)}`);
@@ -784,6 +805,15 @@ export function registerBilling(app: Api): void {
       .set({ void_reason: reason.slice(0, 200), voided_at: now })
       .where("id", "=", inv.id)
       .execute();
+    if (inv.payerPrincipalId && inv.creditAppliedVnd > 0)
+      await addWalletEntry(tx, caller.ctx.orgId, {
+        principalId: inv.payerPrincipalId,
+        at: now,
+        kind: "credit",
+        amountVnd: inv.creditAppliedVnd,
+        note: `Returned from void ${inv.no}`,
+        invoiceId: inv.id,
+      });
     if (inv.leadId)
       await attachFirstInvoice(
         tx,
@@ -843,7 +873,7 @@ export function registerBilling(app: Api): void {
       outstandingVnd: vs.reduce((t, v) => t + v.balanceVnd, 0),
       overdueVnd: vs.filter((v) => v.daysOverdue > 0).reduce((t, v) => t + v.balanceVnd, 0),
       collectedVnd: vs.reduce((t, v) => t + v.paidVnd, 0),
-      creditAppliedVnd: 0,
+      creditAppliedVnd: vs.reduce((t, v) => t + v.creditAppliedVnd, 0),
       byCenter: [...byCenter.values()].sort((a, b) => a.centerName.localeCompare(b.centerName)),
       overdue: vs.filter((v) => v.daysOverdue > 0).sort((a, b) => b.daysOverdue - a.daysOverdue),
     };
@@ -870,7 +900,7 @@ export function registerBilling(app: Api): void {
       return {
         invoices: mine,
         outstandingVnd: mine.reduce((t, v) => t + v.balanceVnd, 0),
-        walletVnd: 0,
+        walletVnd: (await walletOf(tx, principalId)).balanceVnd,
       };
     });
     return out ?? reply.code(403).send({ error: "not_a_payer" });

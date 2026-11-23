@@ -98,6 +98,9 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 | `POST /v1/me/class-courses/:ref/:lessonId/speaking/:blockId` `{choices}`                           | the learner, when the teacher returned the latest attempt         | try a speaking rehearsal again                                                 |
 | `GET /v1/speaking-reviews`                                                                         | the class teacher (reviews), staff with `courses:link` (see only) | the pending speaking rehearsals                                                |
 | `POST /v1/speaking-reviews/decide` `{learnerId, ref, lessonId, blockId, attempt, decision, note?}` | the learner's class teacher only; `return` needs a note           | approve / return                                                               |
+| `GET /v1/me/referrals`                                                                             | a guardian or an adult learner (self)                             | `GrowthPort.getMine`                                                           |
+| `GET /v1/growth/leads` · `…/program` · `POST /v1/growth/leads/:id/confirm\|reject`                 | staff (writes: `growth:manage`)                                   | `listLeads` / `getProgram` / `confirm` / `reject`                              |
+| `GET /v1/public/referrals/:code` · `POST …/:code/leads` (no grant)                                 | anyone with a code — rate-limited                                 | `recordClick` / `submitLead`                                                   |
 | `GET /v1/students`                                                                                 | staff (`students:view` by center), class teachers (own classes)   | `StudentsPort.list`                                                            |
 | `GET /v1/me/skills`                                                                                | the learner (self)                                                | `LearningProfilePort.getProfile`                                               |
 | `GET /v1/engine/rules` · `…/events` · `…/actions` · `…/job`                                        | staff (events / actions run the engine first when stale)          | `DecisionEnginePort.listRules` / `listEvents` / `listActions` / `getJobStatus` |
@@ -216,6 +219,17 @@ Migration 0012: `engine_rule`, `engine_event`, `engine_action`, `engine_fired` (
 - It runs when a staff or teacher page reads events, actions or notifications and the last run is older than 60 s (owner 23/11: no background service). Runs are serialised per organization with an advisory lock and a re-check, so pages asking at the same moment start one run. Staff can also "Run now".
 - Events and actions are insert-only for `ogc_app`, and a trigger refuses updates.
 - Detected on the Platform: skill below / dropped (placement + class-course quizzes), absences in a row, make-up deadline close / passed / missed again, attendance not taken, teacher load, class without a teacher, invoice overdue, no class-course activity, speaking returned. Not yet (no data on the Platform): no practice — the rule detects nothing.
+
+## Growth · referrals
+
+Migration 0014: `referral_code` (a public directory code → organization), `referral_program`, `referral_campaign`, `referral_click`, `referral_reward`, `wallet_entry`; `learner.adult`; `lead.referrer_principal_id` / `referral_code`; invoices may carry wallet credit. Owner decisions 22/11 (demo) and 23/11.
+
+- Guardians and adult learners get a link / code; a learner under 18 has none.
+- The public `/join` page (no grant) records a click and takes a display name, a course and a center — no contact details. It is rate-limited in memory per address (from nginx's `X-Forwarded-For`; addresses are not stored), per code and per organization. The lead enters the one Admissions pipeline as a referral.
+- A referral counts when its first invoice is paid in full (Admissions "enrolled") and staff with `growth:manage` confirm it. Confirming is refused while an anti-fraud flag stands: self-referral, same household, duplicate (a learner or an open lead with the same name at that center), already rewarded. Names are compared without case, punctuation or Vietnamese diacritics. A reward is decided once (insert-only, trigger).
+- The reward is wallet credit: (program % + active campaign %) of the first payment, capped. Billing applies waiting credit to the payer's invoices issued later (never more than the invoice); voiding such an invoice gives it back. Wallet entries are append-only.
+- The seed: program 5 %, cap 2.000.000 ₫, Tết 2027 +2 %; Minh is an adult learner; Mai referred Bao T. (first invoice paid, waiting for confirmation) and "Linh N." (her own child — flagged).
+- Not yet: the metrics dashboard and editing the program (part B).
 
 ## Access policies
 
