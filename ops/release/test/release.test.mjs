@@ -323,6 +323,48 @@ check("make-release: rejects bad sha, unsafe stage, and the live root (fail-clos
   expectFail(run("make-release.sh", [REPO, "a".repeat(40), "/var/www/ogc"]), "live root refused");
 });
 
+// ─────────────────────── ADR-040 §5: check-bundle (demo ↔ platform separation) ───────────
+function bundle(kind, files) {
+  const d = tmp();
+  for (const [name, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(d, name)), { recursive: true });
+    writeFileSync(join(d, name), text);
+  }
+  try {
+    const stdout = execFileSync("node", [join(SCRIPTS, "check-bundle.mjs"), kind, d], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return { code: 0, stdout, stderr: "" };
+  } catch (e) {
+    return { code: e.status ?? 1, stdout: e.stdout?.toString() ?? "", stderr: e.stderr?.toString() ?? "" };
+  }
+}
+
+check("check-bundle: a clean platform build and a clean demo build pass", () => {
+  expectOk(bundle("platform", { "platform.html": "<div id=root>", "assets/a.js": 'fetch("/v1/dev/login")' }), "platform");
+  expectOk(bundle("demo", { "index.html": "<div id=root>", "assets/a.js": 'const p="demo-teacher"' }), "demo");
+});
+
+check("check-bundle: demo personas or storage in the platform build fail, with the hit named", () => {
+  for (const m of ["demo-teacher", "demo-admin", "ogc.demo", "registerPersistent"]) {
+    const r = bundle("platform", { "assets/deep/x.js": `var a=${JSON.stringify(m)}` });
+    expectFail(r, m);
+    if (r.code !== 1 || !r.stderr.includes(m) || !r.stderr.includes("deep/x.js"))
+      throw new Error(`${m}: hit not reported (${r.code}) ${r.stderr}`);
+  }
+});
+
+check("check-bundle: the Platform dev sign-in in the demo build fails", () => {
+  expectFail(bundle("demo", { "assets/a.js": 'fetch("/v1/dev/login")' }), "dev login");
+  expectFail(bundle("demo", { "assets/a.js.map": '"/v1/dev/personas"' }), "dev personas in a map");
+});
+
+check("check-bundle: bad usage and an empty dir are refused (exit 2)", () => {
+  if (bundle("other", { "a.js": "" }).code !== 2) throw new Error("unknown kind");
+  if (bundle("platform", { "a.png": "demo-teacher" }).code !== 2) throw new Error("no text files");
+});
+
 // ───────────────────────────────────── summary ──────────────────────────────────────
 for (const d of tmps) rmSync(d, { recursive: true, force: true });
 console.log(`\n${pass}/${pass + fail} release-toolkit checks passed`);

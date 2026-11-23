@@ -9,6 +9,9 @@ function need(name: string): string {
   return v;
 }
 
+const devLogin = process.env.OGC_DEV_LOGIN === "1";
+if (devLogin && process.env.NODE_ENV === "production")
+  throw new Error("api: OGC_DEV_LOGIN is a staging tool — refused with NODE_ENV=production");
 const db = connect(need("DATABASE_URL")); // the ogc_app role — never the owner role
 const app = buildApi({
   db,
@@ -18,6 +21,7 @@ const app = buildApi({
     timeoutMs: Number(process.env.IIOS_TIMEOUT_MS ?? 2000),
   }),
   logger: true,
+  devLogin,
 });
 const port = Number(process.env.PORT ?? 8788);
 await app.listen({ host: process.env.HOST ?? "127.0.0.1", port });

@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-http/
+dist-platform/
 coverage/
 *.log
 .DS_Store

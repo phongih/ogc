@@ -158,6 +158,68 @@ describe.skipIf(!hasPg)("api — pipeline", () => {
     });
   });
 
+  describe("dev login (staging only)", () => {
+    it("is absent unless enabled (an unknown route without a grant answers 401, like any other)", async () => {
+      expect((await api.inject({ method: "GET", url: "/v1/dev/personas" })).statusCode).toBe(401);
+      expect(
+        (
+          await api.inject({
+            method: "POST",
+            url: "/v1/dev/login",
+            payload: { principalId: "x", orgId: NOVA },
+          })
+        ).statusCode,
+      ).toBe(401);
+    });
+
+    it("lists synthetic personas and issues a grant the pipeline accepts", async () => {
+      const a = buildApi({
+        db: t.app,
+        iios: httpIiosClient({ baseUrl: iiosUrl, clientSecret: SECRET }),
+        devLogin: true,
+      });
+      const personas = (await a.inject({ method: "GET", url: "/v1/dev/personas" })).json();
+      expect(personas.map((p: { principalId: string }) => p.principalId)).toContain(
+        "iios-principal-teacher-1",
+      );
+      expect(personas.find((p: { role: string | null }) => p.role === null)).toBeUndefined();
+      const login = await a.inject({
+        method: "POST",
+        url: "/v1/dev/login",
+        payload: { principalId: "iios-principal-teacher-1", orgId: NOVA },
+      });
+      expect(login.statusCode).toBe(200);
+      const { grant, orgId } = login.json();
+      expect(orgId).toBe(NOVA);
+      const me = await a.inject({
+        method: "GET",
+        url: "/v1/me/access",
+        headers: { authorization: `Bearer ${grant}`, "x-ogc-org": NOVA },
+      });
+      expect(me.json()).toMatchObject({ role: "teacher", principalId: "iios-principal-teacher-1" });
+      // Not a member of that organization → refused; a bad org id → 400.
+      expect(
+        (
+          await a.inject({
+            method: "POST",
+            url: "/v1/dev/login",
+            payload: { principalId: "iios-principal-teacher-1", orgId: LUMEN },
+          })
+        ).statusCode,
+      ).toBe(404);
+      expect(
+        (
+          await a.inject({
+            method: "POST",
+            url: "/v1/dev/login",
+            payload: { principalId: "x", orgId: "nova" },
+          })
+        ).statusCode,
+      ).toBe(400);
+      await a.close();
+    });
+  });
+
   describe("authorization with IIOS narrowing", () => {
     it("/v1/me/access reflects role, Org Admin and the attached policy", async () => {
       const admin = (

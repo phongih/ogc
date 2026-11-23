@@ -42,6 +42,11 @@ export interface ApiDeps {
   iios: IiosClient;
   logger?: boolean;
   now?: () => number; // ms; injectable for tests
+  /**
+   * Staging only: expose the mock IIOS's dev login (persona picker) at /v1/dev/*. Off unless set;
+   * main.ts refuses it with NODE_ENV=production. Synthetic principals only (ADR-040 §6).
+   */
+  devLogin?: boolean;
 }
 
 /** What a route handler gets: the decided grant and helpers bound to it. */
@@ -212,6 +217,22 @@ export function buildApi(deps: ApiDeps): Api {
       allowed,
     };
   });
+
+  if (deps.devLogin) {
+    const dev = deps.iios.dev;
+    if (!dev) throw new Error("api: devLogin needs an IIOS client with dev endpoints");
+    app.get("/v1/dev/personas", { config: { public: true } }, async (_req, reply) => {
+      const m = await dev.members();
+      return m ?? reply.code(503).send({ error: "iios_unavailable" });
+    });
+    app.post("/v1/dev/login", { config: { public: true } }, async (req, reply) => {
+      const b = (req.body ?? {}) as { principalId?: unknown; orgId?: unknown };
+      if (typeof b.principalId !== "string" || typeof b.orgId !== "string" || !UUID.test(b.orgId))
+        return reply.code(400).send({ error: "bad_request" });
+      const g = await dev.issue(b.principalId, b.orgId);
+      return g ? { ...g, orgId: b.orgId } : reply.code(404).send({ error: "not_a_member" });
+    });
+  }
 
   registerSchedule(app);
   registerAttendance(app);
