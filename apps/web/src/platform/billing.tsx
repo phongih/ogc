@@ -13,6 +13,8 @@ import { Button } from "../ui";
 import { platformApi } from "./client";
 import { useSignedIn } from "./App";
 import { PolicyBanner, useMyPlatformAccess } from "./workforce";
+import { ReferToPartner } from "../features/partners/ReferToPartner";
+import { useCanRefer, usePlatformReferApi } from "./partners";
 
 function useCanManage(): boolean {
   const q = useMyPlatformAccess();
@@ -70,12 +72,27 @@ export function PlatformTuitionApi({ children }: { children: ReactNode }) {
   return <TuitionApiContext.Provider value={api}>{children}</TuitionApiContext.Provider>;
 }
 
-/** Admissions → a lead at "placement test done": issue its first invoice (Billing decides). */
+/**
+ * Admissions → an open lead: "Refer to partner" (Partner Commissions decides); at "placement test
+ * done": issue its first invoice (Billing decides).
+ */
 export function PlatformLeadActions({ lead: l }: { lead: Lead }) {
+  const canRefer = useCanRefer();
+  const referApi = usePlatformReferApi();
+  return (
+    <>
+      {canRefer && l.stage !== "offer" ? (
+        <ReferToPartner leadId={l.id} learnerName={l.learnerName} api={referApi} />
+      ) : null}
+      {l.stage === "placement" ? <FirstInvoiceButton lead={l} /> : null}
+    </>
+  );
+}
+
+function FirstInvoiceButton({ lead: l }: { lead: Lead }) {
   const s = useSignedIn();
   const act = useAdmissionsAction();
   const can = useCanManage();
-  if (l.stage !== "placement") return null;
   return (
     <>
       <Button

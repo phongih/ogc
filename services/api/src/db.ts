@@ -247,6 +247,74 @@ export interface PaymentTable {
   recorded_by: string;
 }
 
+export interface PartnerTable {
+  org_id: string;
+  id: string;
+  name: string;
+  courses: string[];
+  near_center_ids: string[];
+  retention_pct: number;
+  settlement_days: number;
+}
+export interface PartnerRuleTable {
+  org_id: string;
+  id: string;
+  partner_id: string;
+  version: number;
+  status: "pending" | "active" | "retired" | "rejected";
+  cycle: "monthly" | "quarterly";
+  mode: "progressive" | "retroactive";
+  tiers: unknown; // jsonb: { minCount, amountVnd }[]
+  attribution_window_days: number;
+  clawback_window_days: number;
+  proposed_by: string;
+  proposed_by_name: string;
+  proposed_at: Date;
+  decided_by_name: string | null;
+  decided_at: Date | null;
+}
+export interface CommissionEntryTable {
+  org_id: string;
+  id: string;
+  partner_id: string;
+  lead_id: string | null;
+  lead_ref_code: string;
+  learner_display_name: string;
+  course_code: string;
+  referred_at: Date;
+  expires_at: Date;
+  enrolled_at: Date | null;
+  enrolled_by: string | null;
+  status: "referred" | "enrolled" | "approved" | "paid" | "rejected";
+  applied_rule_id: string | null;
+  locked_amount_vnd: string | number | null;
+  locked_tier_index: number | null;
+  approved_at: Date | null;
+  due_date: Date | null;
+  reject_reason: string | null;
+  settled_batch_id: string | null;
+  updated_by_name: string;
+  updated_at: Date;
+}
+export interface PartnerActivityTable {
+  org_id: string;
+  seq: number;
+  at: Date;
+  by_name: string;
+  action: string;
+  subject: string;
+  detail: string | null;
+}
+export interface PartnerSignalMarkTable {
+  org_id: string;
+  signal_id: string;
+  state: "snoozed" | "dismissed" | "followed";
+  note: string | null;
+  until: Date | null;
+  by_name: string;
+  at: Date;
+}
+
 export interface DB {
   center: CenterTable;
   teacher: TeacherTable;
@@ -270,6 +338,11 @@ export interface DB {
   invoice: InvoiceTable;
   invoice_line: InvoiceLineTable;
   payment: PaymentTable;
+  partner: PartnerTable;
+  partner_rule: PartnerRuleTable;
+  commission_entry: CommissionEntryTable;
+  partner_activity: PartnerActivityTable;
+  partner_signal_mark: PartnerSignalMarkTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;
