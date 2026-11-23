@@ -1,9 +1,10 @@
 /*
  * Course Studio — how a block READS (preview, published versions, the learner's lesson). Plain
  * text only (never HTML). Video is a link that opens in a new tab — OGC never embeds it.
- * Interactive parts (quiz choice, reflection answer) are passed in by the learner player.
+ * Interactive parts (quiz choice, reflection answer, speaking replies) are passed in by the learner
+ * player. A speaking rehearsal counts for Speaking only once the class teacher approves it.
  */
-import type { CourseBlock } from "@ogc/contracts";
+import type { CourseBlock, SpeakingAttemptView } from "@ogc/contracts";
 
 const TONE: Record<string, { label: string; cls: string }> = {
   info: { label: "Note", cls: "border-brand" },
@@ -17,7 +18,17 @@ export interface Interaction {
   reflection?: string;
   onReflection?: (t: string) => void;
   revealed?: boolean; // after completion: show the correct option
+  // speaking: the reply picked at each turn, and the latest attempt's review (Platform)
+  choices?: (number | undefined)[];
+  onChoose?: (turn: number, option: number) => void;
+  attempt?: SpeakingAttemptView | null;
 }
+
+const SPEAKING_STATUS: Record<SpeakingAttemptView["status"], string> = {
+  pending: "Waiting for your teacher — it counts for Speaking once approved",
+  approved: "Approved by your teacher — counts for Speaking",
+  returned: "Returned by your teacher — try again",
+};
 
 export function BlockView({ b, io }: { b: CourseBlock; io?: Interaction }) {
   switch (b.kind) {
@@ -126,6 +137,71 @@ export function BlockView({ b, io }: { b: CourseBlock; io?: Interaction }) {
             </p>
           )}
         </div>
+      );
+    case "speaking":
+      return (
+        <section
+          aria-label={`Speaking: ${b.scenario || "rehearsal"}`}
+          className="space-y-2 rounded-ogc border border-border p-3"
+        >
+          <p className="font-medium">🗣 {b.scenario || "Speaking rehearsal"}</p>
+          <p className="text-xs text-muted">
+            {io
+              ? "For each line, choose the most natural reply, then say it out loud."
+              : "The learner picks and says a reply at each turn; the class teacher approves it before it counts for Speaking."}
+          </p>
+          <ol className="space-y-2">
+            {b.turns.map((t, i) => {
+              const picked = io?.choices?.[i];
+              return (
+                <li key={i} className="space-y-1">
+                  <p className="text-sm">
+                    <span className="text-muted">Coach:</span> {t.coach || `Turn ${i + 1}`}
+                  </p>
+                  <ul className="space-y-0.5 pl-3">
+                    {t.options.map((o, j) => {
+                      const natural = (io?.revealed || !io) && t.natural === j;
+                      return (
+                        <li key={j}>
+                          <label className="flex items-center gap-2 text-sm">
+                            <input
+                              type="radio"
+                              name={`speaking-${b.id}-${i}`}
+                              aria-label={`Turn ${i + 1}: ${o}`}
+                              checked={picked === j}
+                              disabled={!io?.onChoose}
+                              onChange={() => io?.onChoose?.(i, j)}
+                            />
+                            <span className={natural ? "font-semibold underline" : ""}>
+                              {o || `Reply ${j + 1}`}
+                              {natural ? " ✓" : ""}
+                              {io?.revealed && picked === j && t.natural !== j ? " ✗" : ""}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {(io?.revealed || !io) && t.model ? (
+                    <p className="pl-3 text-xs">
+                      Say it like this: “{t.model}”{t.tip ? ` · ${t.tip}` : ""}
+                    </p>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ol>
+          {io?.attempt ? (
+            <p
+              className={`text-sm ${io.attempt.status === "returned" ? "text-danger" : ""}`}
+              data-testid={`speaking-status-${b.id}`}
+            >
+              {SPEAKING_STATUS[io.attempt.status]} · natural replies {io.attempt.score}%
+              {io.attempt.attempt > 1 ? ` · try ${io.attempt.attempt}` : ""}
+              {io.attempt.note ? ` · “${io.attempt.note}”` : ""}
+            </p>
+          ) : null}
+        </section>
       );
   }
 }

@@ -877,6 +877,7 @@ export async function seedDev(
         ])
           await c.query(`delete from ${t}`);
         await c.query("delete from placement_result");
+        await c.query("delete from course_speaking_attempt");
         await c.query("delete from course_lesson_done");
         await c.query("delete from course_progress");
         await c.query("delete from class_course_link");
@@ -1044,7 +1045,7 @@ export async function seedDev(
     await seedBilling(c, now);
     await seedPartners(c, now);
     await seedCourses(c, now, { tara: TARA, ben: BEN });
-    await seedClassCourses(c, now, { a2Morning: A2M, b1Evening: B1E, an: L(3) });
+    await seedClassCourses(c, now, { a2Morning: A2M, b1Evening: B1E, an: L(3), linh: L(1) });
     await seedEngineRules(c);
     // Skill profile: the demo's synthetic placement results (Khoa and Vy have none, as in the demo).
     await c.query(

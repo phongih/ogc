@@ -11,8 +11,8 @@
  *    read-only). No free-form rules;
  *  - it runs when a staff or teacher page asks and the last run is older than 60 s (owner 23/11:
  *    no background service), serialised per organization; "Run now" for staff.
- * Rules without data on the Platform yet detect nothing: speaking_returned (no speaking review)
- * and no_practice (no practice attempts); both are off by default.
+ * speaking_returned fires when the class teacher returns a speaking rehearsal (owner 23/11).
+ * no_practice detects nothing on the Platform yet (no practice attempts).
  */
 import { sql } from "kysely";
 import {
@@ -97,6 +97,7 @@ async function detect(tx: TenantTx, orgId: string, now: number, rules: Rule[]) {
   const low = byKind.get("skill_low");
   const drop = byKind.get("skill_drop");
   const absent = byKind.get("absence_streak");
+  const spoke = byKind.get("speaking_returned");
   const learners = new Map<string, string[]>();
   for (const [id] of classes)
     for (const key of l.roster) {
@@ -113,18 +114,20 @@ async function detect(tx: TenantTx, orgId: string, now: number, rules: Rule[]) {
       label: `${l.learners.get(learnerId)?.name ?? "Learner"} · ${l.classes.get(own[0])!.name}`,
     };
     const placement = x.placements.get(learnerId);
-    if (placement && (low || drop))
-      for (const s of supportSignals(seedProfile(placement), x.evidence.get(learnerId) ?? [], 0, {
-        low: low ? low.params.threshold : null,
-        drop: drop ? drop.params.drop : null,
-      })) {
+    if (placement && (low || drop || spoke))
+      for (const s of supportSignals(
+        seedProfile(placement),
+        x.evidence.get(learnerId) ?? [],
+        spoke ? (x.returned.get(learnerId) ?? 0) : 0,
+        { low: low ? low.params.threshold : null, drop: drop ? drop.params.drop : null },
+      )) {
         const skill = s.skill ? skillLabel(s.skill) : "";
         if (s.kind === "low_skill" && low)
           out.push({
             rule: low,
             key: `${learnerId}|${s.skill}`,
             subject,
-            evidence: `${skill} is ${s.level}, below ${s.threshold} (${s.source === "placement" ? "placement test only" : "from class-course quizzes"})`,
+            evidence: `${skill} is ${s.level}, below ${s.threshold} (${s.source === "placement" ? "placement test only" : `from class-course ${s.skill === "speaking" ? "rehearsals" : "quizzes"}`})`,
             teacherIds: teachers,
           });
         if (s.kind === "skill_drop" && drop)
@@ -132,7 +135,15 @@ async function detect(tx: TenantTx, orgId: string, now: number, rules: Rule[]) {
             rule: drop,
             key: `${learnerId}|${s.skill}`,
             subject,
-            evidence: `${skill} dropped ${Math.abs(s.delta ?? 0)} to ${s.level} after the latest class-course quiz`,
+            evidence: `${skill} dropped ${Math.abs(s.delta ?? 0)} to ${s.level} after the latest class-course ${s.skill === "speaking" ? "rehearsal" : "quiz"}`,
+            teacherIds: teachers,
+          });
+        if (s.kind === "speaking_returned" && spoke)
+          out.push({
+            rule: spoke,
+            key: `${learnerId}|speaking`,
+            subject,
+            evidence: "Speaking rehearsal returned by the teacher",
             teacherIds: teachers,
           });
       }

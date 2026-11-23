@@ -17,6 +17,8 @@ import type {
   LearnerStudioProgress,
   MyClassCourse,
   MyLessonView,
+  CourseSpeakingReviewItem,
+  SpeakingReviewQueue,
   StudioCourse,
   StudioOverview,
   StudioResult,
@@ -475,13 +477,45 @@ export const platformApi = {
     lessonId: string,
     answers: Record<string, number>,
     reflections: Record<string, string>,
+    speaking: Record<string, number[]>,
   ) =>
     result<AuthoringResult & { score?: number | null }>(
       s,
       "POST",
       `/v1/me/class-courses/${encodeURIComponent(ref)}/${encodeURIComponent(lessonId)}/complete`,
-      { answers, reflections },
+      { answers, reflections, speaking },
     ),
+  retrySpeaking: (
+    s: PlatformSession,
+    ref: string,
+    lessonId: string,
+    blockId: string,
+    choices: number[],
+  ) =>
+    result<AuthoringResult>(
+      s,
+      "POST",
+      `/v1/me/class-courses/${encodeURIComponent(ref)}/${encodeURIComponent(lessonId)}/speaking/${encodeURIComponent(blockId)}`,
+      { choices },
+    ),
+  // Speaking review: the class teacher decides; center staff only see the queue.
+  speakingReviews: (s: PlatformSession) =>
+    staffRead<SpeakingReviewQueue>(s, "/v1/speaking-reviews"),
+  decideSpeaking: (
+    s: PlatformSession,
+    item: Pick<CourseSpeakingReviewItem, "learnerId" | "ref" | "lessonId" | "blockId" | "attempt">,
+    decision: "approve" | "return",
+    note: string,
+  ) =>
+    result<AuthoringResult>(s, "POST", "/v1/speaking-reviews/decide", {
+      learnerId: item.learnerId,
+      ref: item.ref,
+      lessonId: item.lessonId,
+      blockId: item.blockId,
+      attempt: item.attempt,
+      decision,
+      note,
+    }),
 
   // Course Studio (teachers and staff, courses:author) — synthetic courses
   courses: (s: PlatformSession) =>

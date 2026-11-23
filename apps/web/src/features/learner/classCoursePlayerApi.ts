@@ -22,7 +22,15 @@ export interface ClassCoursePlayerApi {
     lessonId: string,
     answers: Record<string, number>,
     reflections: Record<string, string>,
+    speaking: Record<string, number[]>,
   ): Promise<AuthoringResult & { score?: number | null }>;
+  /** Try a returned speaking rehearsal again (Platform; absent in the demo). */
+  retrySpeaking?(
+    ref: string,
+    lessonId: string,
+    blockId: string,
+    choices: number[],
+  ): Promise<AuthoringResult>;
   onChanged(qc: QueryClient): Promise<unknown> | void;
 }
 

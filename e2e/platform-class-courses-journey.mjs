@@ -89,9 +89,9 @@ runPlatformJourney("platform class courses E2E", async ({ browser, base, check }
   await table.waitFor();
   const rows = (await table.locator("tbody tr").allTextContents()).map((t) => t.trim());
   check(
-    "[sam] An P. v1 · 1 of 2; Linh N. and Minh T. 0 of 3",
+    "[sam] An P. v1 · 1 of 2; Linh N. 1 of 3 (Making plans, seed); Minh T. 0 of 3",
     rows.some((r) => r.startsWith("An P.v11 of 2")) &&
-      rows.some((r) => r.startsWith("Linh N.v20 of 3")) &&
+      rows.some((r) => r.startsWith("Linh N.v21 of 3")) &&
       rows.some((r) => r.startsWith("Minh T.v20 of 3")),
   );
 
@@ -102,9 +102,9 @@ runPlatformJourney("platform class courses E2E", async ({ browser, base, check }
   const mine = page.getByRole("region", { name: "Class courses" });
   await mine.getByText("A2 Everyday English — Units 6–8").waitFor();
   check(
-    "[linh] the A2 course of her class, version 2, 0 of 3 lessons",
+    "[linh] the A2 course of her class, version 2, 1 of 3 lessons",
     ((await mine.textContent()) ?? "").includes("version 2") &&
-      ((await mine.textContent()) ?? "").includes("0 of 3 lessons done"),
+      ((await mine.textContent()) ?? "").includes("1 of 3 lessons done"),
   );
   await mine.getByRole("link", { name: "1. At the market" }).click();
   await page.getByRole("radio", { name: "Can I have some rice, please?" }).waitFor();
@@ -128,8 +128,8 @@ runPlatformJourney("platform class courses E2E", async ({ browser, base, check }
   await page.getByRole("link", { name: "Next lesson →" }).waitFor();
   const prog = await samApi("/v1/class-courses/SL-1/progress");
   check(
-    "[api] Linh's progress reaches the class view: 1 of 3 on v2",
-    prog.some((r) => r.name === "Linh N." && r.completedLessons === 1 && r.version === 2),
+    "[api] Linh's progress reaches the class view: 2 of 3 on v2",
+    prog.some((r) => r.name === "Linh N." && r.completedLessons === 2 && r.version === 2),
   );
 
   // 5) Ben sees only his class

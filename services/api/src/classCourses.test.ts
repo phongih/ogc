@@ -284,7 +284,7 @@ describe.skipIf(!hasPg)("class courses + My Learning — API", () => {
     expect(rows.map((r) => [r.name, r.completedLessons, r.totalLessons, r.pct, r.version])).toEqual(
       [
         ["An P.", 1, 2, 50, 1],
-        ["Linh N.", 0, 3, 0, 2],
+        ["Linh N.", 1, 3, 33, 2], // "Making plans", with a speaking rehearsal (seed)
         ["Minh T.", 0, 3, 0, 2],
       ],
     );
@@ -302,8 +302,8 @@ describe.skipIf(!hasPg)("class courses + My Learning — API", () => {
       className: A2,
       version: 2,
       latestVersion: 2,
-      completedLessons: 0,
-      pct: 0,
+      completedLessons: 1, // "Making plans" (seed)
+      pct: 33,
     });
     expect(m.lessons.map((l) => l.lessonId)).toEqual(["a2-l1", "a2-l2", "a2-l3"]);
     const l1 = await lesson(linh, "CS-A2-EVERYDAY", "a2-l1");
@@ -354,9 +354,9 @@ describe.skipIf(!hasPg)("class courses + My Learning — API", () => {
     ).toEqual({ ok: true, score: 0 });
     const [after] = await mine(linh);
     expect([after.completedLessons, after.pct, after.lessons.map((l) => l.score)]).toEqual([
-      2,
-      67,
-      [100, 0, null],
+      3,
+      100,
+      [100, 0, 100],
     ]);
     // Not open to Linh: the B1 course (not her class) — and only learners use My Learning.
     expect((await linh("GET", "/v1/me/class-courses/CS-B1-SPEAK/b1-l1")).statusCode).toBe(404);
@@ -411,7 +411,7 @@ describe.skipIf(!hasPg)("class courses + My Learning — API", () => {
     ).json()) as LearnerStudioProgress[];
     expect(rows.map((r) => [r.name, r.completedLessons, r.totalLessons, r.version])).toEqual([
       ["An P.", 1, 2, 1],
-      ["Linh N.", 1, 3, 2],
+      ["Linh N.", 2, 3, 2],
       ["Minh T.", 0, 4, 3],
     ]);
   });

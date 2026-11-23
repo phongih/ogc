@@ -6,6 +6,8 @@
  *  - CS-IELTS-W1 (Sam, staff): v1 published;
  *  - CS-A2-PHONICS (Ben): submitted, never published — waiting for a reviewer;
  *  - CS-LUMEN-STARTER (the second tenant): v1 published.
+ * "Making plans" (A2 v2) carries the demo's speaking script "Describe your weekend" as a speaking
+ * rehearsal block (owner 23/11; the demo keeps it in its Speaking studio).
  */
 import type pg from "pg";
 import type { CourseContent, CourseLesson } from "@ogc/contracts";
@@ -92,6 +94,53 @@ const A2_L3: CourseLesson = {
       question: "Choose the best answer: “Do you want to see a film?”",
       options: ["Yes, I'd love to.", "Yes, I love.", "I am film."],
       correct: 0,
+    },
+    {
+      id: "a2-l3-b5",
+      kind: "speaking",
+      scenario: "Describe your weekend",
+      turns: [
+        {
+          coach: "Hi! How was your weekend?",
+          options: [
+            "It was great, thanks! I went to the beach.",
+            "I am go to the beach yesterday.",
+            "Weekend is Saturday and Sunday.",
+          ],
+          natural: 0,
+          model: "It was great, thanks! I went to the beach.",
+          tip: "Stress the second part: week-END. Finish “went” with a clear “t”.",
+        },
+        {
+          coach: "Oh nice! Who did you go with?",
+          options: ["With the beach.", "I went with my cousin and her friends.", "Yes, I go."],
+          natural: 1,
+          model: "I went with my cousin and her friends.",
+          tip: "“Cousin” sounds like CUZ-en; end “friends” with “dz”.",
+        },
+        {
+          coach: "What did you do there?",
+          options: [
+            "We swim and eat seafood tomorrow.",
+            "Seafood is delicious.",
+            "We swam in the morning and had seafood for lunch.",
+          ],
+          natural: 2,
+          model: "We swam in the morning and had seafood for lunch.",
+          tip: "“Swam” is the past of “swim”; stress SEA-food.",
+        },
+        {
+          coach: "Sounds fun. Would you go again?",
+          options: [
+            "Definitely — maybe next month.",
+            "I went again yesterday last week.",
+            "No beach.",
+          ],
+          natural: 0,
+          model: "Definitely — maybe next month.",
+          tip: "Four beats, stress the first: DEF-i-nit-ly.",
+        },
+      ],
     },
   ],
 };
@@ -375,7 +424,7 @@ export async function seedLumenCourse(c: pg.Client, now: number): Promise<void> 
 export async function seedClassCourses(
   c: pg.Client,
   now: number,
-  ids: { a2Morning: string; b1Evening: string; an: string },
+  ids: { a2Morning: string; b1Evening: string; an: string; linh: string },
 ): Promise<void> {
   const at = (days: number) => new Date(now - days * DAY);
   // A2 Morning follows the A2 course; Tara proposed the B1 course for B1 Evening.
@@ -395,5 +444,21 @@ export async function seedClassCourses(
     `insert into course_lesson_done (org_id, learner_id, course_ref, lesson_id, at, score, answers, reflections)
      values (ogc_current_org(), $1, 'CS-A2-EVERYDAY', 'a2-l1', $2, 100, '{"a2-l1-b4": 1}', '{}')`,
     [ids.an, at(18)],
+  );
+  // Linh did "Making plans" on v2 yesterday; her speaking rehearsal (3 of 4 natural replies)
+  // waits for Tara, the class teacher — it counts for Speaking only once approved.
+  await c.query(
+    "insert into course_progress (org_id, learner_id, course_ref, version) values (ogc_current_org(), $1, 'CS-A2-EVERYDAY', 2)",
+    [ids.linh],
+  );
+  await c.query(
+    `insert into course_lesson_done (org_id, learner_id, course_ref, lesson_id, at, score, answers, reflections, speaking)
+     values (ogc_current_org(), $1, 'CS-A2-EVERYDAY', 'a2-l3', $2, 100, '{"a2-l3-b4": 0}', '{}', '{"a2-l3-b5": [0, 1, 0, 0]}')`,
+    [ids.linh, at(1)],
+  );
+  await c.query(
+    `insert into course_speaking_attempt (org_id, learner_id, course_ref, lesson_id, block_id, attempt, choices, score, submitted_at)
+     values (ogc_current_org(), $1, 'CS-A2-EVERYDAY', 'a2-l3', 'a2-l3-b5', 1, '[0, 1, 0, 0]', 75, $2)`,
+    [ids.linh, at(1)],
   );
 }

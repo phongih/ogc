@@ -56,7 +56,8 @@ function MyCourses() {
   );
 }
 
-/** The learner's skill profile: the placement seed moved by class-course quiz scores. */
+/** The learner's skill profile: the placement seed moved by class-course quiz scores and, for
+ *  Speaking, rehearsals the class teacher approved. */
 function MySkills() {
   const s = useSignedIn();
   const q = useQuery({
@@ -82,7 +83,9 @@ function MySkills() {
                     {m.level}{" "}
                     <span className="text-muted">
                       {m.evidenceCount
-                        ? `· ${m.evidenceCount} quiz${m.evidenceCount === 1 ? "" : "zes"}`
+                        ? k === "speaking"
+                          ? `· ${m.evidenceCount} approved rehearsal${m.evidenceCount === 1 ? "" : "s"}`
+                          : `· ${m.evidenceCount} quiz${m.evidenceCount === 1 ? "" : "zes"}`
                         : "· placement test only"}
                     </span>
                   </span>

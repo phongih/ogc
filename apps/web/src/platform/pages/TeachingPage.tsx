@@ -9,6 +9,7 @@ import { SelfStudyToConfirmView } from "../../features/makeup/SelfStudyToConfirm
 import { PlatformMakeupApi } from "../makeup";
 import { EngineNotificationsView } from "../../features/engine/EngineNotificationsView";
 import { PlatformNotificationsApi } from "../engine";
+import { SpeakingReviewCard } from "../speaking";
 
 export function TeachingPage() {
   const session = useSignedIn();
@@ -35,6 +36,9 @@ export function TeachingPage() {
         <PlatformNotificationsApi>
           <EngineNotificationsView />
         </PlatformNotificationsApi>
+      </div>
+      <div className="mb-4">
+        <SpeakingReviewCard />
       </div>
       <div className="mb-4">
         <PlatformMakeupApi>

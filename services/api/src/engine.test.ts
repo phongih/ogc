@@ -274,7 +274,8 @@ describe.skipIf(!hasPg)("Decision Engine — API", () => {
         .sort(),
     ).toEqual(["Ben", "Tara"]);
     const inactive = ev.filter((e) => e.kind === "studio_inactive");
-    expect(inactive.map((e) => e.subject.label).sort()).toEqual(["An P.", "Linh N.", "Minh T."]);
+    // Linh did "Making plans" yesterday (seed): active.
+    expect(inactive.map((e) => e.subject.label).sort()).toEqual(["An P.", "Minh T."]);
     expect(inactive[0].evidence).toMatch(
       /^No class course activity since .* in "A2 Everyday English — Units 6–8" \(A2 Morning — Mon\/Wed\)$/,
     );

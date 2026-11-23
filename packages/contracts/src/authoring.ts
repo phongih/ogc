@@ -21,7 +21,25 @@ import type { IiosGrantedContext } from "./iiosContext.js";
 
 // ── Blocks ──────────────────────────────────────────────────────────────────────────────────
 export type BlockKind =
-  "heading" | "text" | "callout" | "divider" | "vocab" | "quiz" | "video" | "reflection";
+  | "heading"
+  | "text"
+  | "callout"
+  | "divider"
+  | "vocab"
+  | "quiz"
+  | "video"
+  | "reflection"
+  | "speaking";
+
+/** One turn of a speaking rehearsal: the coach's line, the replies to choose from (one is the
+ *  natural one), a model line and a pronunciation / usage tip shown after submitting. */
+export interface SpeakingTurn {
+  coach: string;
+  options: string[];
+  natural: number;
+  model: string;
+  tip: string;
+}
 
 export type CalloutTone = "info" | "tip" | "warning";
 
@@ -41,7 +59,8 @@ export type CourseBlock =
     }
   | { id: string; kind: "quiz"; question: string; options: string[]; correct: number }
   | { id: string; kind: "video"; url: string; caption: string }
-  | { id: string; kind: "reflection"; prompt: string };
+  | { id: string; kind: "reflection"; prompt: string }
+  | { id: string; kind: "speaking"; scenario: string; turns: SpeakingTurn[] };
 
 export type BlockOf<K extends BlockKind> = Extract<CourseBlock, { kind: K }>;
 
@@ -56,6 +75,8 @@ export const AUTHORING_LIMITS = {
   optionsMax: 6,
   url: 300,
   reflectionAnswer: 1000,
+  speakingTurnsMax: 8,
+  speakingOptionsMax: 4,
   note: 300,
 } as const;
 
@@ -126,6 +147,17 @@ export const BLOCK_REGISTRY: { [K in BlockKind]: BlockSpec<K> } = {
     hint: "A question the learner answers in their own words (not scored)",
     make: (id) => ({ id, kind: "reflection", prompt: "" }),
   },
+  speaking: {
+    kind: "speaking",
+    label: "Speaking rehearsal",
+    hint: "A role-play: the learner picks and says the natural reply; counts for Speaking only after the class teacher approves it",
+    make: (id) => ({
+      id,
+      kind: "speaking",
+      scenario: "",
+      turns: [{ coach: "", options: ["", ""], natural: 0, model: "", tip: "" }],
+    }),
+  },
 };
 export const BLOCK_KINDS = Object.keys(BLOCK_REGISTRY) as BlockKind[];
 
@@ -181,6 +213,7 @@ export function blockIssue(b: unknown, mode: ValidationMode): string | null {
     quiz: ["question", "options", "correct"],
     video: ["url", "caption"],
     reflection: ["prompt"],
+    speaking: ["scenario", "turns"],
   };
   for (const k of Object.keys(x))
     if (k !== "id" && k !== "kind" && !allowed[kind].includes(k)) return `${label}: unknown field`;
@@ -246,6 +279,49 @@ export function blockIssue(b: unknown, mode: ValidationMode): string | null {
     }
     case "reflection":
       return need("prompt", AUTHORING_LIMITS.shortText);
+    case "speaking": {
+      const e = need("scenario", AUTHORING_LIMITS.shortText);
+      if (e) return e;
+      const turns = x.turns;
+      if (
+        !Array.isArray(turns) ||
+        turns.length < 1 ||
+        turns.length > AUTHORING_LIMITS.speakingTurnsMax
+      )
+        return `${label}: 1–${AUTHORING_LIMITS.speakingTurnsMax} turns`;
+      for (const [i, t] of (turns as unknown[]).entries()) {
+        const n = `${label}, turn ${i + 1}`;
+        if (!t || typeof t !== "object") return `${n}: not a turn`;
+        const tt = t as Record<string, unknown>;
+        for (const k of Object.keys(tt))
+          if (!["coach", "options", "natural", "model", "tip"].includes(k))
+            return `${n}: unknown field`;
+        for (const f of ["coach", "model", "tip"]) {
+          const v = tt[f];
+          if (!isStr(v)) return `${n}: ${f} is missing`;
+          if (tooLong(v, AUTHORING_LIMITS.shortText))
+            return `${n}: ${f} is too long (max ${AUTHORING_LIMITS.shortText})`;
+          if (mode === "submit" && f !== "tip" && v.trim() === "") return `${n}: ${f} is empty`;
+        }
+        const o = tt.options;
+        if (!Array.isArray(o) || !o.every(isStr)) return `${n}: options are missing`;
+        if (o.length < 2 || o.length > AUTHORING_LIMITS.speakingOptionsMax)
+          return `${n}: 2–${AUTHORING_LIMITS.speakingOptionsMax} replies`;
+        if (o.some((s) => tooLong(s, 120))) return `${n}: a reply is too long (max 120)`;
+        if (
+          !Number.isInteger(tt.natural) ||
+          (tt.natural as number) < 0 ||
+          (tt.natural as number) >= o.length
+        )
+          return `${n}: pick the natural reply`;
+        if (mode === "submit") {
+          if (o.some((s) => s.trim() === "")) return `${n}: a reply is empty`;
+          if (new Set(o.map((s) => s.trim().toLowerCase())).size !== o.length)
+            return `${n}: two replies are the same`;
+        }
+      }
+      return null;
+    }
   }
 }
 
@@ -296,6 +372,27 @@ export function lessonQuizScore(
   if (quizzes.length === 0) return null;
   const right = quizzes.filter((q) => answers[q.id] === q.correct).length;
   return Math.round((right / quizzes.length) * 100);
+}
+
+/** A speaking rehearsal's score: % of turns where the learner picked the natural reply. */
+export function speakingScore(block: BlockOf<"speaking">, choices: readonly number[]): number {
+  const right = block.turns.filter((t, i) => choices[i] === t.natural).length;
+  return Math.round((right / block.turns.length) * 100);
+}
+
+/** Before a lesson is completed the learner must not see the answers: quiz `correct` and a
+ *  speaking turn's natural reply become -1, its model line and tip are blanked. */
+export function hideLessonAnswers(l: CourseLesson): CourseLesson {
+  return {
+    ...l,
+    blocks: l.blocks.map((b) =>
+      b.kind === "quiz"
+        ? { ...b, correct: -1 }
+        : b.kind === "speaking"
+          ? { ...b, turns: b.turns.map((t) => ({ ...t, natural: -1, model: "", tip: "" })) }
+          : b,
+    ),
+  };
 }
 
 // ── Course, versions, reviews ──────────────────────────────────────────────────────────────
@@ -405,7 +502,46 @@ export interface MyLessonView {
     score: number | null;
     answers: Record<string, number>;
     reflections: Record<string, string>;
+    speaking?: Record<string, number[]>; // speaking block → the reply chosen at each turn
   } | null;
+  /** Speaking rehearsals of this lesson (Platform): the latest attempt per speaking block. */
+  speaking?: SpeakingAttemptView[];
+}
+
+export type SpeakingAttemptStatus = "pending" | "approved" | "returned";
+export interface SpeakingAttemptView {
+  blockId: string;
+  attempt: number; // 1, 2, … (a returned rehearsal may be tried again)
+  choices: number[];
+  score: number; // % natural replies — counts for Speaking only once approved
+  status: SpeakingAttemptStatus;
+  submittedAt: string;
+  reviewedAt: string | null;
+  reviewerName: string | null;
+  note: string | null; // the class teacher's note when returned
+}
+
+/** A rehearsal waiting for the class teacher (Platform). */
+export interface CourseSpeakingReviewItem {
+  learnerId: string;
+  learnerName: string;
+  className: string;
+  ref: string;
+  courseTitle: string;
+  version: number;
+  lessonId: string;
+  lessonTitle: string;
+  blockId: string;
+  attempt: number;
+  scenario: string;
+  score: number;
+  submittedAt: string;
+  turns: { coach: string; chosen: string | null; model: string; natural: boolean }[];
+}
+/** The speaking review queue: the class teacher reviews; center staff only see it. */
+export interface SpeakingReviewQueue {
+  items: CourseSpeakingReviewItem[];
+  mayReview: boolean;
 }
 
 export interface ClassCoursePlayerPort {
@@ -417,5 +553,6 @@ export interface ClassCoursePlayerPort {
     lessonId: string,
     answers: Record<string, number>,
     reflections: Record<string, string>,
+    speaking?: Record<string, number[]>, // speaking block id → the reply chosen at each turn
   ): Promise<AuthoringResult & { score?: number | null }>;
 }
