@@ -7,6 +7,7 @@ import { mockSupport } from "./mockProfile";
 import { mockMakeup } from "./mockMakeup";
 import { restoreDemoState, saveDemoState } from "./persist";
 import { organizations } from "../../fixtures/directory";
+import { seedSessions } from "../../fixtures/attendance";
 
 const S = "demo-staff";
 const T = "demo-teacher";
@@ -38,7 +39,12 @@ describe("Decision Engine — access", () => {
 
 describe("Decision Engine — detect, decide, act", () => {
   it("first run: evidence in plain words; teacher and staff notified; cooldown stops repeats", async () => {
-    const job = runEngine(ORG);
+    // The seeded "to mark" A2 session is the latest real Mon/Wed 09:00 slot; for 24 h after it
+    // starts the "Attendance not taken" rule is not due yet (seen on main, Mon 23/11 09:11).
+    // Run the engine once that session is surely past the rule's 24 h.
+    const toMark = seedSessions.filter((x) => x.seededMarks === null && Date.parse(x.at) <= Date.now());
+    const t = Math.max(Date.now(), ...toMark.map((x) => Date.parse(x.at) + 25 * 3600_000));
+    const job = runEngine(ORG, t);
     expect(job.lastNewEvents).toBeGreaterThan(0);
     const events = await E.listEvents(as(S));
     const text = events.map((e) => `${e.ruleName}: ${e.subject.label} — ${e.evidence}`);
@@ -71,7 +77,7 @@ describe("Decision Engine — detect, decide, act", () => {
       ),
     ).toBe(true);
     // Decide: an immediate second run is all cooldown.
-    const again = runEngine(ORG);
+    const again = runEngine(ORG, t);
     expect(again).toMatchObject({
       lastNewEvents: 0,
       lastSkippedCooldown: again.lastDetected,
