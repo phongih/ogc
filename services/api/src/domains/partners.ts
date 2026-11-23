@@ -1,7 +1,7 @@
 /*
- * Partner Commissions on the Platform API, core (owner 23/11: refer from Admissions, partners
- * ranked by fit, ledger, tier rules with versions, signals, activity; settlements, report import
- * and trends come next). The rules of the demo's mock adapter
+ * Partner Commissions on the Platform API (owner 23/11, two PRs: core — refer from Admissions,
+ * partners ranked by fit, ledger, tier rules with versions, signals, activity; part B — settlement
+ * batches, partner report import, trends). The rules of the demo's mock adapter
  * (apps/web/src/lib/adapters/mockPartners.ts, owner decisions 22/11), on PostgreSQL:
  *  - a lead goes out from Admissions and closes there as "Referred to partner"; only a reference
  *    code, a short display name and the course go to the partner;
@@ -11,12 +11,22 @@
  *    and approves an entry — never their own step; approving locks the amount;
  *  - signals only suggest; a person follows, snoozes or dismisses (with a reason);
  *  - every step goes into an append-only activity log.
+ * Part B (owner decisions 22/11):
+ *  - settlement batches per partner and enrolment cycle: staff draft one from approved entries; an
+ *    Org Admin who did not draft it sends it — then it is locked; the partner pays the WHOLE batch
+ *    and staff record it (every entry becomes paid); a wrong batch is cancelled with a reason (a
+ *    sent one only by an Org Admin) and its entries go back to "approved";
+ *  - partner reports are previewed against the ledger (applicable / already / conflict / unknown
+ *    code / not valid); a person applies one applicable row at a time, re-checked when applied;
+ *  - trends per partner over six months by referral month, every rate with its counts.
  * SYNTHETIC: a mock receivable — nothing is invoiced, collected or paid.
  */
 import { sql } from "kysely";
 import { authorize, commissionFor, tierIndexFor, tierRuleIssue } from "@ogc/contracts";
 import type {
   ActivityEntry,
+  BatchCandidate,
+  BatchStatus,
   CommissionCycle,
   CommissionEntry,
   CommissionStatus,
@@ -27,6 +37,9 @@ import type {
   PartnerSummary,
   PartnersOverview,
   PartnersRefusal,
+  PartnerTrend,
+  ReportRow,
+  SettlementBatch,
   SignalState,
   TierRule,
   TierRuleDraft,
@@ -113,15 +126,36 @@ interface Book {
     { state: Exclude<SignalState, "open">; note: string | null; until: string | null }
   >;
   centers: Map<string, string>;
+  batches: Batch[];
+}
+interface Batch {
+  id: string;
+  partnerId: string;
+  cycleKey: string;
+  cycleLabel: string;
+  entryIds: string[];
+  status: BatchStatus;
+  createdBy: string;
+  createdByName: string;
+  createdAt: string;
+  sentBy: string | null;
+  sentAt: string | null;
+  dueDate: string | null;
+  paidBy: string | null;
+  paidAt: string | null;
+  paymentRef: string | null;
+  cancelReason: string | null;
 }
 
 async function loadBook(tx: TenantTx): Promise<Book> {
-  const [ps, rs, es, ms, cs] = await Promise.all([
+  const [ps, rs, es, ms, cs, bs, be] = await Promise.all([
     tx.selectFrom("partner").selectAll().orderBy("id").execute(),
     tx.selectFrom("partner_rule").selectAll().execute(),
     tx.selectFrom("commission_entry").selectAll().execute(),
     tx.selectFrom("partner_signal_mark").selectAll().execute(),
     tx.selectFrom("center").select(["id", "name"]).execute(),
+    tx.selectFrom("settlement_batch").selectAll().execute(),
+    tx.selectFrom("settlement_batch_entry").selectAll().execute(),
   ]);
   return {
     partners: ps.map((p) => ({
@@ -179,6 +213,27 @@ async function loadBook(tx: TenantTx): Promise<Book> {
       ms.map((m) => [m.signal_id, { state: m.state, note: m.note, until: iso(m.until) }]),
     ),
     centers: new Map(cs.map((c) => [c.id, c.name])),
+    batches: bs.map((x) => ({
+      id: x.id,
+      partnerId: x.partner_id,
+      cycleKey: x.cycle_key,
+      cycleLabel: x.cycle_label,
+      entryIds: be
+        .filter((y) => y.batch_id === x.id)
+        .map((y) => y.entry_id)
+        .sort((a, c) => Number(a.slice(3)) - Number(c.slice(3))),
+      status: x.status,
+      createdBy: x.created_by,
+      createdByName: x.created_by_name,
+      createdAt: iso(x.created_at)!,
+      sentBy: x.sent_by_name,
+      sentAt: iso(x.sent_at),
+      dueDate: iso(x.due_date),
+      paidBy: x.paid_by_name,
+      paidAt: iso(x.paid_at),
+      paymentRef: x.payment_ref,
+      cancelReason: x.cancel_reason,
+    })),
   };
 }
 
@@ -229,6 +284,15 @@ export function computed(b: Book, e: E, now: number) {
   };
 }
 
+/** The draft / sent / paid batch holding an entry (a cancelled batch releases its entries). */
+const batchOf = (b: Book, entryId: string) =>
+  b.batches.find((x) => x.status !== "cancelled" && x.entryIds.includes(entryId)) ?? null;
+/** When the partner should pay: the sent batch's due date, else the approval's. */
+const dueOf = (b: Book, e: E) => {
+  const x = batchOf(b, e.id);
+  return x && x.status === "sent" && x.dueDate ? x.dueDate : e.dueDate;
+};
+
 function view(b: Book, e: E, now: number): CommissionEntry {
   const c = computed(b, e, now);
   const locked = e.status === "approved" || e.status === "paid";
@@ -250,10 +314,10 @@ function view(b: Book, e: E, now: number): CommissionEntry {
     provisional: !locked && c.provisional,
     approvableFrom:
       e.status === "enrolled" && c.approvableFrom ? new Date(c.approvableFrom).toISOString() : null,
-    dueDate: e.dueDate,
+    dueDate: e.status === "approved" ? dueOf(b, e) : e.dueDate,
     rejectReason: e.rejectReason,
     settledBatchId: e.settledBatchId,
-    batchId: e.settledBatchId,
+    batchId: batchOf(b, e.id)?.id ?? null,
     updatedBy: e.updatedBy,
     updatedAt: e.updatedAt,
     enrolledBy: e.enrolledBy,
@@ -358,9 +422,10 @@ function signalsOf(b: Book, now: number): DecisionSignal[] {
         evidence: rejected.map((e) => `${e.learnerDisplayName}: ${e.rejectReason}`),
       });
     }
-    const overdue = list.filter(
-      (e) => e.status === "approved" && !!e.dueDate && Date.parse(e.dueDate) < now,
-    );
+    const overdue = list.filter((e) => {
+      const due = dueOf(b, e);
+      return e.status === "approved" && !!due && Date.parse(due) < now;
+    });
     if (overdue.length) {
       const total = overdue.reduce((t, e) => t + (e.lockedAmountVnd ?? 0), 0);
       out.push({
@@ -371,7 +436,7 @@ function signalsOf(b: Book, now: number): DecisionSignal[] {
         message: `${p.name} has ${vnd(total)} approved but not paid after the due date.`,
         evidence: overdue.map(
           (e) =>
-            `${e.learnerDisplayName} · ${vnd(e.lockedAmountVnd ?? 0)} · due ${fmtDate(Date.parse(e.dueDate!))} · not in a batch yet`,
+            `${e.learnerDisplayName} · ${vnd(e.lockedAmountVnd ?? 0)} · due ${fmtDate(Date.parse(dueOf(b, e)!))}${batchOf(b, e.id) ? ` · batch ${batchOf(b, e.id)!.id}` : " · not in a batch yet"}`,
         ),
       });
     }
@@ -396,6 +461,141 @@ const STATUS: Record<PartnersRefusal, number> = {
   not_found: 404,
   invalid: 422,
   invalid_step: 409,
+};
+
+// ── part B helpers (the demo's) ───────────────────────────────────────────────────────────────
+function batchView(b: Book, x: Batch, principalId: string, now: number): SettlementBatch {
+  const list = x.entryIds.map((id) => b.entries.find((e) => e.id === id)!).filter(Boolean);
+  return {
+    id: x.id,
+    partnerId: x.partnerId,
+    partnerName: b.partners.find((p) => p.id === x.partnerId)?.name ?? "Partner",
+    cycleLabel: x.cycleLabel,
+    entries: list.map((e) => ({
+      id: e.id,
+      leadRefCode: e.leadRefCode,
+      learnerDisplayName: e.learnerDisplayName,
+      amountVnd: e.lockedAmountVnd ?? 0,
+    })),
+    totalVnd: list.reduce((t, e) => t + (e.lockedAmountVnd ?? 0), 0),
+    status: x.status,
+    createdBy: x.createdByName,
+    createdAt: x.createdAt,
+    sentBy: x.sentBy,
+    sentAt: x.sentAt,
+    dueDate: x.dueDate,
+    paidBy: x.paidBy,
+    paidAt: x.paidAt,
+    paymentRef: x.paymentRef,
+    cancelReason: x.cancelReason,
+    mine: x.createdBy === principalId,
+    overdue: x.status === "sent" && !!x.dueDate && Date.parse(x.dueDate) < now,
+  };
+}
+
+/** Approved entries not in any batch yet, by partner and enrolment cycle. */
+function candidatesOf(b: Book, now: number) {
+  const groups = new Map<
+    string,
+    { partnerId: string; key: string; label: string; ids: string[]; total: number }
+  >();
+  for (const e of b.entries) {
+    if (e.status !== "approved" || batchOf(b, e.id)) continue;
+    const c = computed(b, e, now);
+    if (!c.cycle) continue;
+    const k = `${e.partnerId}|${c.cycle.key}`;
+    const g = groups.get(k) ?? {
+      partnerId: e.partnerId,
+      key: c.cycle.key,
+      label: c.cycle.label,
+      ids: [],
+      total: 0,
+    };
+    g.ids.push(e.id);
+    g.total += e.lockedAmountVnd ?? 0;
+    groups.set(k, g);
+  }
+  return [...groups.values()];
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const centerDay = (t: number) => new Date(t + TZ).toISOString().slice(0, 10);
+const atCenter = (ymd: string) => Date.parse(`${ymd}T09:00:00+07:00`);
+type RowInput = Pick<ReportRow, "leadRefCode" | "reported" | "date" | "reason">;
+
+/** Classify one reported row against the ledger — the same check for preview and apply. */
+function classify(b: Book, partnerId: string, r: RowInput, now: number) {
+  const out = (match: ReportRow["match"], explanation: string, e: E | null = null) => ({
+    match,
+    explanation,
+    entry: e,
+  });
+  if (!r.leadRefCode || !/^LR-\d{1,8}$/.test(r.leadRefCode))
+    return out("invalid", "the first column must be a reference code like LR-1004");
+  if (r.reported !== "enrolled" && r.reported !== "rejected")
+    return out("invalid", "status must be enrolled or rejected");
+  const e = b.entries.find((x) => x.partnerId === partnerId && x.leadRefCode === r.leadRefCode);
+  if (!e) return out("not_found", "no referral with this code to this partner");
+  if (r.reported === "rejected") {
+    if (e.status === "rejected") return out("already", "already rejected in the ledger", e);
+    if (e.status === "approved" || e.status === "paid")
+      return out(
+        "conflict",
+        `the ledger has it ${e.status} — check with the partner, not applied`,
+        e,
+      );
+    const reason = (r.reason ?? "").trim();
+    if (reason.length < 3 || reason.length > 200)
+      return out("invalid", "a rejection needs a reason (3–200 characters)", e);
+    if (/\d{6,}|@/.test(reason)) return out("invalid", "no phone numbers or e-mail addresses", e);
+    return out("applicable", `${e.status} → rejected: ${reason}`, e);
+  }
+  if (counted(e.status)) return out("already", `already ${e.status} in the ledger`, e);
+  if (e.status === "rejected")
+    return out("conflict", `the ledger has it rejected (${e.rejectReason}) — not applied`, e);
+  if (!r.date || !DATE_RE.test(r.date) || Number.isNaN(atCenter(r.date)))
+    return out("invalid", "an enrolment needs a date YYYY-MM-DD", e);
+  if (r.date < centerDay(Date.parse(e.referredAt)))
+    return out(
+      "conflict",
+      `enrolled ${r.date}, before the referral on ${centerDay(Date.parse(e.referredAt))}`,
+      e,
+    );
+  if (r.date > centerDay(now))
+    return out("conflict", `enrolment date ${r.date} is in the future`, e);
+  if (atCenter(r.date) > Date.parse(e.expiresAt))
+    return out(
+      "conflict",
+      `enrolled ${r.date}, after the attribution window ended on ${fmtDate(Date.parse(e.expiresAt))}`,
+      e,
+    );
+  if (!activeRule(b, e.partnerId)) return out("conflict", "the partner has no active tier rule", e);
+  return out("applicable", `referred → enrolled on ${r.date}`, e);
+}
+
+function parseReport(csv: string): (RowInput & { line: number })[] {
+  return csv
+    .split(/\r?\n/)
+    .map((raw, i) => ({ raw: raw.trim(), line: i + 1 }))
+    .filter((x) => x.raw && !/^lead/i.test(x.raw) && !x.raw.startsWith("#"))
+    .map(({ raw, line }) => {
+      const [code, status, date, ...rest] = raw.split(",").map((c) => c.trim());
+      const st = (status ?? "").toLowerCase();
+      return {
+        line,
+        leadRefCode: code || null,
+        reported: st === "enrolled" || st === "rejected" ? (st as ReportRow["reported"]) : null,
+        date: date || null,
+        reason: rest.join(",").trim() || null,
+      };
+    });
+}
+
+const median = (xs: number[]) => {
+  if (!xs.length) return null;
+  const a = [...xs].sort((x, y) => x - y);
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
 };
 
 export function registerPartners(app: Api): void {
@@ -652,6 +852,48 @@ export function registerPartners(app: Api): void {
     return { ok: true };
   });
 
+  /** Record an enrolment under the rule in force now (snapshot), and log it. */
+  const enrol = async (
+    tx: TenantTx,
+    b: Book,
+    caller: Caller,
+    e: E,
+    at: Date,
+    now: Date,
+    log: (action: string, subject: string, detail?: string | null) => Promise<void>,
+    via: string,
+  ) => {
+    const rule = activeRule(b, e.partnerId)!;
+    await tx
+      .updateTable("commission_entry")
+      .set({
+        status: "enrolled",
+        enrolled_at: at,
+        enrolled_by: caller.ctx.principalId,
+        applied_rule_id: rule.id, // snapshot: the rule in force when the enrolment is recorded
+        updated_by_name: await nameOf(tx, caller),
+        updated_at: now,
+      })
+      .where("id", "=", e.id)
+      .execute();
+    const after = {
+      ...e,
+      status: "enrolled" as const,
+      enrolledAt: at.toISOString(),
+      appliedRuleId: rule.id,
+    };
+    const c = computed(
+      { ...b, entries: b.entries.map((x) => (x.id === e.id ? after : x)) },
+      after,
+      now.getTime(),
+    );
+    await log(
+      via,
+      `${e.learnerDisplayName} (${e.leadRefCode})`,
+      `rule v${rule.version} · tier ${c.tierIndex} · ${vnd(c.amountVnd ?? 0)}${c.provisional ? " (provisional)" : ""}`,
+    );
+  };
+
   write("/v1/partners/entries/:id/enrolled", async (tx, b, caller, _d, p, now, log) => {
     const e = entryOf(b, p.id);
     if (!e) return no("not_found");
@@ -661,37 +903,9 @@ export function registerPartners(app: Api): void {
         "invalid_step",
         `the attribution window ended on ${fmtDate(Date.parse(e.expiresAt))} — reject it instead`,
       );
-    const rule = activeRule(b, e.partnerId);
-    if (!rule) return no("invalid_step", "the partner has no active tier rule");
-    const by = await nameOf(tx, caller);
-    await tx
-      .updateTable("commission_entry")
-      .set({
-        status: "enrolled",
-        enrolled_at: now,
-        enrolled_by: caller.ctx.principalId,
-        applied_rule_id: rule.id, // snapshot: the rule in force when the enrolment is recorded
-        updated_by_name: by,
-        updated_at: now,
-      })
-      .where("id", "=", e.id)
-      .execute();
-    const after = {
-      ...e,
-      status: "enrolled" as const,
-      enrolledAt: now.toISOString(),
-      appliedRuleId: rule.id,
-    };
-    const c = computed(
-      { ...b, entries: b.entries.map((x) => (x.id === e.id ? after : x)) },
-      after,
-      now.getTime(),
-    );
-    await log(
-      "enrolment recorded",
-      `${e.learnerDisplayName} (${e.leadRefCode})`,
-      `rule v${rule.version} · tier ${c.tierIndex} · ${vnd(c.amountVnd ?? 0)}${c.provisional ? " (provisional)" : ""}`,
-    );
+    if (!activeRule(b, e.partnerId))
+      return no("invalid_step", "the partner has no active tier rule");
+    await enrol(tx, b, caller, e, now, now, log, "enrolment recorded");
     return { ok: true };
   });
 
@@ -870,5 +1084,259 @@ export function registerPartners(app: Api): void {
       note || null,
     );
     return { ok: true };
+  });
+
+  // ── part B: settlement batches ─────────────────────────────────────────────────────────────
+  read("/v1/partners/batches", (b, caller): SettlementBatch[] => {
+    const order = { draft: 0, sent: 1, paid: 2, cancelled: 3 } as const;
+    return [...b.batches]
+      .sort(
+        (a, c) =>
+          order[a.status] - order[c.status] ||
+          c.createdAt.localeCompare(a.createdAt) ||
+          c.id.localeCompare(a.id),
+      )
+      .map((x) => batchView(b, x, caller.ctx.principalId, caller.now()));
+  });
+
+  read("/v1/partners/batch-candidates", (b, caller): BatchCandidate[] =>
+    candidatesOf(b, caller.now()).map((g) => ({
+      partnerId: g.partnerId,
+      partnerName: b.partners.find((p) => p.id === g.partnerId)?.name ?? "Partner",
+      cycleLabel: g.label,
+      entries: g.ids.length,
+      totalVnd: g.total,
+    })),
+  );
+
+  write("/v1/partners/batches", async (tx, b, caller, d, _p, now, log) => {
+    const g = candidatesOf(b, now.getTime()).find(
+      (x) => x.partnerId === d.partnerId && x.label === d.cycleLabel,
+    );
+    if (!g)
+      return no("invalid_step", "no approved entries outside a batch for this partner and cycle");
+    const short = g.partnerId.replace(/^PTN-/, "");
+    const n = b.batches.filter((x) => x.partnerId === g.partnerId).length + 1;
+    const id = `ST-${short}-${String(n).padStart(2, "0")}`;
+    await tx
+      .insertInto("settlement_batch")
+      .values({
+        org_id: caller.ctx.orgId,
+        id,
+        partner_id: g.partnerId,
+        cycle_key: g.key,
+        cycle_label: g.label,
+        status: "draft",
+        created_by: caller.ctx.principalId,
+        created_by_name: await nameOf(tx, caller),
+        created_at: now,
+        sent_by_name: null,
+        sent_at: null,
+        due_date: null,
+        paid_by_name: null,
+        paid_at: null,
+        payment_ref: null,
+        cancel_reason: null,
+      })
+      .execute();
+    await tx
+      .insertInto("settlement_batch_entry")
+      .values(g.ids.map((entry_id) => ({ org_id: caller.ctx.orgId, batch_id: id, entry_id })))
+      .execute();
+    const partner = b.partners.find((p) => p.id === g.partnerId)!;
+    await log(
+      "batch drafted",
+      `${id} · ${partner.name} · ${g.label}`,
+      `${g.ids.length} entries · ${vnd(g.total)}`,
+    );
+    return { ok: true };
+  });
+
+  const batchFor = (b: Book, id: string) => b.batches.find((x) => x.id === id) ?? null;
+
+  write("/v1/partners/batches/:id/send", async (tx, b, caller, _d, p, now, log) => {
+    if (!caller.ctx.orgAdmin) return no("not_org_admin");
+    const x = batchFor(b, p.id);
+    if (!x) return no("not_found");
+    if (x.status !== "draft") return no("invalid_step", `already ${x.status}`);
+    if (x.createdBy === caller.ctx.principalId)
+      return no("own_step", "you drafted this batch — another person sends it");
+    const partner = b.partners.find((q) => q.id === x.partnerId)!;
+    const due = new Date(now.getTime() + partner.settlementDays * DAY);
+    await tx
+      .updateTable("settlement_batch")
+      .set({ status: "sent", sent_by_name: await nameOf(tx, caller), sent_at: now, due_date: due })
+      .where("id", "=", x.id)
+      .execute();
+    const total = batchView(b, x, caller.ctx.principalId, now.getTime()).totalVnd;
+    await log(
+      "batch sent",
+      `${x.id} · ${partner.name}`,
+      `${vnd(total)} · due ${fmtDate(due.getTime())} · locked`,
+    );
+    return { ok: true };
+  });
+
+  write("/v1/partners/batches/:id/paid", async (tx, b, caller, d, p, now, log) => {
+    const x = batchFor(b, p.id);
+    if (!x) return no("not_found");
+    if (x.status !== "sent")
+      return no(
+        "invalid_step",
+        x.status === "draft" ? "send the batch first" : `already ${x.status}`,
+      );
+    const ref = typeof d.paymentRef === "string" ? d.paymentRef.trim() : "";
+    if (!/^[A-Za-z0-9-]{3,30}$/.test(ref))
+      return no("invalid", "payment reference: 3–30 letters, digits or -");
+    const by = await nameOf(tx, caller);
+    await tx
+      .updateTable("settlement_batch")
+      .set({ status: "paid", paid_by_name: by, paid_at: now, payment_ref: ref })
+      .where("id", "=", x.id)
+      .execute();
+    await tx
+      .updateTable("commission_entry")
+      .set({ status: "paid", settled_batch_id: x.id, updated_by_name: by, updated_at: now })
+      .where("id", "in", x.entryIds)
+      .execute();
+    const partner = b.partners.find((q) => q.id === x.partnerId)!;
+    await log(
+      "batch paid",
+      `${x.id} · ${partner.name}`,
+      `whole batch · ${x.entryIds.length} entries · ref ${ref}`,
+    );
+    return { ok: true };
+  });
+
+  write("/v1/partners/batches/:id/cancel", async (tx, b, caller, d, p, now, log) => {
+    const x = batchFor(b, p.id);
+    if (!x) return no("not_found");
+    if (x.status !== "draft" && x.status !== "sent")
+      return no("invalid_step", `cannot cancel a ${x.status} batch`);
+    if (x.status === "sent" && !caller.ctx.orgAdmin)
+      return no("not_org_admin", "a sent batch is cancelled by an Org Admin");
+    const reason = typeof d.reason === "string" ? d.reason.trim() : "";
+    if (reason.length < 3 || reason.length > 200)
+      return no("invalid", "give a reason (3–200 characters)");
+    await tx
+      .updateTable("settlement_batch")
+      .set({ status: "cancelled", cancel_reason: reason })
+      .where("id", "=", x.id)
+      .execute();
+    void now;
+    const partner = b.partners.find((q) => q.id === x.partnerId)!;
+    await log(
+      "batch cancelled",
+      `${x.id} · ${partner.name}`,
+      `${reason} · entries back to approved`,
+    );
+    return { ok: true };
+  });
+
+  // ── part B: partner reports (preview reads only; a person applies one row) ─────────────────
+  app.secured("POST", "/v1/partners/:partnerId/report/preview", async (caller, req, reply) => {
+    if (!isStaff(caller)) return reply.code(403).send({ error: "not_staff" });
+    if (!may(caller)) return reply.code(403).send({ error: "access_policy" });
+    const partnerId = (req.params as { partnerId: string }).partnerId;
+    const csv = (req.body as { csv?: unknown } | null)?.csv;
+    if (typeof csv !== "string" || csv.length > 20_000)
+      return reply.code(422).send({ error: "invalid" });
+    return caller.tenant(async (tx): Promise<ReportRow[] | null> => {
+      const b = await loadBook(tx);
+      if (!b.partners.some((x) => x.id === partnerId))
+        return reply.code(404).send({ error: "not_found" });
+      const now = caller.now();
+      return parseReport(csv)
+        .slice(0, 200)
+        .map((r): ReportRow => {
+          const c = classify(b, partnerId, r, now);
+          return {
+            ...r,
+            match: c.match,
+            explanation: c.explanation,
+            learnerDisplayName: c.entry?.learnerDisplayName ?? null,
+          };
+        });
+    });
+  });
+
+  write("/v1/partners/:partnerId/report/apply", async (tx, b, caller, d, p, now, log) => {
+    if (!b.partners.some((x) => x.id === p.partnerId)) return no("not_found");
+    const row: RowInput = {
+      leadRefCode: typeof d.leadRefCode === "string" ? d.leadRefCode : null,
+      reported: d.reported === "enrolled" || d.reported === "rejected" ? d.reported : null,
+      date: typeof d.date === "string" ? d.date : null,
+      reason: typeof d.reason === "string" ? d.reason : null,
+    };
+    const c = classify(b, p.partnerId, row, now.getTime());
+    if (c.match !== "applicable" || !c.entry)
+      return no(c.match === "invalid" ? "invalid" : "invalid_step", c.explanation);
+    const e = c.entry;
+    if (row.reported === "enrolled")
+      await enrol(
+        tx,
+        b,
+        caller,
+        e,
+        new Date(Math.min(atCenter(row.date!), now.getTime())),
+        now,
+        log,
+        "report applied: enrolled",
+      );
+    else {
+      const reason = (row.reason ?? "").trim();
+      await tx
+        .updateTable("commission_entry")
+        .set({
+          status: "rejected",
+          reject_reason: reason,
+          updated_by_name: await nameOf(tx, caller),
+          updated_at: now,
+        })
+        .where("id", "=", e.id)
+        .execute();
+      await log("report applied: rejected", `${e.learnerDisplayName} (${e.leadRefCode})`, reason);
+    }
+    return { ok: true };
+  });
+
+  // ── part B: trends ─────────────────────────────────────────────────────────────────────────
+  read("/v1/partners/trends", (b, caller): PartnerTrend[] => {
+    const now = caller.now();
+    const months = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now + TZ);
+      return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - (5 - i), 1))
+        .toISOString()
+        .slice(0, 7);
+    });
+    return b.partners.map((p) => ({
+      partnerId: p.id,
+      partnerName: p.name,
+      months: months.map((m) => {
+        const cohort = b.entries.filter(
+          (e) => e.partnerId === p.id && centerDay(Date.parse(e.referredAt)).slice(0, 7) === m,
+        );
+        const enrolled = cohort.filter((e) => counted(e.status));
+        const rejected = cohort.filter((e) => e.status === "rejected").length;
+        const d = enrolled.length + rejected;
+        return {
+          month: m,
+          referred: cohort.length,
+          enrolled: enrolled.length,
+          rejected,
+          open: cohort.filter((e) => e.status === "referred").length,
+          conversion: {
+            n: enrolled.length,
+            d,
+            pct: d ? Math.round((enrolled.length / d) * 100) : null,
+          },
+          medianDaysToEnrol: median(
+            enrolled
+              .filter((e) => e.enrolledAt)
+              .map((e) => Math.round((Date.parse(e.enrolledAt!) - Date.parse(e.referredAt)) / DAY)),
+          ),
+        };
+      }),
+    }));
   });
 }

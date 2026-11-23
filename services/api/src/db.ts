@@ -315,6 +315,30 @@ export interface PartnerSignalMarkTable {
   at: Date;
 }
 
+export interface SettlementBatchTable {
+  org_id: string;
+  id: string;
+  partner_id: string;
+  cycle_key: string;
+  cycle_label: string;
+  status: "draft" | "sent" | "paid" | "cancelled";
+  created_by: string;
+  created_by_name: string;
+  created_at: Date;
+  sent_by_name: string | null;
+  sent_at: Date | null;
+  due_date: Date | null;
+  paid_by_name: string | null;
+  paid_at: Date | null;
+  payment_ref: string | null;
+  cancel_reason: string | null;
+}
+export interface SettlementBatchEntryTable {
+  org_id: string;
+  batch_id: string;
+  entry_id: string;
+}
+
 export interface DB {
   center: CenterTable;
   teacher: TeacherTable;
@@ -343,6 +367,8 @@ export interface DB {
   commission_entry: CommissionEntryTable;
   partner_activity: PartnerActivityTable;
   partner_signal_mark: PartnerSignalMarkTable;
+  settlement_batch: SettlementBatchTable;
+  settlement_batch_entry: SettlementBatchEntryTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

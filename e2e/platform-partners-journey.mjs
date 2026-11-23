@@ -3,8 +3,7 @@
  * reconciliation adds up; Sam refers Duc A. from Admissions to the best-fitting partner (the lead
  * closes) and records the partner's confirmation; Olivia approves an enrolment Sam recorded (not
  * before the clawback, never her own step) and activates Sao Mai v2; signals only suggest — a
- * dismissal needs a reason; a teacher has no Partners. Settlements, report import and trends are
- * not on the Platform yet. Stack: platform-stack.mjs. Needs OGC_TEST_PG_ADMIN_URL and Playwright.
+ * dismissal needs a reason; a teacher has no Partners. Stack: platform-stack.mjs. Needs OGC_TEST_PG_ADMIN_URL and Playwright.
  */
 import { apiAs, runPlatformJourney } from "./platform-stack.mjs";
 
@@ -38,10 +37,7 @@ runPlatformJourney("platform partners E2E", async ({ browser, base, check }) => 
       .locator("[data-testid^=signal-]")
       .count()) === 6,
   );
-  check(
-    "[sam] no Settlements / Import report / Trends on the Platform yet",
-    (await page.getByRole("tab", { name: /Settlements|Import report|Trends/ }).count()) === 0,
-  );
+  check("[sam] all seven tabs, as in the demo", (await page.getByRole("tab").count()) === 7);
 
   // 2) A dismissal needs a reason
   const near = page.getByTestId("signal-high_rejection_rate");

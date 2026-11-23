@@ -24,6 +24,7 @@ import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner, StatTile } f
 import { vnd } from "../growth/format";
 import { Refused } from "./refused";
 import { usePartnersApi } from "./partnersApi";
+import { ImportReport, Settlements, Trends } from "./PartnersSlice2";
 
 const TABS = [
   "Reconciliation",
@@ -35,7 +36,6 @@ const TABS = [
   "Activity",
 ] as const;
 type Tab = (typeof TABS)[number];
-const SLICE2_TABS: readonly Tab[] = ["Settlements", "Import report", "Trends"];
 const tabClass = (on: boolean) =>
   `px-3 py-2 text-sm ${on ? "border-b-2 border-brand font-medium text-brand" : "text-muted"}`;
 export const STATUS_LABEL: Record<CommissionStatus, string> = {
@@ -62,8 +62,7 @@ function useAction() {
 export function PartnersView() {
   const api = usePartnersApi();
   const [tab, setTab] = useState<Tab>("Reconciliation");
-  const S2 = api.Slice2;
-  const tabs = TABS.filter((t) => S2 || !SLICE2_TABS.includes(t));
+
   const o = useQuery({
     queryKey: [...api.key, "partners-overview"],
     queryFn: () => api.getOverview(),
@@ -87,7 +86,7 @@ export function PartnersView() {
         aria-label="Partner commissions"
         className="flex gap-1 border-b border-border"
       >
-        {tabs.map((t) => (
+        {TABS.map((t) => (
           <button
             key={t}
             role="tab"
@@ -101,9 +100,9 @@ export function PartnersView() {
       </div>
       {tab === "Reconciliation" ? <Reconciliation onOpen={setTab} /> : null}
       {tab === "Ledger" ? <Ledger isAdmin={o.data.isOrgAdmin} /> : null}
-      {S2 && tab === "Settlements" ? <S2.Settlements isAdmin={o.data.isOrgAdmin} /> : null}
-      {S2 && tab === "Import report" ? <S2.ImportReport /> : null}
-      {S2 && tab === "Trends" ? <S2.Trends /> : null}
+      {tab === "Settlements" ? <Settlements isAdmin={o.data.isOrgAdmin} /> : null}
+      {tab === "Import report" ? <ImportReport /> : null}
+      {tab === "Trends" ? <Trends /> : null}
       {tab === "Tiers & policy" ? <Tiers isAdmin={o.data.isOrgAdmin} /> : null}
       {tab === "Activity" ? <Activity /> : null}
       {api.back ? (
