@@ -8,6 +8,9 @@ import {
   BLOCK_REGISTRY,
   blockIssue,
   contentIssue,
+  hideLessonAnswers,
+  speakingScore,
+  type BlockOf,
   type CourseContent,
 } from "@ogc/contracts";
 import { as } from "../../test/grants";
@@ -77,6 +80,60 @@ describe("course studio — blocks are validated fail-closed", () => {
     expect(blockIssue(q(["a", ""], 0), "draft")).toBeNull();
     expect(blockIssue(q(["a", ""], 0), "submit")).toMatch(/empty/);
     expect(blockIssue(q(["a", "A "], 0), "submit")).toMatch(/same/);
+  });
+
+  it("speaking: 1–8 turns of 2–4 distinct replies, a natural one in range; before review a coach and model line", () => {
+    const turn = (o: Partial<BlockOf<"speaking">["turns"][number]> = {}) => ({
+      coach: "Hi! How was your weekend?",
+      options: ["It was great.", "Weekend is Sunday."],
+      natural: 0,
+      model: "It was great, thanks.",
+      tip: "",
+      ...o,
+    });
+    const sp = (turns: unknown[], extra: object = {}) => ({
+      id: "s",
+      kind: "speaking",
+      scenario: "Weekend",
+      turns,
+      ...extra,
+    });
+    expect(blockIssue(sp([turn()]), "submit")).toBeNull();
+    expect(blockIssue(sp([]), "draft")).toMatch(/1–8 turns/);
+    expect(blockIssue(sp(Array(9).fill(turn())), "draft")).toMatch(/1–8 turns/);
+    expect(blockIssue(sp([turn({ options: ["a"] })]), "draft")).toMatch(/2–4 replies/);
+    expect(blockIssue(sp([turn({ options: ["a", "b", "c", "d", "e"] })]), "draft")).toMatch(
+      /2–4 replies/,
+    );
+    expect(blockIssue(sp([turn({ natural: 2 })]), "draft")).toMatch(/natural/);
+    expect(blockIssue(sp([turn({ coach: "" })]), "draft")).toBeNull();
+    expect(blockIssue(sp([turn({ coach: "" })]), "submit")).not.toBeNull();
+    expect(blockIssue(sp([turn({ model: "" })]), "submit")).not.toBeNull();
+    expect(blockIssue(sp([turn({ options: ["a", "A "] })]), "submit")).not.toBeNull();
+    expect(blockIssue(sp([{ ...turn(), audio: "x" }]), "draft")).not.toBeNull();
+    expect(blockIssue(sp([turn()], { html: "<b>" }), "draft")).toMatch(/unknown field/);
+  });
+
+  it("speaking: % natural replies; answers and coaching are hidden until the lesson is done", () => {
+    const b = {
+      id: "s",
+      kind: "speaking",
+      scenario: "Weekend",
+      turns: [0, 1, 2, 0].map((natural) => ({
+        coach: "c",
+        options: ["a", "b", "c"],
+        natural,
+        model: "m",
+        tip: "t",
+      })),
+    } as BlockOf<"speaking">;
+    expect(speakingScore(b, [0, 1, 0, 0])).toBe(75);
+    expect(speakingScore(b, [1, 0, 0, 1])).toBe(0);
+    const hidden = hideLessonAnswers({ id: "l", title: "L", blocks: [b] }).blocks[0] as typeof b;
+    expect(hidden.turns.map((t) => [t.natural, t.model, t.tip])).toEqual(
+      Array(4).fill([-1, "", ""]),
+    );
+    expect(b.turns[0].natural).toBe(0); // the original is untouched
   });
 
   it("a course needs a lesson with a block before review", () => {

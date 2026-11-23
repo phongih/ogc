@@ -52,6 +52,7 @@ describe.skipIf(!hasPg)("foundation — PostgreSQL", () => {
           "0010_class_courses.sql",
           "0011_placement.sql",
           "0012_decision_engine.sql",
+          "0013_speaking_review.sql",
         ],
       });
     });

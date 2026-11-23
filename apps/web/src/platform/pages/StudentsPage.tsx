@@ -1,12 +1,13 @@
 // Staff and class teachers: Current Students — one of three care levels with the evidence behind
 // it (owner 22/11 + 23/11), on the API. Learning evidence is the placement seed and class-course
-// quiz scores; attendance and make-ups come from the schedule. Synthetic data.
+// quiz scores and approved speaking rehearsals; attendance and make-ups come from the schedule. Synthetic data.
 import { useMemo } from "react";
 import { StudentsView } from "../../features/students/StudentsView";
 import { StudentsApiContext, type StudentsApi } from "../../features/students/studentsApi";
 import { platformApi } from "../client";
 import { useSignedIn } from "../App";
 import { PolicyBanner } from "../workforce";
+import { SpeakingReviewCard } from "../speaking";
 
 export function PlatformStudentsPage() {
   const s = useSignedIn();
@@ -22,6 +23,9 @@ export function PlatformStudentsPage() {
   return (
     <StudentsApiContext.Provider value={api}>
       <StudentsView back={null} />
+      <div className="mt-4">
+        <SpeakingReviewCard />
+      </div>
     </StudentsApiContext.Provider>
   );
 }

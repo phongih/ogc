@@ -10,21 +10,30 @@
  *  - a learner of the class takes the course in My Learning, PINNED to the version of their first
  *    completed lesson; quiz answers stay hidden until the lesson is completed; every question and
  *    every reflection must be answered; a completed lesson is final and keeps its quiz score.
- * Not on the Platform yet: the skill profile the demo feeds with quiz scores, Current Students and
- * the Decision Engine's "no class course activity" rule. SYNTHETIC content only.
+ * Speaking rehearsals (owner 23/11): completing a lesson submits each one; it counts for Speaking
+ * only once the learner's class teacher approves it, or the teacher returns it with a note and the
+ * learner tries again. Center staff see the queue, never decide. SYNTHETIC content only.
  */
 import { sql } from "kysely";
-import { AUTHORING_LIMITS, authorize, lessonQuizScore } from "@ogc/contracts";
+import {
+  AUTHORING_LIMITS,
+  authorize,
+  hideLessonAnswers,
+  lessonQuizScore,
+  speakingScore,
+} from "@ogc/contracts";
 import type {
   BlockOf,
   ClassCourseLink,
-  CourseLesson,
+  CourseSpeakingReviewItem,
   CourseVersion,
   LearnerStudioProgress,
   LinkStatus,
   MyClassCourse,
   MyLessonView,
   SkillEvidence,
+  SpeakingAttemptView,
+  SpeakingReviewQueue,
   StudioCourse,
   StudioOverview,
   StudioRefusal,
@@ -67,6 +76,7 @@ interface Done {
   score: number | null;
   answers: Record<string, number>;
   reflections: Record<string, string>;
+  speaking: Record<string, number[]>;
 }
 interface Book {
   classes: Map<string, { name: string; centerId: string; teacherId: string | null }>;
@@ -111,6 +121,7 @@ async function loadBook(tx: TenantTx): Promise<Book> {
       score: d.score,
       answers: d.answers as Record<string, number>,
       reflections: d.reflections as Record<string, string>,
+      speaking: (d.speaking ?? {}) as Record<string, number[]>,
     });
     doneMap.set(k(d.learner_id, d.course_ref), m);
   }
@@ -293,6 +304,94 @@ export async function quizEvidence(tx: TenantTx): Promise<Map<string, SkillEvide
       },
     ]);
   return out;
+}
+
+// ── speaking rehearsals (owner 23/11, slice 5) ──────────────────────────────────────────────
+type AttemptRow = {
+  learner_id: string;
+  course_ref: string;
+  lesson_id: string;
+  block_id: string;
+  attempt: number;
+  choices: unknown;
+  score: number;
+  submitted_at: Date;
+  status: "pending" | "approved" | "returned";
+  reviewed_at: Date | null;
+  reviewed_by: string | null;
+  note: string | null;
+};
+const attemptView = (r: AttemptRow): SpeakingAttemptView => ({
+  blockId: r.block_id,
+  attempt: r.attempt,
+  choices: r.choices as number[],
+  score: r.score,
+  status: r.status,
+  submittedAt: r.submitted_at.toISOString(),
+  reviewedAt: iso(r.reviewed_at),
+  reviewerName: r.reviewed_by,
+  note: r.note,
+});
+/** The latest attempt of each speaking block (learner, course, lesson, block). */
+async function latestAttempts(tx: TenantTx, learnerId?: string): Promise<AttemptRow[]> {
+  let q = tx.selectFrom("course_speaking_attempt").selectAll();
+  if (learnerId) q = q.where("learner_id", "=", learnerId);
+  const rows = (await q.orderBy("attempt", "desc").execute()) as AttemptRow[];
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    const key = [r.learner_id, r.course_ref, r.lesson_id, r.block_id].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** Skill profile: a speaking rehearsal counts for Speaking only once the class teacher approves it. */
+export async function speakingEvidence(tx: TenantTx): Promise<Map<string, SkillEvidence[]>> {
+  const rows = await tx
+    .selectFrom("course_speaking_attempt")
+    .select([
+      "learner_id",
+      "course_ref",
+      "lesson_id",
+      "block_id",
+      "attempt",
+      "score",
+      "reviewed_at",
+    ])
+    .where("status", "=", "approved")
+    .execute();
+  const out = new Map<string, SkillEvidence[]>();
+  for (const r of rows)
+    out.set(r.learner_id, [
+      ...(out.get(r.learner_id) ?? []),
+      {
+        attemptId: `SP:${r.course_ref}:${r.lesson_id}:${r.block_id}:${r.attempt}`,
+        skill: "speaking",
+        score: r.score,
+        at: r.reviewed_at!.toISOString(),
+      },
+    ]);
+  return out;
+}
+
+/** Rehearsals whose latest attempt the class teacher returned, per learner (support signal). */
+export async function speakingReturned(tx: TenantTx): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (const r of await latestAttempts(tx))
+    if (r.status === "returned") out.set(r.learner_id, (out.get(r.learner_id) ?? 0) + 1);
+  return out;
+}
+
+/** The replies chosen in a speaking block: one valid option per turn. */
+function speakingChoices(b: BlockOf<"speaking">, raw: unknown): number[] | null {
+  if (!Array.isArray(raw) || raw.length !== b.turns.length) return null;
+  for (let i = 0; i < raw.length; i++) {
+    const x: unknown = raw[i];
+    if (!Number.isInteger(x) || (x as number) < 0 || (x as number) >= b.turns[i].options.length)
+      return null;
+  }
+  return raw as number[];
 }
 
 interface Who {
@@ -650,11 +749,6 @@ export function registerClassCourses(app: Api): void {
     }
     return open;
   };
-  const hideAnswers = (l: CourseLesson): CourseLesson => ({
-    ...l,
-    blocks: l.blocks.map((x) => (x.kind === "quiz" ? { ...x, correct: -1 } : x)),
-  });
-
   app.secured("GET", "/v1/me/class-courses", async (caller, _req, reply) =>
     caller.tenant(async (tx) => {
       const learnerId = await learnerOf(tx, caller);
@@ -702,13 +796,17 @@ export function registerClassCourses(app: Api): void {
       if (!v || idx < 0) return reply.code(404).send({ error: "not_found" });
       const lesson = v.content.lessons[idx];
       const done = b.done.get(k(learnerId, ref))?.get(lessonId) ?? null;
+      const speaking = (await latestAttempts(tx, learnerId))
+        .filter((a) => a.course_ref === ref && a.lesson_id === lessonId)
+        .map(attemptView);
       const out: MyLessonView = {
         ref,
         version: v.version,
-        lesson: done ? lesson : hideAnswers(lesson),
+        lesson: done ? lesson : hideLessonAnswers(lesson),
         index: idx,
         total: v.content.lessons.length,
         completed: done,
+        speaking,
       };
       return out;
     }),
@@ -742,6 +840,204 @@ export function registerClassCourses(app: Api): void {
     );
   });
 
+  // ── speaking rehearsals: try again, and the class teacher's review ─────────────────────────
+  const lock = (tx: TenantTx, c: Caller) =>
+    sql`select pg_advisory_xact_lock(hashtext('courses:' || ${c.ctx.orgId}))`.execute(tx);
+  const rehearsalOf = (b: Book, ref: string, learnerId: string, lessonId: string, id: string) => {
+    const v = versionFor(b, ref, learnerId);
+    const lesson = v?.content.lessons.find((l) => l.id === lessonId);
+    const block = lesson?.blocks.find((x) => x.id === id && x.kind === "speaking") as
+      BlockOf<"speaking"> | undefined;
+    return v && lesson && block ? { v, lesson, block } : null;
+  };
+
+  type Plain = { ok: true } | { ok: false; reason: StudioRefusal; detail?: string };
+  app.secured(
+    "POST",
+    "/v1/me/class-courses/:ref/:lessonId/speaking/:blockId",
+    async (caller, req) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const params = req.params as { ref: string; lessonId: string; blockId: string };
+      await caller.write<Plain>(
+        "POST /v1/me/class-courses/:ref/:lessonId/speaking/:blockId",
+        { params, body },
+        async (tx) => {
+          await lock(tx, caller);
+          const r = await retry(tx, caller, params, body);
+          return {
+            status: r.ok ? 200 : STATUS[r.reason],
+            body: r,
+            audit: {
+              action: "courses:learn",
+              resource: { ...params },
+              outcome: r.ok ? ("allowed" as const) : ("denied" as const),
+              ...(r.ok ? {} : { reason: r.reason }),
+            },
+          };
+        },
+      );
+    },
+  );
+  async function retry(
+    tx: TenantTx,
+    caller: Caller,
+    { ref, lessonId, blockId }: { ref: string; lessonId: string; blockId: string },
+    body: Record<string, unknown>,
+  ): Promise<Plain> {
+    const learnerId = await learnerOf(tx, caller);
+    if (!learnerId) return no("not_allowed", "learners rehearse their own lessons");
+    const b = await loadBook(tx);
+    if (!openTo(b, learnerId).some((o) => o.ref === ref)) return no("not_found");
+    const found = rehearsalOf(b, ref, learnerId, lessonId, blockId);
+    if (!found) return no("not_found");
+    const last = (await latestAttempts(tx, learnerId)).find(
+      (a) => a.course_ref === ref && a.lesson_id === lessonId && a.block_id === blockId,
+    );
+    if (!last || last.status !== "returned")
+      return no("invalid_step", "only a rehearsal the teacher returned can be sent again");
+    const choices = speakingChoices(found.block, body.choices);
+    if (!choices) return no("invalid", "choose a reply at every speaking turn");
+    await tx
+      .insertInto("course_speaking_attempt")
+      .values({
+        org_id: sql`ogc_current_org()`,
+        learner_id: learnerId,
+        course_ref: ref,
+        lesson_id: lessonId,
+        block_id: blockId,
+        attempt: last.attempt + 1,
+        choices: JSON.stringify(choices),
+        score: speakingScore(found.block, choices),
+        submitted_at: new Date(caller.now()),
+      } as never)
+      .execute();
+    return { ok: true };
+  }
+
+  /** The classes of a learner that follow `ref`, among those the caller sees. */
+  const classesFor = (
+    b: Book,
+    list: [string, { name: string; teacherId: string | null }][],
+    learnerId: string,
+    ref: string,
+  ) =>
+    list.filter(
+      ([id]) =>
+        activeLinkOf(b, id)?.courseRef === ref &&
+        (b.roster.get(id) ?? []).some((r) => r.learnerId === learnerId),
+    );
+
+  app.secured("GET", "/v1/speaking-reviews", async (caller, _req, reply) =>
+    caller.tenant(async (tx) => {
+      const b = await loadBook(tx);
+      const who = await whoAmI(tx, caller);
+      const vis = visible(b, caller, who);
+      if (!vis) return reply.code(403).send({ error: "not_allowed" });
+      const items: CourseSpeakingReviewItem[] = [];
+      for (const a of await latestAttempts(tx)) {
+        if (a.status !== "pending") continue;
+        const cls = classesFor(b, vis.list, a.learner_id, a.course_ref)[0];
+        const found = cls && rehearsalOf(b, a.course_ref, a.learner_id, a.lesson_id, a.block_id);
+        if (!cls || !found) continue;
+        const choices = a.choices as number[];
+        items.push({
+          learnerId: a.learner_id,
+          learnerName:
+            (b.roster.get(cls[0]) ?? []).find((r) => r.learnerId === a.learner_id)?.name ??
+            a.learner_id,
+          className: cls[1].name,
+          ref: a.course_ref,
+          courseTitle: found.v.content.title,
+          version: found.v.version,
+          lessonId: a.lesson_id,
+          lessonTitle: found.lesson.title,
+          blockId: a.block_id,
+          attempt: a.attempt,
+          scenario: found.block.scenario,
+          score: a.score,
+          submittedAt: a.submitted_at.toISOString(),
+          turns: found.block.turns.map((t, i) => ({
+            coach: t.coach,
+            chosen: t.options[choices[i]] ?? null,
+            model: t.model,
+            natural: choices[i] === t.natural,
+          })),
+        });
+      }
+      items.sort((x, z) => x.submittedAt.localeCompare(z.submittedAt));
+      const out: SpeakingReviewQueue = { items, mayReview: vis.role === "teacher" };
+      return out;
+    }),
+  );
+
+  app.secured("POST", "/v1/speaking-reviews/decide", async (caller, req) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    await caller.write<Plain>("POST /v1/speaking-reviews/decide", { body }, async (tx) => {
+      await lock(tx, caller);
+      const r = await review(tx, caller, body);
+      return {
+        status: r.ok ? 200 : STATUS[r.reason],
+        body: r,
+        audit: {
+          action: "courses:review_speaking",
+          resource: {
+            learnerId: String(body.learnerId ?? ""),
+            ref: String(body.ref ?? ""),
+            lessonId: String(body.lessonId ?? ""),
+            blockId: String(body.blockId ?? ""),
+          },
+          outcome: r.ok ? ("allowed" as const) : ("denied" as const),
+          ...(r.ok ? { after: { decision: body.decision } } : { reason: r.reason }),
+        },
+      };
+    });
+  });
+  async function review(
+    tx: TenantTx,
+    caller: Caller,
+    body: Record<string, unknown>,
+  ): Promise<Plain> {
+    const str = (x: unknown) => (typeof x === "string" ? x : "");
+    const learnerId = str(body.learnerId);
+    const ref = str(body.ref);
+    const lessonId = str(body.lessonId);
+    const blockId = str(body.blockId);
+    const decision = body.decision;
+    if (decision !== "approve" && decision !== "return")
+      return no("invalid", "decision is approve or return");
+    const note = typeof body.note === "string" ? body.note.trim() : "";
+    if (decision === "return" && (note.length < 3 || note.length > 300))
+      return no("invalid", "a returned rehearsal needs a note for the learner (3–300)");
+    if (decision === "approve" && note.length > 300) return no("invalid", "the note is too long");
+    const who = await whoAmI(tx, caller);
+    if (!who.teacherId) return no("not_allowed", "the class teacher reviews speaking rehearsals");
+    const b = await loadBook(tx);
+    const mine = [...b.classes.entries()].filter(([, x]) => x.teacherId === who.teacherId);
+    if (!classesFor(b, mine, learnerId, ref).length)
+      return no("not_allowed", "only the teacher of the learner's class reviews it");
+    const last = (await latestAttempts(tx, learnerId)).find(
+      (a) => a.course_ref === ref && a.lesson_id === lessonId && a.block_id === blockId,
+    );
+    if (!last) return no("not_found");
+    if (last.status !== "pending" || last.attempt !== body.attempt)
+      return no("invalid_step", "this rehearsal is not waiting for review");
+    await tx
+      .updateTable("course_speaking_attempt")
+      .set({
+        status: decision === "approve" ? "approved" : "returned",
+        reviewed_at: new Date(caller.now()),
+        reviewed_by: who.name,
+        note: note || null,
+      })
+      .where("learner_id", "=", learnerId)
+      .where("course_ref", "=", ref)
+      .where("lesson_id", "=", lessonId)
+      .where("block_id", "=", blockId)
+      .where("attempt", "=", last.attempt)
+      .execute();
+    return { ok: true };
+  }
+
   async function complete(
     tx: TenantTx,
     caller: Caller,
@@ -760,18 +1056,22 @@ export function registerClassCourses(app: Api): void {
       return { ok: false, reason: "invalid_step", detail: "already completed" };
     const answers = body.answers;
     const reflections = body.reflections;
+    const spoken = body.speaking ?? {};
     const isObj = (x: unknown): x is Record<string, unknown> =>
       !!x && typeof x === "object" && !Array.isArray(x);
-    if (!isObj(answers) || !isObj(reflections))
+    if (!isObj(answers) || !isObj(reflections) || !isObj(spoken))
       return { ok: false, reason: "invalid", detail: "answers and reflections are required" };
     const quizzes = lesson.blocks.filter((x): x is BlockOf<"quiz"> => x.kind === "quiz");
     const prompts = lesson.blocks.filter(
       (x): x is BlockOf<"reflection"> => x.kind === "reflection",
     );
+    const rehearsals = lesson.blocks.filter((x): x is BlockOf<"speaking"> => x.kind === "speaking");
     const known = new Set([...quizzes, ...prompts].map((x) => x.id));
+    const knownS = new Set(rehearsals.map((x) => x.id));
     if (
       Object.keys(answers).some((x) => !known.has(x)) ||
-      Object.keys(reflections).some((x) => !known.has(x))
+      Object.keys(reflections).some((x) => !known.has(x)) ||
+      Object.keys(spoken).some((x) => !knownS.has(x))
     )
       return {
         ok: false,
@@ -799,6 +1099,13 @@ export function registerClassCourses(app: Api): void {
         };
       keepR[p.id] = t;
     }
+    const keepS: Record<string, number[]> = {};
+    for (const r of rehearsals) {
+      const c = speakingChoices(r, spoken[r.id]);
+      if (!c)
+        return { ok: false, reason: "invalid", detail: "choose a reply at every speaking turn" };
+      keepS[r.id] = c;
+    }
     const score = lessonQuizScore(lesson, keepA);
     // The first completed lesson pins the learner to this version.
     if (!b.pins.has(k(learnerId, ref)))
@@ -822,8 +1129,25 @@ export function registerClassCourses(app: Api): void {
         score,
         answers: JSON.stringify(keepA),
         reflections: JSON.stringify(keepR),
+        speaking: JSON.stringify(keepS),
       } as never)
       .execute();
+    // Each rehearsal goes to the class teacher (attempt 1, pending).
+    for (const r of rehearsals)
+      await tx
+        .insertInto("course_speaking_attempt")
+        .values({
+          org_id: sql`ogc_current_org()`,
+          learner_id: learnerId,
+          course_ref: ref,
+          lesson_id: lessonId,
+          block_id: r.id,
+          attempt: 1,
+          choices: JSON.stringify(keepS[r.id]),
+          score: speakingScore(r, keepS[r.id]),
+          submitted_at: new Date(caller.now()),
+        } as never)
+        .execute();
     return { ok: true, score };
   }
 }

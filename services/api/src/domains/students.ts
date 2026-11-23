@@ -11,8 +11,9 @@
  *    itself; recommendations are suggestions for people. Overdue tuition is shown to staff with
  *    billing:manage as information only and never changes the level.
  * Thresholds come from the Decision Engine's rules (a paused rule shows no evidence), as in the demo.
- * Not on the Platform: practice attempts and speaking reviews (no "no practice" / "speaking
- * returned" evidence yet).
+ * Speaking rehearsals count for Speaking once the class teacher approves them; a rehearsal the
+ * teacher returned is "watch" evidence (owner 23/11). Not on the Platform: practice attempts (no
+ * "no practice" evidence yet).
  */
 import {
   authorize,
@@ -36,7 +37,12 @@ import type {
 import type { TenantTx } from "../db.js";
 import type { Api, Caller } from "../server.js";
 import { tuitionByLearner } from "./billing.js";
-import { quizEvidence, studioByLearner } from "./classCourses.js";
+import {
+  quizEvidence,
+  speakingEvidence,
+  speakingReturned,
+  studioByLearner,
+} from "./classCourses.js";
 import { loadLedger, makeupItems, type Ledger } from "./makeup.js";
 
 const DAY = 86_400_000;
@@ -49,11 +55,13 @@ export const MIN_MARKED = 3;
 export interface CareThresholds extends SupportThresholds {
   absenceSessions: number | null; // absent N marked sessions in a row; null = off
   makeupDueDays: number | null; // a make-up's deadline within N days; null = off
+  speakingReturned: boolean; // a returned speaking rehearsal is evidence; false = off
 }
 export const DEFAULT_CARE: CareThresholds = {
   ...DEFAULT_SUPPORT_THRESHOLDS,
   absenceSessions: 2,
   makeupDueDays: 3,
+  speakingReturned: true,
 };
 
 /** Thresholds from the organization's engine rules: an inactive rule turns its evidence off. */
@@ -61,7 +69,13 @@ export async function careThresholds(tx: TenantTx): Promise<CareThresholds> {
   const rules = await tx
     .selectFrom("engine_rule")
     .select(["kind", "enabled", "params"])
-    .where("kind", "in", ["skill_low", "skill_drop", "absence_streak", "makeup_due_soon"])
+    .where("kind", "in", [
+      "skill_low",
+      "skill_drop",
+      "absence_streak",
+      "makeup_due_soon",
+      "speaking_returned",
+    ])
     .execute();
   if (rules.length === 0) return { ...DEFAULT_CARE };
   const p = (kind: string, key: string): number | null => {
@@ -75,6 +89,7 @@ export async function careThresholds(tx: TenantTx): Promise<CareThresholds> {
     drop: p("skill_drop", "drop"),
     absenceSessions: p("absence_streak", "sessions"),
     makeupDueDays: p("makeup_due_soon", "days"),
+    speakingReturned: !!rules.find((x) => x.kind === "speaking_returned")?.enabled,
   };
 }
 
@@ -130,7 +145,8 @@ export const fmtDate = (iso: string) =>
 export interface Inputs {
   ledger: Ledger;
   placements: Map<string, PlacementResult>;
-  evidence: Map<string, SkillEvidence[]>;
+  evidence: Map<string, SkillEvidence[]>; // class-course quizzes + approved speaking rehearsals
+  returned: Map<string, number>; // speaking rehearsals whose latest attempt was returned
   studio: Awaited<ReturnType<typeof studioByLearner>>;
   centers: Map<string, string>;
 }
@@ -154,17 +170,25 @@ function cardFor(
   // Learning: the shared support signals over placement + class-course quiz evidence.
   const placement = x.placements.get(learnerId);
   if (placement)
-    for (const s of supportSignals(seedProfile(placement), x.evidence.get(learnerId) ?? [], 0, t)) {
+    for (const s of supportSignals(
+      seedProfile(placement),
+      x.evidence.get(learnerId) ?? [],
+      t.speakingReturned ? (x.returned.get(learnerId) ?? 0) : 0,
+      t,
+    )) {
       const skill = s.skill ? skillLabel(s.skill) : "";
       if (s.kind === "skill_drop") {
         evidence.push({
           level: "support",
           kind: "skill_drop",
-          text: `${skill} dropped ${Math.abs(s.delta ?? 0)} to ${s.level} after the latest class-course quiz`,
+          text: `${skill} dropped ${Math.abs(s.delta ?? 0)} to ${s.level} after the latest class-course ${s.skill === "speaking" ? "rehearsal" : "quiz"}`,
         });
         rec({ kind: "skill_drop", text: `Review ${skill} in class with the learner`, link: null });
       } else if (s.kind === "low_skill") {
-        const from = s.source === "placement" ? "placement test only" : "from class-course quizzes";
+        const from =
+          s.source === "placement"
+            ? "placement test only"
+            : `from class-course ${s.skill === "speaking" ? "rehearsals" : "quizzes"}`;
         evidence.push({
           level: "watch",
           kind: "skill_low",
@@ -173,6 +197,17 @@ function cardFor(
         rec({
           kind: "skill_low",
           text: `Give ${skill} extra attention${s.source === "placement" ? " — the level is from the placement test only" : ""}`,
+          link: null,
+        });
+      } else if (s.kind === "speaking_returned") {
+        evidence.push({
+          level: "watch",
+          kind: "speaking_returned",
+          text: "A speaking rehearsal was returned by the teacher for another try",
+        });
+        rec({
+          kind: "speaking_returned",
+          text: "Follow up on the returned speaking rehearsal",
           link: null,
         });
       }
@@ -263,18 +298,30 @@ function cardFor(
   };
 }
 
+/** Assessed evidence per learner: class-course quizzes, then approved speaking rehearsals. */
+export function mergeEvidence(
+  ...maps: Map<string, SkillEvidence[]>[]
+): Map<string, SkillEvidence[]> {
+  const out = new Map<string, SkillEvidence[]>();
+  for (const m of maps) for (const [id, list] of m) out.set(id, [...(out.get(id) ?? []), ...list]);
+  return out;
+}
+
 export async function loadInputs(tx: TenantTx, orgId: string): Promise<Inputs> {
-  const [ledger, pl, evidence, studio, centers] = await Promise.all([
+  const [ledger, pl, quiz, spoken, returned, studio, centers] = await Promise.all([
     loadLedger(tx),
     placements(tx, orgId),
     quizEvidence(tx),
+    speakingEvidence(tx),
+    speakingReturned(tx),
     studioByLearner(tx),
     tx.selectFrom("center").select(["id", "name"]).execute(),
   ]);
   return {
     ledger,
     placements: pl,
-    evidence,
+    evidence: mergeEvidence(quiz, spoken),
+    returned,
     studio,
     centers: new Map(centers.map((c) => [c.id, c.name])),
   };
@@ -347,7 +394,7 @@ export function registerStudents(app: Api): void {
       if (!me || !placement) return reply.code(404).send({ error: "no_placement" });
       const profile: LearnerProfile = updateMastery(
         seedProfile(placement),
-        (await quizEvidence(tx)).get(me.id) ?? [],
+        mergeEvidence(await quizEvidence(tx), await speakingEvidence(tx)).get(me.id) ?? [],
       );
       return profile;
     }),

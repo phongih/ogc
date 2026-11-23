@@ -44,6 +44,37 @@ describe("Course Studio editor", () => {
     expect(screen.getByRole("button", { name: "Withdraw from review" })).toBeInTheDocument();
   });
 
+  it("teacher: adds a speaking rehearsal — coach line, replies, the natural one, a model line — and submits", async () => {
+    const user = userEvent.setup();
+    renderApp("/app/teaching/courses/CS-B1-SPEAK", "teacher");
+    const editor = await screen.findByRole("region", { name: "Editor" });
+    await user.click(within(editor).getByRole("button", { name: /3\. Short debates/ }));
+    await user.selectOptions(within(editor).getByLabelText("Block type"), "speaking");
+    await user.click(within(editor).getByRole("button", { name: "Add block" }));
+    const f = (label: string) => within(editor).getByLabelText(`${label} · block 2`);
+    await user.type(f("Scenario"), "Disagree politely");
+    await user.type(f("Coach line 1"), "I think homework is useless.");
+    await user.type(f("Reply 1 of turn 1"), "You are wrong.");
+    await user.type(f("Reply 2 of turn 1"), "I see your point, but it helps me practise.");
+    expect(within(editor).getByTestId("draft-state")).not.toHaveTextContent(/error|must/i);
+    await user.click(f("Natural reply 2 of turn 1"));
+    await user.type(f("Model line 1"), "I see your point, but it helps me practise.");
+    await user.click(within(editor).getByRole("button", { name: "Save draft" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("draft-state")).toHaveTextContent("Saved · revision 5"),
+    );
+    const c = (await A.get(as("demo-teacher"), "CS-B1-SPEAK"))!;
+    expect(c.draft.lessons[2].blocks[1]).toMatchObject({
+      kind: "speaking",
+      scenario: "Disagree politely",
+      turns: [
+        { natural: 1, options: ["You are wrong.", "I see your point, but it helps me practise."] },
+      ],
+    });
+    await user.click(screen.getByRole("button", { name: "Submit for review" }));
+    expect(await screen.findByText("In review", { selector: "span" })).toBeInTheDocument();
+  });
+
   it("an invalid video link cannot be saved", async () => {
     const user = userEvent.setup();
     renderApp("/app/teaching/courses/CS-B1-SPEAK", "teacher");

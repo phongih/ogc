@@ -734,5 +734,96 @@ function BlockFields({
           onChange={(prompt) => onChange({ ...b, prompt })}
         />
       );
+    case "speaking": {
+      const setTurn = (i: number, t: Partial<(typeof b.turns)[number]>) =>
+        onChange({ ...b, turns: b.turns.map((x, j) => (j === i ? { ...x, ...t } : x)) });
+      return (
+        <div className="space-y-2">
+          <Field
+            label={at("Scenario")}
+            value={b.scenario}
+            max={L.shortText}
+            onChange={(scenario) => onChange({ ...b, scenario })}
+          />
+          {b.turns.map((t, i) => (
+            <fieldset key={i} className="space-y-1 rounded-ogc border border-border p-2">
+              <legend className="text-xs text-muted">Turn {i + 1} — mark the natural reply</legend>
+              <Field
+                label={at(`Coach line ${i + 1}`)}
+                value={t.coach}
+                max={L.shortText}
+                onChange={(coach) => setTurn(i, { coach })}
+              />
+              {t.options.map((o, j) => (
+                <div key={j} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name={`natural-${b.id}-${i}`}
+                    aria-label={`Natural reply ${j + 1} of turn ${i + 1} · block ${n}`}
+                    checked={t.natural === j}
+                    onChange={() => setTurn(i, { natural: j })}
+                  />
+                  <input
+                    aria-label={`Reply ${j + 1} of turn ${i + 1} · block ${n}`}
+                    className={input}
+                    value={o}
+                    maxLength={120}
+                    onChange={(e) =>
+                      setTurn(i, {
+                        options: t.options.map((x, k) => (k === j ? e.target.value : x)),
+                      })
+                    }
+                  />
+                </div>
+              ))}
+              <button
+                type="button"
+                className="text-xs text-brand disabled:opacity-40"
+                disabled={t.options.length >= L.speakingOptionsMax}
+                onClick={() => setTurn(i, { options: [...t.options, ""] })}
+              >
+                + reply · turn {i + 1} · block {n}
+              </button>
+              <Field
+                label={at(`Model line ${i + 1}`)}
+                value={t.model}
+                max={L.shortText}
+                onChange={(model) => setTurn(i, { model })}
+              />
+              <Field
+                label={at(`Tip ${i + 1}`)}
+                value={t.tip}
+                max={L.shortText}
+                onChange={(tip) => setTurn(i, { tip })}
+              />
+              <button
+                type="button"
+                className="text-xs text-muted disabled:opacity-40"
+                disabled={b.turns.length <= 1}
+                onClick={() => onChange({ ...b, turns: b.turns.filter((_, k) => k !== i) })}
+              >
+                Remove turn {i + 1} · block {n}
+              </button>
+            </fieldset>
+          ))}
+          <button
+            type="button"
+            className="text-xs text-brand disabled:opacity-40"
+            disabled={b.turns.length >= L.speakingTurnsMax}
+            onClick={() =>
+              onChange({
+                ...b,
+                turns: [
+                  ...b.turns,
+                  { coach: "", options: ["", ""], natural: 0, model: "", tip: "" },
+                ],
+              })
+            }
+          >
+            + turn · block {n}
+          </button>
+        </div>
+      );
+    }
   }
 }

@@ -2,16 +2,17 @@
  * Course Studio — the learner side, in My Learning (SYNTHETIC, mock). Owner decisions 22/11: a
  * learner takes the OGC course linked to their class, pinned to the version they started; a quiz
  * score is assessed evidence for the skill profile; reflections are free text, never scored.
- * Self-scoped: a learner grant acts on its own learner record only (fail-closed).
+ * Self-scoped: a learner grant acts on its own learner record only (fail-closed). A speaking block
+ * (owner 23/11) is answered with the lesson; the teacher review that makes it count for Speaking
+ * runs on the Platform — the demo keeps the replies and shows the model lines, never as evidence.
  */
 import type {
   AuthoringResult,
   BlockOf,
   ClassCoursePlayerPort,
-  CourseLesson,
   MyClassCourse,
 } from "@ogc/contracts";
-import { AUTHORING_LIMITS, lessonQuizScore } from "@ogc/contracts";
+import { AUTHORING_LIMITS, hideLessonAnswers, lessonQuizScore } from "@ogc/contracts";
 import { classes, rosters } from "../../fixtures/teaching";
 import { learnerById } from "../../fixtures/learners";
 import { courseOf, latestVersion } from "./mockCourseAuthoring";
@@ -41,10 +42,7 @@ function scope(viewer: Parameters<ClassCoursePlayerPort["mine"]>[0]) {
   return { learnerId, orgId: viewer.orgId, open };
 }
 
-const hideAnswers = (l: CourseLesson): CourseLesson => ({
-  ...l,
-  blocks: l.blocks.map((b) => (b.kind === "quiz" ? { ...b, correct: -1 } : b)),
-});
+const hideAnswers = hideLessonAnswers;
 
 export const mockClassCoursePlayer: ClassCoursePlayerPort = {
   mine: (viewer) =>
@@ -98,7 +96,7 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
       });
     }),
 
-  complete: (viewer, ref, lessonId, answers, reflections) =>
+  complete: (viewer, ref, lessonId, answers, reflections, speaking = {}) =>
     withFault("classCourses.complete", () => {
       const s = scope(viewer);
       if (!s) return refuse("not_allowed", "learners complete their own lessons");
@@ -112,12 +110,25 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
       const prompts = lesson.blocks.filter(
         (b): b is BlockOf<"reflection"> => b.kind === "reflection",
       );
+      const talks = lesson.blocks.filter((b): b is BlockOf<"speaking"> => b.kind === "speaking");
       const known = new Set([...quizzes, ...prompts].map((b) => b.id));
       if (
         Object.keys(answers).some((k) => !known.has(k)) ||
-        Object.keys(reflections).some((k) => !known.has(k))
+        Object.keys(reflections).some((k) => !known.has(k)) ||
+        Object.keys(speaking).some((k) => !talks.some((t) => t.id === k))
       )
         return refuse("invalid", "answers for blocks that are not in this lesson");
+      const keepS: Record<string, number[]> = {};
+      for (const t of talks) {
+        const c = speaking[t.id];
+        if (
+          !Array.isArray(c) ||
+          c.length !== t.turns.length ||
+          c.some((x, i) => !Number.isInteger(x) || x < 0 || x >= t.turns[i].options.length)
+        )
+          return refuse("invalid", "choose a reply at every speaking turn");
+        keepS[t.id] = [...c];
+      }
       for (const q of quizzes) {
         const a = answers[q.id];
         if (!Number.isInteger(a) || a < 0 || a >= q.options.length)
@@ -143,6 +154,7 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
         score,
         answers: keepA,
         reflections: keepR,
+        ...(talks.length ? { speaking: keepS } : {}),
       });
       return latency<Out>({ ok: true, score });
     }),

@@ -379,6 +379,22 @@ export interface CourseLessonDoneTable {
   score: number | null;
   answers: unknown;
   reflections: unknown;
+  speaking: unknown;
+}
+export interface CourseSpeakingAttemptTable {
+  org_id: string;
+  learner_id: string;
+  course_ref: string;
+  lesson_id: string;
+  block_id: string;
+  attempt: number;
+  choices: unknown;
+  score: number;
+  submitted_at: Date;
+  status: "pending" | "approved" | "returned";
+  reviewed_at: Date | null;
+  reviewed_by: string | null;
+  note: string | null;
 }
 export interface PlacementResultTable {
   org_id: string;
@@ -516,6 +532,7 @@ export interface DB {
   engine_fired: EngineFiredTable;
   engine_notification: EngineNotificationTable;
   engine_job: EngineJobTable;
+  course_speaking_attempt: CourseSpeakingAttemptTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

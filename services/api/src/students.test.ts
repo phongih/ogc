@@ -217,8 +217,8 @@ describe.skipIf(!hasPg)("skill profile + Current Students — API", () => {
       cefrBand: "A2",
       skills: {
         reading: { level: 70, evidenceCount: 0 },
-        use_of_english: { level: 65, evidenceCount: 0 },
-        speaking: { level: 55, evidenceCount: 0 },
+        use_of_english: { level: 79, evidenceCount: 1 }, // "Making plans" quiz, 100 (seed)
+        speaking: { level: 55, evidenceCount: 0 }, // the rehearsal waits for Tara: not counted
       },
     });
     expect((await (await as(TARA))("GET", "/v1/me/skills")).statusCode).toBe(403);

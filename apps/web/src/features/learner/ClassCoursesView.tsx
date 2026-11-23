@@ -68,10 +68,26 @@ export function ClassLessonView() {
   const course = useQuery({ queryKey: [...api.key, "mine"], queryFn: () => api.mine() });
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [reflections, setReflections] = useState<Record<string, string>>({});
+  const [speaking, setSpeaking] = useState<Record<string, number[]>>({});
+  const [retry, setRetry] = useState<Record<string, number[]>>({});
   const done = useMutation({
-    mutationFn: () => api.complete(ref, lessonId, answers, reflections),
+    mutationFn: () => api.complete(ref, lessonId, answers, reflections, speaking),
     onSuccess: () => api.onChanged(qc),
   });
+  const again = useMutation({
+    mutationFn: (blockId: string) =>
+      api.retrySpeaking!(ref, lessonId, blockId, retry[blockId] ?? []),
+    onSuccess: async (r, blockId) => {
+      if (r.ok) setRetry((x) => ({ ...x, [blockId]: [] }));
+      await api.onChanged(qc);
+    },
+  });
+  const choose = (set: typeof setSpeaking, blockId: string) => (turn: number, option: number) =>
+    set((x) => {
+      const next = [...(x[blockId] ?? [])];
+      next[turn] = option;
+      return { ...x, [blockId]: next };
+    });
   if (q.isLoading) return <Spinner label="Loading the lesson" />;
   if (q.isError)
     return <ErrorState message="Could not load the lesson." onRetry={() => q.refetch()} />;
@@ -91,8 +107,18 @@ export function ClassLessonView() {
             reflection: reflections[b.id] ?? "",
             onReflection: (t) => setReflections((r) => ({ ...r, [b.id]: t })),
           };
+    if (b.kind === "speaking") {
+      const attempt = v.speaking?.find((a) => a.blockId === b.id) ?? null;
+      if (!c) return { choices: speaking[b.id] ?? [], onChoose: choose(setSpeaking, b.id) };
+      if (attempt?.status === "returned" && api.retrySpeaking)
+        return { choices: retry[b.id] ?? [], onChoose: choose(setRetry, b.id), attempt };
+      return { choices: c.speaking?.[b.id] ?? attempt?.choices ?? [], revealed: true, attempt };
+    }
     return undefined;
   };
+  const returned = c
+    ? (v.speaking ?? []).filter((a) => a.status === "returned" && api.retrySpeaking)
+    : [];
   const mine = course.data?.find((x) => x.ref === ref);
   const nextId = mine?.lessons[v.index + 1]?.lessonId;
   return (
@@ -104,6 +130,18 @@ export function ClassLessonView() {
       <Card>
         <LessonView blocks={v.lesson.blocks} io={io} />
       </Card>
+      {returned.map((a) => (
+        <div key={a.blockId} className="flex items-center gap-2">
+          <Button
+            onClick={() => again.mutate(a.blockId)}
+            disabled={again.isPending}
+            aria-label={`Send the rehearsal again (${a.blockId})`}
+          >
+            Send the rehearsal again
+          </Button>
+          <Refused r={again.data} />
+        </div>
+      ))}
       {c ? (
         <p className="text-sm" data-testid="lesson-done">
           Lesson completed
