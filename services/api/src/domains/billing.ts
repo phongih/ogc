@@ -324,6 +324,25 @@ const STATUS: Record<BillingRefusal, number> = {
   no_fee_line: 409,
 };
 
+/** Decision Engine: unpaid invoices at least `days` past their due date (staff are told). */
+export async function overdueInvoices(tx: TenantTx, days: number, now: number) {
+  const centers = new Map(
+    (await tx.selectFrom("center").select(["id", "name"]).execute()).map((c) => [c.id, c.name]),
+  );
+  return (await loadInvoices(tx))
+    .map((i) => view(i, centers, now))
+    .filter((v) => v.balanceVnd > 0 && v.daysOverdue >= days)
+    .map((v) => ({
+      id: v.id,
+      no: v.no,
+      learnerName: v.learnerName,
+      centerName: v.centerName,
+      dueDate: v.dueDate,
+      daysOverdue: v.daysOverdue,
+      balanceVnd: v.balanceVnd,
+    }));
+}
+
 /** Current Students: what each learner still has to pay and how much is overdue (information only). */
 export async function tuitionByLearner(
   tx: TenantTx,

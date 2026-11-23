@@ -20,6 +20,7 @@ import { PlatformAdmissionsPage } from "./pages/AdmissionsPage";
 import { PlatformBillingPage, PlatformTuitionPage } from "./pages/BillingPage";
 import { PlatformPartnersPage } from "./pages/PartnersPage";
 import { PlatformStudentsPage } from "./pages/StudentsPage";
+import { PlatformEnginePage } from "./pages/EnginePage";
 import {
   PlatformClassLessonPage,
   PlatformCoursePage,
@@ -79,6 +80,7 @@ function Shell({ children }: { children: ReactNode }) {
             {session.role === "staff" || session.role === "teacher" ? (
               <Link to="/students">Students</Link>
             ) : null}
+            {session.role === "staff" ? <Link to="/engine">Engine</Link> : null}
             {session.role === "learner" || session.role === "guardian" ? (
               <Link to="/my-makeups">Make-ups</Link>
             ) : null}
@@ -218,6 +220,14 @@ export function App() {
                 element={
                   <Protected>
                     <PlatformPartnersPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/engine"
+                element={
+                  <Protected>
+                    <PlatformEnginePage />
                   </Protected>
                 }
               />

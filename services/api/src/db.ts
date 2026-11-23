@@ -388,6 +388,67 @@ export interface PlacementResultTable {
   use_of_english: number;
   speaking: number;
 }
+export interface EngineRuleTable {
+  org_id: string;
+  id: string;
+  kind: string;
+  category: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  priority: string;
+  cooldown_min: number;
+  params: unknown;
+  actions: string[];
+  updated_by: string | null;
+  updated_at: Date | null;
+}
+export interface EngineEventTable {
+  org_id: string;
+  id: string;
+  rule_id: string;
+  rule_name: string;
+  kind: string;
+  priority: string;
+  at: Date;
+  subject: unknown;
+  evidence: string;
+}
+export interface EngineActionTable {
+  org_id: string;
+  id: string;
+  event_id: string;
+  rule_name: string;
+  action: string;
+  target: string;
+  at: Date;
+}
+export interface EngineFiredTable {
+  org_id: string;
+  rule_id: string;
+  key: string;
+  at: Date;
+}
+export interface EngineNotificationTable {
+  org_id: string;
+  id: string;
+  recipient: string;
+  event_id: string;
+  priority: string;
+  text: string;
+  at: Date;
+  read: boolean;
+}
+export interface EngineJobTable {
+  org_id: string;
+  runs: number;
+  last_run_at: Date | null;
+  last_duration_ms: number | null;
+  last_detected: number;
+  last_new_events: number;
+  last_skipped: number;
+  seq: string | number;
+}
 export interface SettlementBatchTable {
   org_id: string;
   id: string;
@@ -449,6 +510,12 @@ export interface DB {
   course_progress: CourseProgressTable;
   course_lesson_done: CourseLessonDoneTable;
   placement_result: PlacementResultTable;
+  engine_rule: EngineRuleTable;
+  engine_event: EngineEventTable;
+  engine_action: EngineActionTable;
+  engine_fired: EngineFiredTable;
+  engine_notification: EngineNotificationTable;
+  engine_job: EngineJobTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

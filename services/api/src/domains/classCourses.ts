@@ -34,6 +34,7 @@ import type { Api, Caller } from "../server.js";
 import { latest, load as loadCourses, statusOf, type Stored } from "./courses.js";
 
 export const MAX_PREP_HOURS = 10;
+const DAY = 86_400_000;
 
 type Result = { ok: true } | { ok: false; reason: StudioRefusal; detail?: string };
 const no = (reason: StudioRefusal, detail?: string): Result => ({
@@ -228,6 +229,42 @@ export async function studioByLearner(
           completedLessons: p.completedLessons,
           totalLessons: p.totalLessons,
           lastActivityAt: p.lastActivityAt,
+        });
+    }
+  }
+  return out;
+}
+
+/** Decision Engine: learners of linked classes with no lesson completed for `days` (completion only). */
+export async function studioInactive(tx: TenantTx, days: number, now: number) {
+  const b = await loadBook(tx);
+  const out: {
+    learnerId: string;
+    name: string;
+    classId: string;
+    className: string;
+    teacherId: string | null;
+    course: string;
+    since: string;
+  }[] = [];
+  for (const l of b.links) {
+    if (l.status !== "linked") continue;
+    const linkedAt = Date.parse(l.decidedAt ?? "");
+    if (!Number.isFinite(linkedAt) || now - linkedAt < days * DAY) continue; // give a new link time
+    const cls = b.classes.get(l.classId);
+    for (const r of b.roster.get(l.classId) ?? []) {
+      const p = completionOf(b, l.courseRef, r.learnerId);
+      if (!p) continue;
+      const last = p.lastActivityAt ? Math.max(Date.parse(p.lastActivityAt), linkedAt) : linkedAt;
+      if (p.completedLessons < p.totalLessons && now - last >= days * DAY)
+        out.push({
+          learnerId: r.learnerId,
+          name: r.name,
+          classId: l.classId,
+          className: cls?.name ?? "a class",
+          teacherId: cls?.teacherId ?? null,
+          course: p.title,
+          since: new Date(last).toISOString(),
         });
     }
   }

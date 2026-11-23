@@ -5,6 +5,13 @@
  * contract's result shapes (ScheduleResult, RecordAttendanceResult) whatever the HTTP status.
  */
 import type {
+  ActionLogEntry,
+  EngineEvent,
+  EngineNotification,
+  JobStatus,
+  Rule,
+  RuleUpdate,
+  RuleUpdateResult,
   LearnerProfile,
   StudentCard,
   LearnerStudioProgress,
@@ -96,7 +103,11 @@ export interface MyClass {
 export interface MyAccess {
   role: string;
   orgAdmin: boolean;
-  narrowing: { state: string; name?: string };
+  narrowing: {
+    state: string;
+    name?: string;
+    rules?: { action: string; readonlyFields?: string[] }[];
+  };
   allowed: string[];
 }
 
@@ -388,6 +399,26 @@ export const platformApi = {
       row,
     ),
   partnerTrends: (s: PlatformSession) => staffRead<PartnerTrend[]>(s, "/v1/partners/trends"),
+
+  // Decision Engine (staff) and in-app notifications (staff and teachers)
+  engineRules: (s: PlatformSession) => staffRead<Rule[]>(s, "/v1/engine/rules"),
+  updateEngineRule: (s: PlatformSession, id: string, patch: RuleUpdate) =>
+    result<RuleUpdateResult>(s, "POST", `/v1/engine/rules/${encodeURIComponent(id)}`, patch),
+  runEngine: async (s: PlatformSession) => {
+    const r = await send(s, "POST", "/v1/engine/run", {});
+    if (r.status === 403) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as JobStatus;
+  },
+  engineEvents: async (s: PlatformSession) =>
+    (await staffRead<EngineEvent[]>(s, "/v1/engine/events")) ?? [],
+  engineActions: async (s: PlatformSession) =>
+    (await staffRead<ActionLogEntry[]>(s, "/v1/engine/actions")) ?? [],
+  engineJob: (s: PlatformSession) => staffRead<JobStatus>(s, "/v1/engine/job"),
+  notifications: async (s: PlatformSession) =>
+    (await staffRead<EngineNotification[]>(s, "/v1/me/notifications")) ?? [],
+  markNotificationRead: (s: PlatformSession, id: string) =>
+    result<{ ok: boolean }>(s, "POST", `/v1/me/notifications/${encodeURIComponent(id)}/read`, {}),
 
   // Current Students (staff by center, class teachers) and a learner's own skill profile
   students: (s: PlatformSession) => staffRead<StudentCard[]>(s, "/v1/students"),

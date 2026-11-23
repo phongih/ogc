@@ -10,7 +10,7 @@
  *    the learner's own class teacher see it; learners and guardians do not. It never acts by
  *    itself; recommendations are suggestions for people. Overdue tuition is shown to staff with
  *    billing:manage as information only and never changes the level.
- * Thresholds are the Decision Engine's defaults until its rules arrive on the Platform (PR B).
+ * Thresholds come from the Decision Engine's rules (a paused rule shows no evidence), as in the demo.
  * Not on the Platform: practice attempts and speaking reviews (no "no practice" / "speaking
  * returned" evidence yet).
  */
@@ -45,7 +45,7 @@ export const LOW_ATTENDANCE_PCT = 80;
 /** Only judge attendance once this many sessions are marked. */
 export const MIN_MARKED = 3;
 
-/** The thresholds the care level uses (the Decision Engine's defaults until PR B). */
+/** The thresholds the care level uses: the Decision Engine's rules, or their defaults. */
 export interface CareThresholds extends SupportThresholds {
   absenceSessions: number | null; // absent N marked sessions in a row; null = off
   makeupDueDays: number | null; // a make-up's deadline within N days; null = off
@@ -55,6 +55,28 @@ export const DEFAULT_CARE: CareThresholds = {
   absenceSessions: 2,
   makeupDueDays: 3,
 };
+
+/** Thresholds from the organization's engine rules: an inactive rule turns its evidence off. */
+export async function careThresholds(tx: TenantTx): Promise<CareThresholds> {
+  const rules = await tx
+    .selectFrom("engine_rule")
+    .select(["kind", "enabled", "params"])
+    .where("kind", "in", ["skill_low", "skill_drop", "absence_streak", "makeup_due_soon"])
+    .execute();
+  if (rules.length === 0) return { ...DEFAULT_CARE };
+  const p = (kind: string, key: string): number | null => {
+    const r = rules.find((x) => x.kind === kind);
+    if (!r || !r.enabled) return null;
+    const v = (r.params as Record<string, unknown>)[key];
+    return typeof v === "number" ? v : null;
+  };
+  return {
+    low: p("skill_low", "threshold"),
+    drop: p("skill_drop", "drop"),
+    absenceSessions: p("absence_streak", "sessions"),
+    makeupDueDays: p("makeup_due_soon", "days"),
+  };
+}
 
 export async function placements(
   tx: TenantTx,
@@ -96,7 +118,7 @@ export function absenceStreak(l: Ledger, learnerId: string, classIds: readonly s
   return best;
 }
 
-const fmtDate = (iso: string) =>
+export const fmtDate = (iso: string) =>
   new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Ho_Chi_Minh",
     weekday: "short",
@@ -105,7 +127,7 @@ const fmtDate = (iso: string) =>
     year: "numeric",
   }).format(new Date(iso));
 
-interface Inputs {
+export interface Inputs {
   ledger: Ledger;
   placements: Map<string, PlacementResult>;
   evidence: Map<string, SkillEvidence[]>;
@@ -291,6 +313,7 @@ export function registerStudents(app: Api): void {
           if (c === classId) byLearner.set(learnerId, [...(byLearner.get(learnerId) ?? []), c]);
         }
       const tuition = staff ? await tuitionByLearner(tx, now) : null;
+      const care = await careThresholds(tx);
       const order = { support: 0, watch: 1, ok: 2 } as const;
       return [...byLearner.entries()]
         .map(([learnerId, own]) =>
@@ -303,7 +326,7 @@ export function registerStudents(app: Api): void {
               ? (tuition.get(learnerId) ?? { balanceVnd: 0, overdueVnd: 0 })
               : null,
             staff,
-            DEFAULT_CARE,
+            care,
             now,
           ),
         )
