@@ -178,7 +178,13 @@ describe("make-up — deadline", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(at(unit5().at, 15 * DAY));
     const b = await board();
-    expect(b.items[0]).toMatchObject({ learnerId: LEARNER_AN, overdue: true });
+    // Overdue items come first; which learner is first depends on where "now" falls in the week
+    // (the seed follows the real weekly slots), so check An's item and the ordering, not item 0.
+    expect(b.items.find((i) => i.learnerId === LEARNER_AN)).toMatchObject({ overdue: true });
+    const firstNotOverdue = b.items.findIndex((i) => !i.overdue);
+    if (firstNotOverdue >= 0)
+      expect(b.items.slice(firstNotOverdue).every((i) => !i.overdue)).toBe(true);
+    expect(b.items[0].overdue).toBe(true);
     expect(b.counts.overdue).toBeGreaterThanOrEqual(1);
   });
 });
