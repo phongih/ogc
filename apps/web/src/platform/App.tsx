@@ -15,6 +15,7 @@ import { SessionPage } from "./pages/SessionPage";
 import { AccessPage } from "./pages/AccessPage";
 import { MakeupsPage } from "./pages/MakeupsPage";
 import { MyMakeupsPage } from "./pages/MyMakeupsPage";
+import { PlatformWorkforcePage } from "./pages/WorkforcePage";
 
 interface Ctx {
   session: PlatformSession | null;
@@ -58,6 +59,7 @@ function Shell({ children }: { children: ReactNode }) {
           <nav aria-label="Platform" className="flex gap-4 text-sm">
             {session.role === "staff" ? <Link to="/schedule">Schedule</Link> : null}
             {session.role === "staff" ? <Link to="/makeups">Make-ups</Link> : null}
+            {session.role === "staff" ? <Link to="/workforce">Workforce</Link> : null}
             {session.role === "learner" || session.role === "guardian" ? (
               <Link to="/my-makeups">Make-ups</Link>
             ) : null}
@@ -153,6 +155,14 @@ export function App() {
                 element={
                   <Protected>
                     <MakeupsPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/workforce"
+                element={
+                  <Protected>
+                    <PlatformWorkforcePage />
                   </Protected>
                 }
               />

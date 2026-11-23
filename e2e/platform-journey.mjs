@@ -150,11 +150,11 @@ runPlatformJourney("platform E2E", async ({ browser, base, check, restartIios })
   await page.getByRole("button", { name: "Sign out" }).click();
   await page.getByRole("button", { name: "Sam (Org Staff)" }).click();
   await page.getByRole("heading", { name: "Schedule" }).waitFor();
-  await page.getByText("A2 Morning — Mon/Wed").waitFor();
+  await page.getByRole("heading", { name: "A2 Morning — Mon/Wed" }).waitFor();
   check(
     "[sam] narrowed to District 1: no B1 Evening (Thu Duc)",
-    (await page.getByText("B1 Evening — Tue/Thu").count()) === 0 &&
-      (await page.getByText("A2 Evening — Tue/Thu").count()) === 1,
+    (await page.getByRole("heading", { name: "B1 Evening — Tue/Thu" }).count()) === 0 &&
+      (await page.getByRole("heading", { name: "A2 Evening — Tue/Thu" }).count()) === 1,
   );
   await page.getByLabel("Teacher of A2 Morning — Mon/Wed").selectOption({ label: "Ben" });
   await page.getByText("Your access policy does not allow this here.").waitFor();

@@ -54,6 +54,10 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 | `POST /v1/me/makeups/:item/self-study` `{note}`           | learner (own item)                                     | `submitSelfStudy`                           |
 | `GET /v1/me/makeups/to-confirm`                           | the learner's own class teacher                        | `listToConfirm`                             |
 | `POST /v1/makeups/:item/confirm` / `…/return` `{note}`    | the learner's own class teacher                        | `confirmSelfStudy` / `returnSelfStudy`      |
+| `GET /v1/workforce`                                       | staff                                                  | `WorkforcePort.getOverview`                 |
+| `PUT /v1/workforce/teachers/:id/target`                   | staff with `workforce:manage`                          | `setTarget`                                 |
+| `PUT /v1/workforce/settings` `{underPct, overPct}`        | staff with `workforce:manage`                          | `updateSettings`                            |
+| `GET /v1/workforce/suggest/class/:id` · `…/session/:id`   | staff (suggest only, nothing assigned)                 | `suggestForClass` / `suggestForSession`     |
 | `GET /v1/access/admin`                                    | Org Admin (IIOS decides)                               | `IiosPolicyAdminPort.getAdminView` → IIOS   |
 | `POST /v1/access/policies` `{name, description, rules}`   | Org Admin                                              | `createPolicy` → IIOS                       |
 | `PUT /v1/access/policies/:ref` `{expectedVersion, …}`     | Org Admin, not a policy that restricts them            | `revisePolicy` → IIOS                       |
@@ -72,6 +76,16 @@ Make-up items are not stored. Every absent mark at a regular session of the lear
 An item closes when the learner is marked present or late at the booked session, or when the learner's own class teacher confirms the self-study. Booked guests appear on that session's attendance sheet with "make-up for <class>". A booking into a session that was later cancelled counts as open again.
 
 Guardian ↔ learner links (`guardian_link`) come from the synthetic seed only. `ogc_app` may only read them; there is no path to create a link (D-14 stays closed).
+
+## Workforce
+
+Load is the teaching hours in the next 7 days, computed on read from the schedule:
+
+- each session counts its class's real length;
+- a substitute's session counts for the substitute;
+- make-up sessions count.
+
+Each teacher has a target in hours per week (`teacher_target`, migration 0004). Bands are a percentage of that target, with thresholds staff tune (`workforce_settings`, default 60 / 100). Suggestions rank candidates by fit, with any clash last. They assign nobody, and going over the target only warns. Not on the Platform yet: course-prep hours and the new-center wizard's hint.
 
 ## Access policies
 

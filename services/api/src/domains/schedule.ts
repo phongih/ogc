@@ -110,7 +110,7 @@ export async function snapshot(tx: TenantTx): Promise<Snapshot> {
   };
 }
 
-type Sess = Snapshot["sessions"][number];
+export type Sess = Snapshot["sessions"][number];
 
 const ref = (snap: Snapshot, id: string | null): TeacherRef | null =>
   id && snap.teachers.has(id) ? { id, name: snap.teachers.get(id)! } : null;
@@ -152,9 +152,13 @@ export interface Slot {
   centerId: string | null;
   room: string | null;
 }
-const teacherOf = (snap: Snapshot, s: Sess) =>
+export const teacherOf = (snap: Snapshot, s: Sess) =>
   s.substituteId ?? s.heldBy ?? snap.classes.get(s.classId)?.teacherId ?? null;
-function slotOf(snap: Snapshot, s: Pick<Sess, "classId" | "at">, teacherId: string | null): Slot {
+export function slotOf(
+  snap: Snapshot,
+  s: Pick<Sess, "classId" | "at">,
+  teacherId: string | null,
+): Slot {
   const c = snap.classes.get(s.classId)!;
   return {
     label: c.name,

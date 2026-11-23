@@ -7,6 +7,8 @@ import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from
 import { centerLocalToIso, formatCenterDateTime, isoToCenterLocal } from "../../lib/centerTime";
 import { platformApi } from "../client";
 import { useSignedIn } from "../App";
+import { LoadHintView } from "../../features/workforce/LoadHintView";
+import { PlatformWorkforceApi, PolicyBanner } from "../workforce";
 
 export const REFUSAL_TEXT: Record<string, string> = {
   not_found: "Not found in this organization.",
@@ -138,6 +140,7 @@ function SessionRow({
           </label>
         </div>
       ) : null}
+      {editable ? <LoadHintView target={{ sessionId: s.id }} label={s.title} /> : null}
       <Outcome r={change.data} />
     </li>
   );
@@ -181,6 +184,7 @@ function ClassCard({ cls, teachers }: { cls: ClassSchedule; teachers: TeacherRef
           </select>
         </label>
       </div>
+      <LoadHintView target={{ classId: cls.classId }} label={cls.className} />
       <Outcome r={teacherChange.data} />
       <ul className="mt-2">
         {cls.sessions.map((s) => (
@@ -245,9 +249,14 @@ export function SchedulePage() {
   return (
     <section>
       <PageHeader title="Schedule" subtitle="Times are center time (Asia/Ho_Chi_Minh)." />
-      {data.classes.map((c) => (
-        <ClassCard key={c.classId} cls={c} teachers={data.teachers} />
-      ))}
+      <PlatformWorkforceApi>
+        <div className="mb-4">
+          <PolicyBanner />
+        </div>
+        {data.classes.map((c) => (
+          <ClassCard key={c.classId} cls={c} teachers={data.teachers} />
+        ))}
+      </PlatformWorkforceApi>
     </section>
   );
 }

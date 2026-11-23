@@ -89,6 +89,8 @@ export async function seedDev(
       for (const org of SYNTHETIC_ORGS) {
         await scope(org);
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        await c.query("delete from teacher_target");
+        await c.query("delete from workforce_settings");
         await c.query("delete from makeup_booking");
         await c.query("delete from makeup_selfstudy");
         await c.query("delete from attendance");
@@ -144,6 +146,17 @@ export async function seedDev(
         ($1, $4, $5, 'A2 Evening — Tue/Thu', $8, 'course-a2')`,
       [NOVA, A2M, B1E, A2E, D1, THU_DUC, TARA, BEN],
     );
+    // Workforce targets (demo spread): Tara over, Ben meets, Mia and Khang have room.
+    for (const [teacher, employment, hours] of [
+      [TARA, "part_time", 2.5],
+      [BEN, "part_time", 4],
+      [MIA, "part_time", 4.5],
+      ["00000000-0000-4000-8000-00000000t004", "full_time", 20],
+    ] as const)
+      await c.query(
+        "insert into teacher_target (org_id, teacher_id, employment, target_hours, updated_by) values ($1, $2, $3, $4, 'seed')",
+        [NOVA, teacher, employment, hours],
+      );
     const rosters: [string, number[]][] = [
       [A2M, [1, 2, 3]],
       [B1E, [4, 5]],

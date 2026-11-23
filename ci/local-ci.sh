@@ -74,6 +74,7 @@ if node -e "require('module').createRequire('/opt/npm-tools/node_modules/').reso
     echo "== e2e: Platform (browser → /v1 → API → mock IIOS + PostgreSQL) =="
     node e2e/platform-journey.mjs
     node e2e/platform-makeup-journey.mjs
+    node e2e/platform-workforce-journey.mjs
   else
     echo "== e2e: Platform NOT RUN — OGC_TEST_PG_ADMIN_URL not set =="
   fi
