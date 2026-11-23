@@ -15,7 +15,7 @@
 import pg from "pg";
 import { commissionFor } from "@ogc/contracts";
 import { cycleOf } from "./domains/partners.js";
-import { seedCourses, seedLumenCourse } from "./seedCourses.js";
+import { seedClassCourses, seedCourses, seedLumenCourse } from "./seedCourses.js";
 
 export const NOVA = "00000000-0000-4000-8000-000000000001";
 export const LUMEN = "00000000-0000-4000-8000-000000000002";
@@ -846,6 +846,9 @@ export async function seedDev(
       for (const org of SYNTHETIC_ORGS) {
         await scope(org);
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        await c.query("delete from course_lesson_done");
+        await c.query("delete from course_progress");
+        await c.query("delete from class_course_link");
         await c.query("delete from course_review");
         await c.query("delete from course_version");
         await c.query("delete from authored_course");
@@ -1010,6 +1013,7 @@ export async function seedDev(
     await seedBilling(c, now);
     await seedPartners(c, now);
     await seedCourses(c, now, { tara: TARA, ben: BEN });
+    await seedClassCourses(c, now, { a2Morning: A2M, b1Evening: B1E, an: L(3) });
 
     // ── Lumen Edu (a second tenant, for isolation) ────────────────────────────────────────
     await scope(LUMEN);

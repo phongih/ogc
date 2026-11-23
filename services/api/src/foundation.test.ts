@@ -49,6 +49,7 @@ describe.skipIf(!hasPg)("foundation — PostgreSQL", () => {
           "0007_partners.sql",
           "0008_partner_settlements.sql",
           "0009_course_studio.sql",
+          "0010_class_courses.sql",
         ],
       });
     });

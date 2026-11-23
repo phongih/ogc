@@ -351,6 +351,35 @@ export interface CourseReviewTable {
   note: string | null;
 }
 
+export interface ClassCourseLinkTable {
+  org_id: string;
+  id: string;
+  class_id: string;
+  course_ref: string;
+  status: "proposed" | "linked" | "rejected" | "unlinked";
+  prep_hours: string | number;
+  proposed_by: string | null;
+  proposed_at: Date | null;
+  decided_by: string | null;
+  decided_at: Date | null;
+  reason: string | null;
+}
+export interface CourseProgressTable {
+  org_id: string;
+  learner_id: string;
+  course_ref: string;
+  version: number;
+}
+export interface CourseLessonDoneTable {
+  org_id: string;
+  learner_id: string;
+  course_ref: string;
+  lesson_id: string;
+  at: Date;
+  score: number | null;
+  answers: unknown;
+  reflections: unknown;
+}
 export interface SettlementBatchTable {
   org_id: string;
   id: string;
@@ -408,6 +437,9 @@ export interface DB {
   authored_course: AuthoredCourseTable;
   course_version: CourseVersionTable;
   course_review: CourseReviewTable;
+  class_course_link: ClassCourseLinkTable;
+  course_progress: CourseProgressTable;
+  course_lesson_done: CourseLessonDoneTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;
