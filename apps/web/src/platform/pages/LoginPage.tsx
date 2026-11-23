@@ -20,6 +20,7 @@ export function LoginPage() {
         principalId: p.principalId,
         displayName: p.displayName,
         role: p.role === "admin" ? "staff" : p.role,
+        orgAdmin: p.role === "admin",
       });
       nav(homeFor(p.role === "admin" ? "staff" : p.role));
     },

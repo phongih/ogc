@@ -39,13 +39,20 @@ export async function freshDb(): Promise<TestDb> {
   const name = `ogc_test_${randomBytes(6).toString("hex")}`;
   const admin = new pg.Client({ connectionString: ADMIN_URL });
   await admin.connect();
-  for (const [role, pw] of [
-    ["ogc_owner", OWNER_PW],
-    ["ogc_app", APP_PW],
-  ] as const) {
-    const exists = await admin.query("select 1 from pg_roles where rolname = $1", [role]);
-    if (exists.rowCount === 0)
-      await admin.query(`create role ${role} login password '${pw}' nosuperuser nobypassrls`);
+  // Test files run in parallel: on a brand-new cluster (CI) two of them would race to create the
+  // roles ("rolname already exists"). One at a time.
+  await admin.query("select pg_advisory_lock(40480098)");
+  try {
+    for (const [role, pw] of [
+      ["ogc_owner", OWNER_PW],
+      ["ogc_app", APP_PW],
+    ] as const) {
+      const exists = await admin.query("select 1 from pg_roles where rolname = $1", [role]);
+      if (exists.rowCount === 0)
+        await admin.query(`create role ${role} login password '${pw}' nosuperuser nobypassrls`);
+    }
+  } finally {
+    await admin.query("select pg_advisory_unlock(40480098)");
   }
   await admin.query(`create database ${name} owner ogc_owner`);
   await admin.end();

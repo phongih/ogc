@@ -4,6 +4,7 @@
  * runtimes can be compared. No real person, no real organization.
  */
 import type { PolicyRule } from "@ogc/contracts";
+import type { PolicyRecord } from "./policies.js";
 
 export const ORG_NOVA = "00000000-0000-4000-8000-000000000001";
 export const ORG_LUMEN = "00000000-0000-4000-8000-000000000002";
@@ -107,24 +108,42 @@ export const MEMBERS: Member[] = [
   },
 ];
 
-export interface StoredPolicy {
-  ref: string;
-  orgId: string;
-  name: string;
-  version: number;
-  status: "active" | "retired";
-  rules: PolicyRule[];
-}
+const SEED_AT = "2026-11-01T02:00:00.000Z";
 
-export function seedPolicies(): StoredPolicy[] {
+/** The two policies the demo seeds (same refs, names, rules), version 1 by Olivia. */
+export function seedPolicies(): PolicyRecord[] {
+  const mk = (
+    ref: string,
+    name: string,
+    description: string,
+    rules: PolicyRule[],
+  ): PolicyRecord => ({
+    ref,
+    orgId: ORG_NOVA,
+    name,
+    description,
+    version: 1,
+    status: "active",
+    rules,
+    updatedAt: SEED_AT,
+    history: [
+      {
+        version: 1,
+        status: "active",
+        description,
+        rules,
+        changedBy: "Olivia (Org Admin)",
+        changedAt: SEED_AT,
+        change: "created",
+      },
+    ],
+  });
   return [
-    {
-      ref: "policy-front-desk-d1",
-      orgId: ORG_NOVA,
-      name: "Front desk — District 1 only",
-      version: 1,
-      status: "active",
-      rules: [
+    mk(
+      "policy-front-desk-d1",
+      "Front desk — District 1 only",
+      "Schedule, make-ups, billing, admissions and the forecast for District 1 only; cannot change class teachers or substitutes.",
+      [
         {
           action: "schedule:manage",
           criteria: { centerId: [CENTER_D1] },
@@ -137,17 +156,15 @@ export function seedPolicies(): StoredPolicy[] {
         { action: "forecast:view", criteria: { centerId: [CENTER_D1] } },
         { action: "courses:link", criteria: { centerId: [CENTER_D1] } },
       ],
-    },
-    {
-      ref: "policy-own-classes",
-      orgId: ORG_NOVA,
-      name: "Teacher — own classes only",
-      version: 1,
-      status: "active",
-      rules: [
+    ),
+    mk(
+      "policy-own-classes",
+      "Teacher — own classes only",
+      "Marks attendance for their own classes only, not as a substitute; sees their own learners' care.",
+      [
         { action: "attendance:mark", criteria: { sessionRole: ["owner"] } },
         { action: "students:view" },
       ],
-    },
+    ),
   ];
 }

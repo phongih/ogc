@@ -5,7 +5,11 @@
  * contract's result shapes (ScheduleResult, RecordAttendanceResult) whatever the HTTP status.
  */
 import type {
+  AccessAdminView,
   AttendanceMark,
+  PolicyInput,
+  PolicyResult,
+  PolicyRule,
   AttendanceSummaryRow,
   ClassSession,
   OperationsOverview,
@@ -125,6 +129,34 @@ export const platformApi = {
   setSubstitute: (s: PlatformSession, sessionId: string, teacherId: string | null) =>
     result<ScheduleResult>(s, "PUT", `/v1/sessions/${encodeURIComponent(sessionId)}/substitute`, {
       teacherId,
+    }),
+
+  // Access policies (Org Admin; IIOS stores and decides, the API relays — OGC-ADR-039 option C)
+  accessAdmin: async (s: PlatformSession): Promise<AccessAdminView | null> => {
+    const r = await send(s, "GET", "/v1/access/admin");
+    if (r.status === 403) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as AccessAdminView;
+  },
+  createPolicy: (s: PlatformSession, input: PolicyInput) =>
+    result<PolicyResult>(s, "POST", "/v1/access/policies", input),
+  revisePolicy: (
+    s: PlatformSession,
+    ref: string,
+    expectedVersion: number,
+    patch: { description?: string | null; rules?: PolicyRule[] },
+  ) =>
+    result<PolicyResult>(s, "PUT", `/v1/access/policies/${encodeURIComponent(ref)}`, {
+      expectedVersion,
+      ...patch,
+    }),
+  retirePolicy: (s: PlatformSession, ref: string, expectedVersion: number) =>
+    result<PolicyResult>(s, "POST", `/v1/access/policies/${encodeURIComponent(ref)}/retire`, {
+      expectedVersion,
+    }),
+  attachPolicy: (s: PlatformSession, member: string, ref: string | null) =>
+    result<PolicyResult>(s, "PUT", `/v1/access/members/${encodeURIComponent(member)}/policy`, {
+      policyRef: ref,
     }),
 
   // Attendance (teachers)

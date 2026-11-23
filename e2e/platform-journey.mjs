@@ -151,6 +151,7 @@ async function main() {
       await admin.query(`create role ${role} login password '${pw}' nosuperuser nobypassrls`);
   }
   await admin.query(`create database ${name} owner ogc_owner`);
+  await admin.query(`create database ${name}_iios`); // the mock IIOS's own database
   await admin.end();
   const ownerUrl = dbUrl(name, "ogc_owner", "ogc_owner_test_only");
   const env = { ...process.env, DATABASE_URL_MIGRATE: ownerUrl };
@@ -167,12 +168,41 @@ async function main() {
       env: { ...process.env, NODE_ENV: "development", ...e },
     });
     procs.push(p);
+    return p;
   };
-  start("services/iios-mock/dist/main.mjs", {
-    IIOS_MOCK_KEY: randomBytes(32).toString("base64"),
+  const iiosEnv = {
+    IIOS_MOCK_KEY: randomBytes(32).toString("base64"), // kept across the restart below
     IIOS_MOCK_CLIENT_SECRET: secret,
+    IIOS_MOCK_DATABASE_URL: (() => {
+      const u = new URL(ADMIN_URL);
+      u.pathname = `/${name}_iios`;
+      return u.toString();
+    })(),
     PORT: String(IIOS_PORT),
-  });
+  };
+  let iiosProc = start("services/iios-mock/dist/main.mjs", iiosEnv);
+  const iiosUp = async () => {
+    const end = Date.now() + 15000;
+    while (Date.now() < end) {
+      try {
+        const r = await fetch(`http://${HOST}:${IIOS_PORT}/v1/dev/members`, {
+          headers: { authorization: `Bearer ${secret}` },
+        });
+        if (r.ok) return;
+      } catch {
+        /* not up */
+      }
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    throw new Error("mock IIOS did not come back");
+  };
+  const restartIios = async () => {
+    const exited = new Promise((r) => iiosProc.once("exit", r));
+    iiosProc.kill();
+    await exited;
+    iiosProc = start("services/iios-mock/dist/main.mjs", iiosEnv);
+    await iiosUp();
+  };
   start("services/api/dist/main.mjs", {
     DATABASE_URL: dbUrl(name, "ogc_app", "ogc_app_test_only"),
     IIOS_URL: `http://${HOST}:${IIOS_PORT}`,
@@ -279,7 +309,64 @@ async function main() {
       Number(cells[3]) >= 1 && Number(cells[5]) >= 1,
     );
 
-    // 6) a grant the API refuses → back to sign in
+    // 6) Olivia → Access: attach a policy to Sam, create one; restart the mock IIOS; Sam narrowed
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.getByRole("button", { name: "Olivia (Org Admin)" }).click();
+    await page
+      .getByRole("navigation", { name: "Platform" })
+      .getByRole("link", { name: "Access" })
+      .click();
+    await page.getByRole("heading", { name: "Access policies" }).waitFor();
+    check(
+      "[olivia] Access page from the API; cannot change own access",
+      (await page.getByText(/another Org Admin must change this/).count()) === 1,
+    );
+    await page
+      .getByLabel("Access policy for Sam (Org Staff)")
+      .selectOption({ label: "Front desk — District 1 only" });
+    await page.getByText("used by 1").waitFor();
+    await page.getByRole("button", { name: "+ New policy" }).click();
+    await page.getByLabel("Policy name").fill("Evening desk");
+    await page.getByLabel("Rule 1: action").selectOption("students:view");
+    await page.getByRole("button", { name: "Create policy" }).click();
+    await page
+      .locator('[data-policy="Evening desk"]')
+      .getByText(/v1 · created by Olivia/)
+      .waitFor({ state: "attached" }); // inside the collapsed History
+    check("[olivia] policy attached and a new one created", true);
+
+    await restartIios();
+    await page.reload();
+    await page.getByRole("heading", { name: "Access policies" }).waitFor();
+    check(
+      "[iios restart] attachment and new policy kept in the mock IIOS's database",
+      (await page.getByText("used by 1").count()) === 1 &&
+        (await page.locator('[data-policy="Evening desk"]').count()) === 1 &&
+        (await page.getByLabel("Access policy for Sam (Org Staff)").inputValue()) ===
+          "policy-front-desk-d1",
+    );
+
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.getByRole("button", { name: "Sam (Org Staff)" }).click();
+    await page.getByRole("heading", { name: "Schedule" }).waitFor();
+    await page.getByText("A2 Morning — Mon/Wed").waitFor();
+    check(
+      "[sam] narrowed to District 1: no B1 Evening (Thu Duc)",
+      (await page.getByText("B1 Evening — Tue/Thu").count()) === 0 &&
+        (await page.getByText("A2 Evening — Tue/Thu").count()) === 1,
+    );
+    await page.getByLabel("Teacher of A2 Morning — Mon/Wed").selectOption({ label: "Ben" });
+    await page.getByText("Your access policy does not allow this here.").waitFor();
+    check("[sam] class teacher is read-only under the policy (refused by the API)", true);
+    check(
+      "[access] no Access link for staff",
+      (await page
+        .getByRole("navigation", { name: "Platform" })
+        .getByRole("link", { name: "Access" })
+        .count()) === 0,
+    );
+
+    // 7) a grant the API refuses → back to sign in
     await page.evaluate(() => {
       const k = "ogc.platform.session";
       const s = JSON.parse(sessionStorage.getItem(k));
@@ -291,6 +378,18 @@ async function main() {
     check("a refused grant (401) sends the user back to sign in", true);
   } catch (e) {
     console.error(e);
+    if (process.env.E2E_DEBUG && browser)
+      for (const ctx of browser.contexts())
+        for (const pg2 of ctx.pages())
+          console.error(
+            "PAGE TEXT:\n" +
+              (
+                await pg2
+                  .locator("main")
+                  .innerText()
+                  .catch(() => "?")
+              ).slice(0, 3000),
+          );
     check(`journey completed (${e.message.split("\n")[0]})`, false);
   } finally {
     await browser?.close();
@@ -299,6 +398,7 @@ async function main() {
     const a = new pg.Client({ connectionString: ADMIN_URL });
     await a.connect();
     await a.query(`drop database if exists ${name} with (force)`);
+    await a.query(`drop database if exists ${name}_iios with (force)`);
     await a.end();
   }
   const failed = checks.filter((c) => !c.ok).length;

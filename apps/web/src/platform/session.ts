@@ -9,6 +9,8 @@ export interface PlatformSession {
   principalId: string;
   displayName: string;
   role: string;
+  /** IIOS member attribute (display only: the API and IIOS decide every request). */
+  orgAdmin?: boolean;
   expiresAt: string;
 }
 

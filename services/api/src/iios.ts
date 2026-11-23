@@ -21,8 +21,25 @@ export interface DevMember {
   role: string;
 }
 
+/** IIOS's answer to a policy admin call: the decision, IIOS's refusal, or no usable answer. */
+export type AdminOutcome<T> =
+  | { kind: "ok"; body: T }
+  | { kind: "not_admin" }
+  | { kind: "denied" } // IIOS would not open the grant (expired / revoked / other org)
+  | { kind: "unavailable" };
+
 export interface IiosClient {
   resolve(grant: string, intendedOrgId: string): Promise<ResolveOutcome>;
+  /**
+   * Access policy administration (OGC-ADR-039 option C): IIOS stores and decides; OGC passes the
+   * caller's own grant and relays the result. `path` is the IIOS admin operation.
+   */
+  policyAdmin?(
+    path: "view" | "create" | "revise" | "retire" | "attach",
+    grant: string,
+    orgId: string,
+    body: Record<string, unknown>,
+  ): Promise<AdminOutcome<unknown>>;
   /** Staging only (mock IIOS): list synthetic members and issue a grant for one of them. */
   dev?: {
     members(): Promise<DevMember[] | null>;
@@ -52,6 +69,28 @@ export function httpIiosClient(opts: {
     }
   };
   return {
+    async policyAdmin(path, grant, orgId, body) {
+      const url = path === "attach" ? "/v1/admin/attach" : `/v1/admin/policies/${path}`;
+      let res: Response;
+      try {
+        res = await fetch(`${opts.baseUrl}${url}`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${opts.clientSecret}`,
+          },
+          body: JSON.stringify({ ...body, grant, orgId }),
+          signal: AbortSignal.timeout(opts.timeoutMs ?? 2000),
+        });
+      } catch {
+        return { kind: "unavailable" };
+      }
+      if (res.status === 401) return { kind: "denied" };
+      if (res.status === 403) return { kind: "not_admin" };
+      if (res.status !== 200) return { kind: "unavailable" };
+      const b = (await res.json().catch(() => null)) as unknown;
+      return b && typeof b === "object" ? { kind: "ok", body: b } : { kind: "unavailable" };
+    },
     dev: {
       async members() {
         const r = await call("GET", "/v1/dev/members");

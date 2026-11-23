@@ -9,18 +9,20 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/main.mjs --external:fastify",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/main.mjs --external:fastify --external:pg",
     "start": "node dist/main.mjs",
     "test": "vitest run"
   },
   "dependencies": {
     "@ogc/contracts": "workspace:*",
-    "fastify": "5.1.0"
+    "fastify": "5.1.0",
+    "pg": "8.13.1"
   },
   "devDependencies": {
     "@types/node": "22.7.4",
     "esbuild": "0.21.5",
     "typescript": "5.6.2",
-    "vitest": "2.1.1"
+    "vitest": "2.1.1",
+    "@types/pg": "8.11.10"
   }
 }

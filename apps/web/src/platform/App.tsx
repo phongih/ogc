@@ -12,6 +12,7 @@ import { SchedulePage } from "./pages/SchedulePage";
 import { TeachingPage } from "./pages/TeachingPage";
 import { ClassPage } from "./pages/ClassPage";
 import { SessionPage } from "./pages/SessionPage";
+import { AccessPage } from "./pages/AccessPage";
 
 interface Ctx {
   session: PlatformSession | null;
@@ -45,6 +46,13 @@ function Shell({ children }: { children: ReactNode }) {
         <Link to={session ? homeFor(session.role) : "/login"} className="font-semibold">
           OGC Platform
         </Link>
+        {session ? (
+          <nav aria-label="Platform" className="flex gap-4 text-sm">
+            {session.role === "staff" ? <Link to="/schedule">Schedule</Link> : null}
+            {session.role === "teacher" ? <Link to="/teaching">Teaching</Link> : null}
+            {session.orgAdmin ? <Link to="/access">Access</Link> : null}
+          </nav>
+        ) : null}
         {session ? (
           <div className="flex items-center gap-3 text-sm">
             <span data-testid="who">
@@ -125,6 +133,14 @@ export function App() {
                 element={
                   <Protected>
                     <SessionPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/access"
+                element={
+                  <Protected>
+                    <AccessPage />
                   </Protected>
                 }
               />
