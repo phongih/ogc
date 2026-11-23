@@ -19,7 +19,12 @@ import { PlatformWorkforcePage } from "./pages/WorkforcePage";
 import { PlatformAdmissionsPage } from "./pages/AdmissionsPage";
 import { PlatformBillingPage, PlatformTuitionPage } from "./pages/BillingPage";
 import { PlatformPartnersPage } from "./pages/PartnersPage";
-import { PlatformCoursePage, PlatformCoursesPage } from "./pages/CoursesPage";
+import {
+  PlatformClassLessonPage,
+  PlatformCoursePage,
+  PlatformCoursesPage,
+  PlatformMyCoursesPage,
+} from "./pages/CoursesPage";
 
 interface Ctx {
   session: PlatformSession | null;
@@ -76,6 +81,7 @@ function Shell({ children }: { children: ReactNode }) {
             {session.role === "learner" || session.role === "guardian" ? (
               <Link to="/tuition">Tuition</Link>
             ) : null}
+            {session.role === "learner" ? <Link to="/my-courses">My courses</Link> : null}
             {session.role === "teacher" ? <Link to="/teaching">Teaching</Link> : null}
             {session.orgAdmin ? <Link to="/access">Access</Link> : null}
           </nav>
@@ -224,6 +230,22 @@ export function App() {
                 element={
                   <Protected>
                     <PlatformCoursePage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/my-courses"
+                element={
+                  <Protected>
+                    <PlatformMyCoursesPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/my-courses/:ref/:lessonId"
+                element={
+                  <Protected>
+                    <PlatformClassLessonPage />
                   </Protected>
                 }
               />

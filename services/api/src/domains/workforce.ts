@@ -7,7 +7,9 @@
  *    bands are % of target with thresholds staff tune (workforce:manage);
  *  - SUGGEST ONLY: candidates for a class teacher or a substitute are ranked with load before →
  *    after and any clash; nothing is assigned, going over the target only warns.
- * Not on the Platform yet: course-prep hours (Course Studio) and the new-center wizard's hint.
+ *  - weekly prep hours staff set on a linked class course count for the class teacher (owner 22/11,
+ *    slice 3 part B).
+ * Not on the Platform yet: the new-center wizard's hint.
  */
 import { authorize } from "@ogc/contracts";
 import type {
@@ -24,6 +26,7 @@ import type {
 import type { TenantTx } from "../db.js";
 import type { Api, Caller } from "../server.js";
 import { clashes, slotOf, snapshot, teacherOf, type Sess, type Snapshot } from "./schedule.js";
+import { prepHoursByTeacher } from "./classCourses.js";
 
 const DAY = 86_400_000;
 export const DEFAULT_SETTINGS: WorkforceSettings = { underPct: 60, overPct: 100 };
@@ -33,13 +36,15 @@ interface Plan {
   snap: Snapshot;
   targets: Map<string, { employment: Employment; targetHours: number }>;
   settings: WorkforceSettings;
+  prep: Map<string, { classId: string; className: string; hours: number }[]>;
 }
 
 async function plan(tx: TenantTx): Promise<Plan> {
-  const [snap, targets, settings] = await Promise.all([
+  const [snap, targets, settings, prep] = await Promise.all([
     snapshot(tx),
     tx.selectFrom("teacher_target").select(["teacher_id", "employment", "target_hours"]).execute(),
     tx.selectFrom("workforce_settings").select(["under_pct", "over_pct"]).executeTakeFirst(),
+    prepHoursByTeacher(tx),
   ]);
   return {
     snap,
@@ -52,6 +57,7 @@ async function plan(tx: TenantTx): Promise<Plan> {
     settings: settings
       ? { underPct: settings.under_pct, overPct: settings.over_pct }
       : { ...DEFAULT_SETTINGS },
+    prep,
   };
 }
 
@@ -100,6 +106,15 @@ function loadOf(p: Plan, teacherId: string, now: number): TeacherLoad {
     g.hours = round(g.hours + hoursOf(p, x));
     groups.set(k, g);
   }
+  // Class courses: weekly prep hours staff set on a linked course count for the class teacher.
+  const prep = p.prep.get(teacherId) ?? [];
+  for (const x of prep)
+    groups.set(`${x.classId}|prep`, {
+      label: x.className,
+      kind: "prep",
+      sessions: 0,
+      hours: x.hours,
+    });
   const tg = targetOf(p, teacherId);
   return {
     teacherId,
@@ -109,7 +124,7 @@ function loadOf(p: Plan, teacherId: string, now: number): TeacherLoad {
     classes: [...p.snap.classes.values()].filter((c) => c.teacherId === teacherId).length,
     breakdown: [...groups.values()],
     ...point(
-      mine.reduce((t, x) => t + hoursOf(p, x), 0),
+      mine.reduce((t, x) => t + hoursOf(p, x), 0) + prep.reduce((t, x) => t + x.hours, 0),
       mine.length,
       tg.targetHours,
       p.settings,

@@ -25,7 +25,7 @@ runPlatformJourney("platform course studio E2E", async ({ browser, base, check }
 
   // 1) Tara → Courses: her own and the published ones
   await signIn("Tara (Teacher)", "Teaching");
-  await nav().getByRole("link", { name: "Courses" }).click();
+  await nav().getByRole("link", { name: "Courses", exact: true }).click();
   await page.getByRole("heading", { name: "Course Studio" }).waitFor();
   await page.getByRole("table", { name: "Course list" }).waitFor();
   const tara = await rows();
@@ -67,7 +67,7 @@ runPlatformJourney("platform course studio E2E", async ({ browser, base, check }
 
   // 3) Sam approves → v2; v1 unchanged
   await signIn("Sam (Org Staff)", "Schedule");
-  await nav().getByRole("link", { name: "Courses" }).click();
+  await nav().getByRole("link", { name: "Courses", exact: true }).click();
   await page.getByTestId("to-review").waitFor();
   check(
     "[sam] B1 Speaking Confidence and A2 Pronunciation Lab wait for review",
@@ -94,7 +94,7 @@ runPlatformJourney("platform course studio E2E", async ({ browser, base, check }
 
   // 4) Olivia returns Ben's course with a note
   await signIn("Olivia (Org Admin)", "Schedule");
-  await nav().getByRole("link", { name: "Courses" }).click();
+  await nav().getByRole("link", { name: "Courses", exact: true }).click();
   await page.getByRole("link", { name: "A2 Pronunciation Lab" }).click();
   const r2 = page.getByRole("region", { name: "Review" });
   await r2.getByLabel("Review note").fill("Add a second lesson");
@@ -106,9 +106,9 @@ runPlatformJourney("platform course studio E2E", async ({ browser, base, check }
   await signIn("Linh (Learner)", "My make-ups");
   check(
     "[linh] no Courses link",
-    (await nav().getByRole("link", { name: "Courses" }).count()) === 0,
+    (await nav().getByRole("link", { name: "Courses", exact: true }).count()) === 0,
   );
   await page.goto(`${base}/courses`);
-  await page.getByText("Not available").waitFor();
-  check("[linh] /courses says not available", true);
+  await page.getByText("Course Studio is for staff and class teachers").waitFor();
+  check("[linh] /courses says it is for staff and class teachers", true);
 });

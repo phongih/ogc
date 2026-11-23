@@ -1,6 +1,6 @@
 /*
- * Course Studio on the Platform API (owner 23/11, slice 3 part A — authoring; part B links courses
- * to classes and adds My Learning). The rules of the demo's mock adapter
+ * Course Studio on the Platform API (owner 23/11, slice 3 part A — authoring; part B, in
+ * classCourses.ts, links courses to classes and adds My Learning). The rules of the demo's mock adapter
  * (apps/web/src/lib/adapters/mockCourseAuthoring.ts, owner decisions 22/11), on PostgreSQL:
  *  - a course is lessons of typed blocks, checked by the contracts' fail-closed validator; what is
  *    stored is rebuilt from the validated fields only (no unknown keys reach the database);
@@ -53,7 +53,7 @@ interface Person {
   id: string; // IIOS principal — "a different person" is decided on this
   name: string;
 }
-interface Stored {
+export interface Stored {
   ref: string;
   ownerTeacherId: string | null;
   owner: Person;
@@ -98,7 +98,7 @@ function normalized(c: CourseContent): CourseContent {
   };
 }
 
-async function load(tx: TenantTx, ref?: string): Promise<Stored[]> {
+export async function load(tx: TenantTx, ref?: string): Promise<Stored[]> {
   let cq = tx.selectFrom("authored_course").selectAll();
   let vq = tx.selectFrom("course_version").selectAll();
   let rq = tx.selectFrom("course_review").selectAll();
@@ -186,7 +186,7 @@ export function statusOf(c: Stored): AuthoredStatus {
   if (!last) return "draft";
   return same(last.content, c.draft) ? "published" : "unpublished_changes";
 }
-const latest = (c: Stored) => c.versions[c.versions.length - 1] ?? null;
+export const latest = (c: Stored) => c.versions[c.versions.length - 1] ?? null;
 
 function canEdit(me: Me, c: Stored): boolean {
   if (!me.authors) return false;
@@ -228,7 +228,7 @@ function summaryOf(me: Me, c: Stored): AuthoredCourseSummary {
     canReview: reviewBlock(me, c) === null,
   };
 }
-function detailOf(me: Me, c: Stored): AuthoredCourseDetail {
+function detailOf(me: Me, c: Stored, linkedClasses: string[]): AuthoredCourseDetail {
   const editable = canEdit(me, c);
   const insider = editable || me.staff;
   return {
@@ -243,7 +243,7 @@ function detailOf(me: Me, c: Stored): AuthoredCourseDetail {
     editorsSinceLastPublication: c.editors.map((e) => e.name),
     versions: [...c.versions].reverse(),
     reviews: [...c.reviews].reverse(),
-    linkedClasses: [], // class links arrive with part B
+    linkedClasses,
     reviewBlockedReason: c.pending ? reviewBlock(me, c) : null,
   };
 }
@@ -291,7 +291,19 @@ export function registerCourses(app: Api): void {
       const me = await whoAmI(tx, caller);
       const [c] = await load(tx, (req.params as { ref: string }).ref);
       if (!c || !canRead(me, c)) return reply.code(404).send({ error: "not_found" });
-      return detailOf(me, c);
+      const linked = await tx
+        .selectFrom("class_course_link as l")
+        .innerJoin("class as k", "k.id", "l.class_id")
+        .select("k.name")
+        .where("l.course_ref", "=", c.ref)
+        .where("l.status", "=", "linked")
+        .orderBy("k.name")
+        .execute();
+      return detailOf(
+        me,
+        c,
+        linked.map((x) => x.name),
+      );
     }),
   );
 

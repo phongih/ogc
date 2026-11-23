@@ -5,6 +5,12 @@
  * contract's result shapes (ScheduleResult, RecordAttendanceResult) whatever the HTTP status.
  */
 import type {
+  LearnerStudioProgress,
+  MyClassCourse,
+  MyLessonView,
+  StudioCourse,
+  StudioOverview,
+  StudioResult,
   AuthoredCourseDetail,
   AuthoredCourseSummary,
   AuthoringResult,
@@ -380,6 +386,60 @@ export const platformApi = {
       row,
     ),
   partnerTrends: (s: PlatformSession) => staffRead<PartnerTrend[]>(s, "/v1/partners/trends"),
+
+  // Class courses (class teachers propose, staff with courses:link decide) and My Learning
+  classCourses: (s: PlatformSession) => staffRead<StudioOverview>(s, "/v1/class-courses"),
+  searchClassCourses: (s: PlatformSession, q: string) =>
+    staffRead<StudioCourse[]>(s, `/v1/class-courses/search?q=${encodeURIComponent(q)}`),
+  proposeClassCourse: (s: PlatformSession, classId: string, courseRef: string) =>
+    result<StudioResult>(s, "POST", "/v1/class-courses/propose", { classId, courseRef }),
+  linkClassCourse: (
+    s: PlatformSession,
+    classId: string,
+    courseRef: string,
+    prepHoursPerWeek: number,
+  ) =>
+    result<StudioResult>(s, "POST", "/v1/class-courses/link", {
+      classId,
+      courseRef,
+      prepHoursPerWeek,
+    }),
+  classCourseStep: (
+    s: PlatformSession,
+    id: string,
+    step: "reject" | "unlink" | "prep",
+    body: object,
+  ) => result<StudioResult>(s, "POST", `/v1/class-courses/${encodeURIComponent(id)}/${step}`, body),
+  classCourseProgress: async (s: PlatformSession, id: string) => {
+    const r = await send(s, "GET", `/v1/class-courses/${encodeURIComponent(id)}/progress`);
+    if (r.status === 404 || r.status === 403) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as LearnerStudioProgress[];
+  },
+  myClassCourses: (s: PlatformSession) => staffRead<MyClassCourse[]>(s, "/v1/me/class-courses"),
+  myClassLesson: async (s: PlatformSession, ref: string, lessonId: string) => {
+    const r = await send(
+      s,
+      "GET",
+      `/v1/me/class-courses/${encodeURIComponent(ref)}/${encodeURIComponent(lessonId)}`,
+    );
+    if (r.status === 404 || r.status === 403) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as MyLessonView;
+  },
+  completeClassLesson: (
+    s: PlatformSession,
+    ref: string,
+    lessonId: string,
+    answers: Record<string, number>,
+    reflections: Record<string, string>,
+  ) =>
+    result<AuthoringResult & { score?: number | null }>(
+      s,
+      "POST",
+      `/v1/me/class-courses/${encodeURIComponent(ref)}/${encodeURIComponent(lessonId)}/complete`,
+      { answers, reflections },
+    ),
 
   // Course Studio (teachers and staff, courses:author) — synthetic courses
   courses: (s: PlatformSession) =>

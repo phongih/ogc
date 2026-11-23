@@ -370,3 +370,30 @@ export async function seedLumenCourse(c: pg.Client, now: number): Promise<void> 
     updatedDays: 5,
   });
 }
+
+/** Nova's class links and one learner's progress (the demo's), after the courses and classes. */
+export async function seedClassCourses(
+  c: pg.Client,
+  now: number,
+  ids: { a2Morning: string; b1Evening: string; an: string },
+): Promise<void> {
+  const at = (days: number) => new Date(now - days * DAY);
+  // A2 Morning follows the A2 course; Tara proposed the B1 course for B1 Evening.
+  await c.query(
+    `insert into class_course_link (org_id, id, class_id, course_ref, status, prep_hours, proposed_by, proposed_at,
+       decided_by, decided_at, reason)
+     values (ogc_current_org(), 'SL-1', $1, 'CS-A2-EVERYDAY', 'linked', 0, null, null, 'Sam (Org Staff)', $2, null),
+            (ogc_current_org(), 'SL-2', $3, 'CS-B1-SPEAK', 'proposed', 0, 'Tara', $4, null, null, null)`,
+    [ids.a2Morning, at(20), ids.b1Evening, at(2)],
+  );
+  // An P. started the A2 course on v1, 18 days ago — still pinned to v1 after v2.
+  await c.query(
+    "insert into course_progress (org_id, learner_id, course_ref, version) values (ogc_current_org(), $1, 'CS-A2-EVERYDAY', 1)",
+    [ids.an],
+  );
+  await c.query(
+    `insert into course_lesson_done (org_id, learner_id, course_ref, lesson_id, at, score, answers, reflections)
+     values (ogc_current_org(), $1, 'CS-A2-EVERYDAY', 'a2-l1', $2, 100, '{"a2-l1-b4": 1}', '{}')`,
+    [ids.an, at(18)],
+  );
+}
