@@ -25,6 +25,7 @@ import { idempotent, KEY_FORMAT } from "./idempotency.js";
 import type { IiosClient } from "./iios.js";
 import { registerAccess } from "./domains/access.js";
 import { registerAttendance } from "./domains/attendance.js";
+import { registerMakeup } from "./domains/makeup.js";
 import { registerSchedule } from "./domains/schedule.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -237,6 +238,7 @@ export function buildApi(deps: ApiDeps): Api {
 
   registerSchedule(app);
   registerAttendance(app);
+  registerMakeup(app);
   registerAccess(app, deps.iios);
   return app;
 }

@@ -6,6 +6,11 @@
  */
 import type {
   AccessAdminView,
+  MakeupBoard,
+  MakeupItem,
+  MakeupItemResult,
+  MakeupOption,
+  MakeupResult,
   AttendanceMark,
   PolicyInput,
   PolicyResult,
@@ -158,6 +163,39 @@ export const platformApi = {
     result<PolicyResult>(s, "PUT", `/v1/access/members/${encodeURIComponent(member)}/policy`, {
       policyRef: ref,
     }),
+
+  // Make-ups (staff arrange; learners submit self-study; guardians read; class teachers confirm)
+  makeupBoard: async (s: PlatformSession): Promise<MakeupBoard | null> => {
+    const r = await send(s, "GET", "/v1/makeups");
+    if (r.status === 403) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as MakeupBoard;
+  },
+  makeupOptions: async (s: PlatformSession, item: string): Promise<MakeupOption[] | null> => {
+    const r = await send(s, "GET", `/v1/makeups/${encodeURIComponent(item)}/options`);
+    if (r.status === 404 || r.status === 403) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as MakeupOption[];
+  },
+  bookMakeup: (s: PlatformSession, item: string, sessionId: string) =>
+    result<MakeupResult>(s, "POST", `/v1/makeups/${encodeURIComponent(item)}/book`, { sessionId }),
+  openMakeupSession: (s: PlatformSession, item: string, at: string, teacherId: string) =>
+    result<MakeupResult>(s, "POST", `/v1/makeups/${encodeURIComponent(item)}/makeup-session`, {
+      at,
+      teacherId,
+    }),
+  assignSelfStudy: (s: PlatformSession, item: string) =>
+    result<MakeupResult>(s, "POST", `/v1/makeups/${encodeURIComponent(item)}/self-study`, {}),
+  myMakeups: (s: PlatformSession) => read<MakeupItem[]>(s, "/v1/me/makeups"),
+  submitSelfStudy: (s: PlatformSession, item: string, note: string) =>
+    result<MakeupItemResult>(s, "POST", `/v1/me/makeups/${encodeURIComponent(item)}/self-study`, {
+      note,
+    }),
+  selfStudyToConfirm: (s: PlatformSession) => read<MakeupItem[]>(s, "/v1/me/makeups/to-confirm"),
+  confirmSelfStudy: (s: PlatformSession, item: string) =>
+    result<MakeupItemResult>(s, "POST", `/v1/makeups/${encodeURIComponent(item)}/confirm`, {}),
+  returnSelfStudy: (s: PlatformSession, item: string, note: string) =>
+    result<MakeupItemResult>(s, "POST", `/v1/makeups/${encodeURIComponent(item)}/return`, { note }),
 
   // Attendance (teachers)
   myClasses: (s: PlatformSession) => read<MyClass[]>(s, "/v1/me/classes"),

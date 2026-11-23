@@ -7,100 +7,9 @@
  *   4. Sam (staff): a clashing reschedule is refused with the clash sentence; a free time saves
  *   5. Tara (teacher): marks the session waiting for attendance; the summary counts it
  *   6. a stale / revoked grant (401) sends the user back to sign in
- * Needs OGC_TEST_PG_ADMIN_URL and the pre-installed Playwright. Exit 0 = all checks passed.
+ * The stack (databases, services, build, guard, proxy) comes from platform-stack.mjs.
  */
-import http from "node:http";
-import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { extname, join, normalize } from "node:path";
-import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_process";
-import { createRequire } from "node:module";
-import { randomBytes } from "node:crypto";
-
-const ROOT = fileURLToPath(new URL("..", import.meta.url));
-const WEB = join(ROOT, "apps/web");
-const DIST = join(WEB, "dist-platform");
-const HOST = "127.0.0.1";
-const IIOS_PORT = 18790;
-const API_PORT = 18788;
-const ADMIN_URL = process.env.OGC_TEST_PG_ADMIN_URL ?? "";
-const NOVA = "00000000-0000-4000-8000-000000000001";
-
-const req = createRequire(join(ROOT, "services/api/package.json"));
-const pg = req("pg");
-let chromium;
-try {
-  ({ chromium } = createRequire("/opt/npm-tools/node_modules/")("playwright"));
-} catch {
-  ({ chromium } = createRequire(join(WEB, "package.json"))("playwright"));
-}
-
-const checks = [];
-const check = (name, ok) => (
-  checks.push({ name, ok }),
-  console.log(`${ok ? "PASS" : "FAIL"}  ${name}`)
-);
-const MIME = {
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-};
-
-function run(cmd, args, opts = {}) {
-  return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { stdio: "inherit", cwd: ROOT, ...opts });
-    p.on("exit", (code) =>
-      code === 0 ? resolve() : reject(new Error(`${cmd} ${args.join(" ")} exited ${code}`)),
-    );
-    p.on("error", reject);
-  });
-}
-async function waitFor(url, ms) {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    try {
-      if ((await fetch(url)).ok) return;
-    } catch {
-      /* not up */
-    }
-    await new Promise((r) => setTimeout(r, 150));
-  }
-  throw new Error(`timed out waiting for ${url}`);
-}
-const dbUrl = (db, user, pw) => {
-  const u = new URL(ADMIN_URL);
-  u.pathname = `/${db}`;
-  u.username = user;
-  u.password = pw;
-  return u.toString();
-};
-
-// Static dist-platform with the SPA fallback and a same-origin /v1 proxy — what nginx does on VM 2.
-function startFront() {
-  const server = http.createServer(async (rq, rs) => {
-    if ((rq.url || "").startsWith("/v1/")) {
-      const up = http.request(
-        { host: HOST, port: API_PORT, path: rq.url, method: rq.method, headers: rq.headers },
-        (r) => (rs.writeHead(r.statusCode ?? 502, r.headers), r.pipe(rs)),
-      );
-      up.on("error", () => rs.writeHead(502).end());
-      return rq.pipe(up);
-    }
-    try {
-      const p = decodeURIComponent((rq.url || "/").split("?")[0]);
-      let f = normalize(join(DIST, p));
-      if (!f.startsWith(DIST)) return rs.writeHead(403).end();
-      if (p === "/" || !existsSync(f) || extname(f) === "") f = join(DIST, "platform.html");
-      rs.writeHead(200, { "content-type": MIME[extname(f)] ?? "application/octet-stream" });
-      rs.end(await readFile(f));
-    } catch {
-      rs.writeHead(500).end();
-    }
-  });
-  return new Promise((r) => server.listen(0, HOST, () => r(server)));
-}
+import { apiAs, runPlatformJourney } from "./platform-stack.mjs";
 
 /** "YYYY-MM-DDTHH:MM" in center time (UTC+7) for UTC midnight today + d days at a center hour. */
 function centerLocal(d, hour) {
@@ -111,298 +20,161 @@ function centerLocal(d, hour) {
 
 /** Tara's next B1 Evening slot (session k2-p1) as "YYYY-MM-DDTHH:MM" center time, read via the API. */
 async function nextB1Evening() {
-  const api = `http://${HOST}:${API_PORT}`;
-  const login = await fetch(`${api}/v1/dev/login`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ principalId: "iios-principal-staff-1", orgId: NOVA }),
-  });
-  const { grant } = await login.json();
-  const o = await (
-    await fetch(`${api}/v1/schedule`, {
-      headers: { authorization: `Bearer ${grant}`, "x-ogc-org": NOVA },
-    })
-  ).json();
+  const o = await (await apiAs("iios-principal-staff-1"))("/v1/schedule");
   const at = o.classes.flatMap((c) => c.sessions).find((x) => x.id === "k2-p1").at;
   return new Date(Date.parse(at) + 7 * 3600000).toISOString().slice(0, 16);
 }
 
-async function main() {
-  if (!ADMIN_URL) {
-    console.error("platform E2E: OGC_TEST_PG_ADMIN_URL is required");
-    process.exit(2);
-  }
-  for (const f of ["services/api/dist/main.mjs", "services/iios-mock/dist/main.mjs"])
-    if (!existsSync(join(ROOT, f))) {
-      console.error(`${f} missing — build @ogc/api and @ogc/iios-mock first`);
-      process.exit(2);
-    }
+runPlatformJourney("platform E2E", async ({ browser, base, check, restartIios }) => {
+  const page = await browser.newPage();
+  const apiCalls = [];
+  page.on("request", (r) => r.url().includes("/v1/") && apiCalls.push(r.url()));
 
-  // 1) database
-  const name = `ogc_e2e_${randomBytes(5).toString("hex")}`;
-  const admin = new pg.Client({ connectionString: ADMIN_URL });
-  await admin.connect();
-  for (const [role, pw] of [
-    ["ogc_owner", "ogc_owner_test_only"],
-    ["ogc_app", "ogc_app_test_only"],
-  ]) {
-    const ex = await admin.query("select 1 from pg_roles where rolname = $1", [role]);
-    if (!ex.rowCount)
-      await admin.query(`create role ${role} login password '${pw}' nosuperuser nobypassrls`);
-  }
-  await admin.query(`create database ${name} owner ogc_owner`);
-  await admin.query(`create database ${name}_iios`); // the mock IIOS's own database
-  await admin.end();
-  const ownerUrl = dbUrl(name, "ogc_owner", "ogc_owner_test_only");
-  const env = { ...process.env, DATABASE_URL_MIGRATE: ownerUrl };
-  await run("node", ["services/api/dist/migrate.mjs"], { env });
-  await run("node", ["services/api/dist/seed.mjs"], { env });
+  // 4) Sam — staff schedule
+  await page.goto(`${base}/`);
+  await page.getByRole("heading", { name: "Sign in (staging)" }).waitFor();
+  check(
+    "sign-in lists both synthetic orgs",
+    (await page.getByText("Lumen", { exact: false }).count()) > 0,
+  );
+  check(
+    "banner says staging / synthetic / mock IIOS",
+    (await page.getByText("STAGING · synthetic data · mock IIOS").count()) === 1,
+  );
+  await page.getByRole("button", { name: "Sam (Org Staff)" }).click();
+  await page.getByRole("heading", { name: "Schedule" }).waitFor();
+  check("Sam lands on Schedule", page.url().endsWith("/schedule"));
+  check(
+    "header shows Sam · staff",
+    ((await page.getByTestId("who").textContent()) ?? "").includes("Sam"),
+  );
+  check(
+    "Lumen classes are not shown to Nova staff",
+    (await page.getByText("Lumen", { exact: false }).count()) === 0,
+  );
 
-  // 2) services
-  const secret = randomBytes(24).toString("hex");
-  const procs = [];
-  const start = (file, e) => {
-    const p = spawn("node", [file], {
-      cwd: ROOT,
-      stdio: "inherit",
-      env: { ...process.env, NODE_ENV: "development", ...e },
-    });
-    procs.push(p);
-    return p;
-  };
-  const iiosEnv = {
-    IIOS_MOCK_KEY: randomBytes(32).toString("base64"), // kept across the restart below
-    IIOS_MOCK_CLIENT_SECRET: secret,
-    IIOS_MOCK_DATABASE_URL: (() => {
-      const u = new URL(ADMIN_URL);
-      u.pathname = `/${name}_iios`;
-      return u.toString();
-    })(),
-    PORT: String(IIOS_PORT),
-  };
-  let iiosProc = start("services/iios-mock/dist/main.mjs", iiosEnv);
-  const iiosUp = async () => {
-    const end = Date.now() + 15000;
-    while (Date.now() < end) {
-      try {
-        const r = await fetch(`http://${HOST}:${IIOS_PORT}/v1/dev/members`, {
-          headers: { authorization: `Bearer ${secret}` },
-        });
-        if (r.ok) return;
-      } catch {
-        /* not up */
-      }
-      await new Promise((r) => setTimeout(r, 150));
-    }
-    throw new Error("mock IIOS did not come back");
-  };
-  const restartIios = async () => {
-    const exited = new Promise((r) => iiosProc.once("exit", r));
-    iiosProc.kill();
-    await exited;
-    iiosProc = start("services/iios-mock/dist/main.mjs", iiosEnv);
-    await iiosUp();
-  };
-  start("services/api/dist/main.mjs", {
-    DATABASE_URL: dbUrl(name, "ogc_app", "ogc_app_test_only"),
-    IIOS_URL: `http://${HOST}:${IIOS_PORT}`,
-    IIOS_CLIENT_SECRET: secret,
-    OGC_DEV_LOGIN: "1",
-    HOST,
-    PORT: String(API_PORT),
-  });
+  const row = page.getByTestId("session-k1-p1");
+  await row.getByLabel("New time for k1-p1").fill(await nextB1Evening()); // Tara teaches B1 Evening then
+  await row.getByRole("button", { name: "Reschedule" }).click();
+  const refusal = row.getByTestId("refusal");
+  await refusal.waitFor();
+  const rtext = (await refusal.textContent()) ?? "";
+  check(
+    "clashing reschedule refused with the clash explained",
+    rtext.includes("already busy") && /B1 Evening/.test(rtext),
+  );
 
-  let front;
-  let browser;
-  try {
-    await waitFor(`http://${HOST}:${API_PORT}/v1/health`, 15000);
+  await row.getByLabel("New time for k1-p1").fill(centerLocal(1, 15));
+  await row.getByRole("button", { name: "Reschedule" }).click();
+  await page
+    .getByTestId("session-k1-p1")
+    .getByText("15:00", { exact: false })
+    .waitFor({ timeout: 5000 });
+  check("free time saves and the schedule re-reads it", true);
+  check(
+    "every API call went to the same origin /v1",
+    apiCalls.every((u) => u.startsWith(`${base}/v1/`)),
+  );
 
-    // 3) build + guard + serve
-    await run("pnpm", ["--filter", "@ogc/web", "build:platform"]);
-    await run("node", ["ops/release/check-bundle.mjs", "platform", DIST]);
-    check("bundle guard: dist-platform has no demo persona / mock storage", true);
-    front = await startFront();
-    const base = `http://${HOST}:${front.address().port}`;
+  // 5) Tara — attendance
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Tara (Teacher)" }).click();
+  await page.getByRole("heading", { name: "Teaching" }).waitFor();
+  const toMark = page.getByRole("link", { name: /A2 — / }).first();
+  check("Tara has a session to mark", (await toMark.count()) === 1);
+  await toMark.click();
+  await page.getByRole("button", { name: "Save attendance" }).waitFor();
+  check(
+    "save disabled until every learner is marked",
+    await page.getByRole("button", { name: "Save attendance" }).isDisabled(),
+  );
+  await page.getByLabel("Linh N. present").check();
+  await page.getByLabel("Minh T. late").check();
+  await page.getByLabel("An P. absent").check();
+  await page.getByRole("button", { name: "Save attendance" }).click();
+  await page.getByRole("status").getByText("Saved.").waitFor();
+  check("attendance saved", true);
+  await page.goto(`${base}/teaching`);
+  await page.getByRole("heading", { name: "Teaching" }).waitFor();
+  await page.getByText("Nothing to mark.").waitFor();
+  check("to-mark list is empty after saving", true);
+  await page.getByRole("link", { name: "A2 Morning — Mon/Wed" }).click();
+  await page.getByRole("heading", { name: "Attendance summary" }).waitFor();
+  const cells = await page
+    .getByRole("row", { name: /An P\./ })
+    .locator("td")
+    .allTextContents();
+  // [name, present, late, absent, attended, absent streak]: the new mark is absent → streak ≥ 1
+  check(
+    "summary counts the new absence (absent ≥ 1, streak ≥ 1)",
+    Number(cells[3]) >= 1 && Number(cells[5]) >= 1,
+  );
 
-    browser = await chromium.launch();
-    const page = await browser.newPage();
-    const apiCalls = [];
-    page.on("request", (r) => r.url().includes("/v1/") && apiCalls.push(r.url()));
+  // 6) Olivia → Access: attach a policy to Sam, create one; restart the mock IIOS; Sam narrowed
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Olivia (Org Admin)" }).click();
+  await page
+    .getByRole("navigation", { name: "Platform" })
+    .getByRole("link", { name: "Access" })
+    .click();
+  await page.getByRole("heading", { name: "Access policies" }).waitFor();
+  check(
+    "[olivia] Access page from the API; cannot change own access",
+    (await page.getByText(/another Org Admin must change this/).count()) === 1,
+  );
+  await page
+    .getByLabel("Access policy for Sam (Org Staff)")
+    .selectOption({ label: "Front desk — District 1 only" });
+  await page.getByText("used by 1").waitFor();
+  await page.getByRole("button", { name: "+ New policy" }).click();
+  await page.getByLabel("Policy name").fill("Evening desk");
+  await page.getByLabel("Rule 1: action").selectOption("students:view");
+  await page.getByRole("button", { name: "Create policy" }).click();
+  await page
+    .locator('[data-policy="Evening desk"]')
+    .getByText(/v1 · created by Olivia/)
+    .waitFor({ state: "attached" }); // inside the collapsed History
+  check("[olivia] policy attached and a new one created", true);
 
-    // 4) Sam — staff schedule
-    await page.goto(`${base}/`);
-    await page.getByRole("heading", { name: "Sign in (staging)" }).waitFor();
-    check(
-      "sign-in lists both synthetic orgs",
-      (await page.getByText("Lumen", { exact: false }).count()) > 0,
-    );
-    check(
-      "banner says staging / synthetic / mock IIOS",
-      (await page.getByText("STAGING · synthetic data · mock IIOS").count()) === 1,
-    );
-    await page.getByRole("button", { name: "Sam (Org Staff)" }).click();
-    await page.getByRole("heading", { name: "Schedule" }).waitFor();
-    check("Sam lands on Schedule", page.url().endsWith("/schedule"));
-    check(
-      "header shows Sam · staff",
-      ((await page.getByTestId("who").textContent()) ?? "").includes("Sam"),
-    );
-    check(
-      "Lumen classes are not shown to Nova staff",
-      (await page.getByText("Lumen", { exact: false }).count()) === 0,
-    );
+  await restartIios();
+  await page.reload();
+  await page.getByRole("heading", { name: "Access policies" }).waitFor();
+  check(
+    "[iios restart] attachment and new policy kept in the mock IIOS's database",
+    (await page.getByText("used by 1").count()) === 1 &&
+      (await page.locator('[data-policy="Evening desk"]').count()) === 1 &&
+      (await page.getByLabel("Access policy for Sam (Org Staff)").inputValue()) ===
+        "policy-front-desk-d1",
+  );
 
-    const row = page.getByTestId("session-k1-p1");
-    await row.getByLabel("New time for k1-p1").fill(await nextB1Evening()); // Tara teaches B1 Evening then
-    await row.getByRole("button", { name: "Reschedule" }).click();
-    const refusal = row.getByTestId("refusal");
-    await refusal.waitFor();
-    const rtext = (await refusal.textContent()) ?? "";
-    check(
-      "clashing reschedule refused with the clash explained",
-      rtext.includes("already busy") && /B1 Evening/.test(rtext),
-    );
-
-    await row.getByLabel("New time for k1-p1").fill(centerLocal(1, 15));
-    await row.getByRole("button", { name: "Reschedule" }).click();
-    await page
-      .getByTestId("session-k1-p1")
-      .getByText("15:00", { exact: false })
-      .waitFor({ timeout: 5000 });
-    check("free time saves and the schedule re-reads it", true);
-    check(
-      "every API call went to the same origin /v1",
-      apiCalls.every((u) => u.startsWith(`${base}/v1/`)),
-    );
-
-    // 5) Tara — attendance
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await page.getByRole("button", { name: "Tara (Teacher)" }).click();
-    await page.getByRole("heading", { name: "Teaching" }).waitFor();
-    const toMark = page.getByRole("link", { name: /A2 — / }).first();
-    check("Tara has a session to mark", (await toMark.count()) === 1);
-    await toMark.click();
-    await page.getByRole("button", { name: "Save attendance" }).waitFor();
-    check(
-      "save disabled until every learner is marked",
-      await page.getByRole("button", { name: "Save attendance" }).isDisabled(),
-    );
-    await page.getByLabel("Linh N. present").check();
-    await page.getByLabel("Minh T. late").check();
-    await page.getByLabel("An P. absent").check();
-    await page.getByRole("button", { name: "Save attendance" }).click();
-    await page.getByRole("status").getByText("Saved.").waitFor();
-    check("attendance saved", true);
-    await page.goto(`${base}/teaching`);
-    await page.getByRole("heading", { name: "Teaching" }).waitFor();
-    await page.getByText("Nothing to mark.").waitFor();
-    check("to-mark list is empty after saving", true);
-    await page.getByRole("link", { name: "A2 Morning — Mon/Wed" }).click();
-    await page.getByRole("heading", { name: "Attendance summary" }).waitFor();
-    const cells = await page
-      .getByRole("row", { name: /An P\./ })
-      .locator("td")
-      .allTextContents();
-    // [name, present, late, absent, attended, absent streak]: the new mark is absent → streak ≥ 1
-    check(
-      "summary counts the new absence (absent ≥ 1, streak ≥ 1)",
-      Number(cells[3]) >= 1 && Number(cells[5]) >= 1,
-    );
-
-    // 6) Olivia → Access: attach a policy to Sam, create one; restart the mock IIOS; Sam narrowed
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await page.getByRole("button", { name: "Olivia (Org Admin)" }).click();
-    await page
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Sam (Org Staff)" }).click();
+  await page.getByRole("heading", { name: "Schedule" }).waitFor();
+  await page.getByText("A2 Morning — Mon/Wed").waitFor();
+  check(
+    "[sam] narrowed to District 1: no B1 Evening (Thu Duc)",
+    (await page.getByText("B1 Evening — Tue/Thu").count()) === 0 &&
+      (await page.getByText("A2 Evening — Tue/Thu").count()) === 1,
+  );
+  await page.getByLabel("Teacher of A2 Morning — Mon/Wed").selectOption({ label: "Ben" });
+  await page.getByText("Your access policy does not allow this here.").waitFor();
+  check("[sam] class teacher is read-only under the policy (refused by the API)", true);
+  check(
+    "[access] no Access link for staff",
+    (await page
       .getByRole("navigation", { name: "Platform" })
       .getByRole("link", { name: "Access" })
-      .click();
-    await page.getByRole("heading", { name: "Access policies" }).waitFor();
-    check(
-      "[olivia] Access page from the API; cannot change own access",
-      (await page.getByText(/another Org Admin must change this/).count()) === 1,
-    );
-    await page
-      .getByLabel("Access policy for Sam (Org Staff)")
-      .selectOption({ label: "Front desk — District 1 only" });
-    await page.getByText("used by 1").waitFor();
-    await page.getByRole("button", { name: "+ New policy" }).click();
-    await page.getByLabel("Policy name").fill("Evening desk");
-    await page.getByLabel("Rule 1: action").selectOption("students:view");
-    await page.getByRole("button", { name: "Create policy" }).click();
-    await page
-      .locator('[data-policy="Evening desk"]')
-      .getByText(/v1 · created by Olivia/)
-      .waitFor({ state: "attached" }); // inside the collapsed History
-    check("[olivia] policy attached and a new one created", true);
+      .count()) === 0,
+  );
 
-    await restartIios();
-    await page.reload();
-    await page.getByRole("heading", { name: "Access policies" }).waitFor();
-    check(
-      "[iios restart] attachment and new policy kept in the mock IIOS's database",
-      (await page.getByText("used by 1").count()) === 1 &&
-        (await page.locator('[data-policy="Evening desk"]').count()) === 1 &&
-        (await page.getByLabel("Access policy for Sam (Org Staff)").inputValue()) ===
-          "policy-front-desk-d1",
-    );
-
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await page.getByRole("button", { name: "Sam (Org Staff)" }).click();
-    await page.getByRole("heading", { name: "Schedule" }).waitFor();
-    await page.getByText("A2 Morning — Mon/Wed").waitFor();
-    check(
-      "[sam] narrowed to District 1: no B1 Evening (Thu Duc)",
-      (await page.getByText("B1 Evening — Tue/Thu").count()) === 0 &&
-        (await page.getByText("A2 Evening — Tue/Thu").count()) === 1,
-    );
-    await page.getByLabel("Teacher of A2 Morning — Mon/Wed").selectOption({ label: "Ben" });
-    await page.getByText("Your access policy does not allow this here.").waitFor();
-    check("[sam] class teacher is read-only under the policy (refused by the API)", true);
-    check(
-      "[access] no Access link for staff",
-      (await page
-        .getByRole("navigation", { name: "Platform" })
-        .getByRole("link", { name: "Access" })
-        .count()) === 0,
-    );
-
-    // 7) a grant the API refuses → back to sign in
-    await page.evaluate(() => {
-      const k = "ogc.platform.session";
-      const s = JSON.parse(sessionStorage.getItem(k));
-      s.grant = "not-a-grant";
-      sessionStorage.setItem(k, JSON.stringify(s));
-    });
-    await page.goto(`${base}/teaching`);
-    await page.getByRole("heading", { name: "Sign in (staging)" }).waitFor({ timeout: 5000 });
-    check("a refused grant (401) sends the user back to sign in", true);
-  } catch (e) {
-    console.error(e);
-    if (process.env.E2E_DEBUG && browser)
-      for (const ctx of browser.contexts())
-        for (const pg2 of ctx.pages())
-          console.error(
-            "PAGE TEXT:\n" +
-              (
-                await pg2
-                  .locator("main")
-                  .innerText()
-                  .catch(() => "?")
-              ).slice(0, 3000),
-          );
-    check(`journey completed (${e.message.split("\n")[0]})`, false);
-  } finally {
-    await browser?.close();
-    front?.close();
-    for (const p of procs) p.kill();
-    const a = new pg.Client({ connectionString: ADMIN_URL });
-    await a.connect();
-    await a.query(`drop database if exists ${name} with (force)`);
-    await a.query(`drop database if exists ${name}_iios with (force)`);
-    await a.end();
-  }
-  const failed = checks.filter((c) => !c.ok).length;
-  console.log(`\nplatform E2E: ${checks.length - failed}/${checks.length} checks passed`);
-  process.exit(failed ? 1 : 0);
-}
-main();
+  // 7) a grant the API refuses → back to sign in
+  await page.evaluate(() => {
+    const k = "ogc.platform.session";
+    const s = JSON.parse(sessionStorage.getItem(k));
+    s.grant = "not-a-grant";
+    sessionStorage.setItem(k, JSON.stringify(s));
+  });
+  await page.goto(`${base}/teaching`);
+  await page.getByRole("heading", { name: "Sign in (staging)" }).waitFor({ timeout: 5000 });
+  check("a refused grant (401) sends the user back to sign in", true);
+});

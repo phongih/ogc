@@ -29,29 +29,49 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 
 ## Routes (slice 1)
 
-| Route                                                   | Who                                                    | Port it serves                              |
-| ------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------- |
-| `GET /v1/health`                                        | public                                                 | —                                           |
-| `GET /v1/me/access`                                     | any grant                                              | `MyAccessPort`                              |
-| `GET /v1/schedule`                                      | staff (`schedule:manage`, narrowed by center)          | `SchedulePort.getOverview`                  |
-| `POST /v1/sessions/:id/reschedule` `{at}`               | staff                                                  | `reschedule`                                |
-| `POST /v1/sessions/:id/cancel` `{replacementAt}`        | staff                                                  | `cancelWithReplacement`                     |
-| `POST /v1/classes/:id/sessions` `{title, at}`           | staff                                                  | `addSession`                                |
-| `PUT /v1/classes/:id/teacher` `{teacherId}`             | staff (not if `classTeacher` is read-only)             | `assignTeacher`                             |
-| `PUT /v1/sessions/:id/substitute` `{teacherId \| null}` | staff (not if `substitute` is read-only)               | `setSubstitute`                             |
-| `GET /v1/classes/:id/sessions`                          | the class teacher                                      | `AttendancePort.listClassSessions`          |
-| `GET` / `PUT /v1/sessions/:id/attendance`               | owner or that session's substitute (`attendance:mark`) | `getSessionAttendance` / `recordAttendance` |
-| `GET /v1/classes/:id/attendance-summary`                | the class teacher                                      | `getClassSummary`                           |
-| `GET /v1/me/to-mark`                                    | teachers                                               | `listToMark`                                |
-| `GET /v1/me/classes`                                    | teachers (403 `not_a_teacher` otherwise)               | — (teacher home)                            |
-| `GET /v1/dev/personas`, `POST /v1/dev/login`            | public, only with `OGC_DEV_LOGIN=1` (staging)          | — (mock IIOS issues the grant)              |
-| `GET /v1/access/admin`                                  | Org Admin (IIOS decides)                               | `IiosPolicyAdminPort.getAdminView` → IIOS   |
-| `POST /v1/access/policies` `{name, description, rules}` | Org Admin                                              | `createPolicy` → IIOS                       |
-| `PUT /v1/access/policies/:ref` `{expectedVersion, …}`   | Org Admin, not a policy that restricts them            | `revisePolicy` → IIOS                       |
-| `POST /v1/access/policies/:ref/retire`                  | Org Admin, not while in use                            | `retirePolicy` → IIOS                       |
-| `PUT /v1/access/members/:principalId/policy`            | Org Admin, never their own membership                  | `attachPolicy` → IIOS                       |
+| Route                                                     | Who                                                    | Port it serves                              |
+| --------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------- |
+| `GET /v1/health`                                          | public                                                 | —                                           |
+| `GET /v1/me/access`                                       | any grant                                              | `MyAccessPort`                              |
+| `GET /v1/schedule`                                        | staff (`schedule:manage`, narrowed by center)          | `SchedulePort.getOverview`                  |
+| `POST /v1/sessions/:id/reschedule` `{at}`                 | staff                                                  | `reschedule`                                |
+| `POST /v1/sessions/:id/cancel` `{replacementAt}`          | staff                                                  | `cancelWithReplacement`                     |
+| `POST /v1/classes/:id/sessions` `{title, at}`             | staff                                                  | `addSession`                                |
+| `PUT /v1/classes/:id/teacher` `{teacherId}`               | staff (not if `classTeacher` is read-only)             | `assignTeacher`                             |
+| `PUT /v1/sessions/:id/substitute` `{teacherId \| null}`   | staff (not if `substitute` is read-only)               | `setSubstitute`                             |
+| `GET /v1/classes/:id/sessions`                            | the class teacher                                      | `AttendancePort.listClassSessions`          |
+| `GET` / `PUT /v1/sessions/:id/attendance`                 | owner or that session's substitute (`attendance:mark`) | `getSessionAttendance` / `recordAttendance` |
+| `GET /v1/classes/:id/attendance-summary`                  | the class teacher                                      | `getClassSummary`                           |
+| `GET /v1/me/to-mark`                                      | teachers                                               | `listToMark`                                |
+| `GET /v1/me/classes`                                      | teachers (403 `not_a_teacher` otherwise)               | — (teacher home)                            |
+| `GET /v1/dev/personas`, `POST /v1/dev/login`              | public, only with `OGC_DEV_LOGIN=1` (staging)          | — (mock IIOS issues the grant)              |
+| `GET /v1/makeups`                                         | staff (`makeup:manage`, narrowed by center)            | `MakeupPort.getBoard`                       |
+| `GET /v1/makeups/:item/options`                           | staff                                                  | `listOptions`                               |
+| `POST /v1/makeups/:item/book` `{sessionId}`               | staff                                                  | `book`                                      |
+| `POST /v1/makeups/:item/makeup-session` `{at, teacherId}` | staff                                                  | `openMakeupSession`                         |
+| `POST /v1/makeups/:item/self-study`                       | staff                                                  | `assignSelfStudy`                           |
+| `GET /v1/me/makeups`                                      | learner (own) · guardian (linked, read-only)           | `listMine`                                  |
+| `POST /v1/me/makeups/:item/self-study` `{note}`           | learner (own item)                                     | `submitSelfStudy`                           |
+| `GET /v1/me/makeups/to-confirm`                           | the learner's own class teacher                        | `listToConfirm`                             |
+| `POST /v1/makeups/:item/confirm` / `…/return` `{note}`    | the learner's own class teacher                        | `confirmSelfStudy` / `returnSelfStudy`      |
+| `GET /v1/access/admin`                                    | Org Admin (IIOS decides)                               | `IiosPolicyAdminPort.getAdminView` → IIOS   |
+| `POST /v1/access/policies` `{name, description, rules}`   | Org Admin                                              | `createPolicy` → IIOS                       |
+| `PUT /v1/access/policies/:ref` `{expectedVersion, …}`     | Org Admin, not a policy that restricts them            | `revisePolicy` → IIOS                       |
+| `POST /v1/access/policies/:ref/retire`                    | Org Admin, not while in use                            | `retirePolicy` → IIOS                       |
+| `PUT /v1/access/members/:principalId/policy`              | Org Admin, never their own membership                  | `attachPolicy` → IIOS                       |
 
 Schedule writes return the contract's `ScheduleResult` and attendance writes return `RecordAttendanceResult`; the HTTP status matches the outcome (404, 403, 409, 422).
+
+## Make-ups
+
+Make-up items are not stored. Every absent mark at a regular session of the learner's own class is an item (id `<missedSessionId>::<learnerId>`), derived on read, so none can be forgotten or deleted by hand. What is stored (migration 0003) is how an item is being made up:
+
+- a booking (`makeup_booking`): joining another class of the same course for the same unit, or a make-up session;
+- self-study (`makeup_selfstudy`).
+
+An item closes when the learner is marked present or late at the booked session, or when the learner's own class teacher confirms the self-study. Booked guests appear on that session's attendance sheet with "make-up for <class>". A booking into a session that was later cancelled counts as open again.
+
+Guardian ↔ learner links (`guardian_link`) come from the synthetic seed only. `ogc_app` may only read them; there is no path to create a link (D-14 stays closed).
 
 ## Access policies
 

@@ -89,9 +89,19 @@ export async function seedDev(
       for (const org of SYNTHETIC_ORGS) {
         await scope(org);
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        await c.query("delete from makeup_booking");
+        await c.query("delete from makeup_selfstudy");
         await c.query("delete from attendance");
         await c.query("update session set replaced_by = null, replaces = null");
-        for (const t of ["session", "roster", "class", "learner", "teacher", "center"])
+        for (const t of [
+          "session",
+          "roster",
+          "class",
+          "guardian_link",
+          "learner",
+          "teacher",
+          "center",
+        ])
           await c.query(`delete from ${t}`);
         await c.query("delete from idempotency_key");
       }
@@ -113,16 +123,25 @@ export async function seedDev(
       [NOVA, TARA, BEN, MIA],
     );
     const names = ["Linh N.", "Minh T.", "An P.", "Huy D.", "Thao V.", "Khoa L.", "Vy H."];
+    // Linh and Minh sign in (IIOS principals, as in the demo); the others do not.
+    const principals: Record<number, string> = {
+      1: "iios-principal-learner-1",
+      2: "iios-principal-learner-2",
+    };
     for (const [i, n] of names.entries())
-      await c.query("insert into learner (org_id, id, display_name) values ($1, $2, $3)", [
-        NOVA,
-        L(i + 1),
-        n,
-      ]);
+      await c.query(
+        "insert into learner (org_id, id, principal_id, display_name) values ($1, $2, $3, $4)",
+        [NOVA, L(i + 1), principals[i + 1] ?? null, n],
+      );
+    // Mai (guardian) is linked to Linh — synthetic, pre-established (no link-creation path).
     await c.query(
-      `insert into class (org_id, id, center_id, name, teacher_id) values
-        ($1, $2, $5, 'A2 Morning — Mon/Wed', $7), ($1, $3, $6, 'B1 Evening — Tue/Thu', $7),
-        ($1, $4, $5, 'A2 Evening — Tue/Thu', $8)`,
+      "insert into guardian_link (org_id, guardian_principal_id, learner_id) values ($1, 'iios-principal-guardian-1', $2)",
+      [NOVA, L(1)],
+    );
+    await c.query(
+      `insert into class (org_id, id, center_id, name, teacher_id, course_id) values
+        ($1, $2, $5, 'A2 Morning — Mon/Wed', $7, 'course-a2'), ($1, $3, $6, 'B1 Evening — Tue/Thu', $7, 'course-b1'),
+        ($1, $4, $5, 'A2 Evening — Tue/Thu', $8, 'course-a2')`,
       [NOVA, A2M, B1E, A2E, D1, THU_DUC, TARA, BEN],
     );
     const rosters: [string, number[]][] = [
