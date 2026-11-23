@@ -83,3 +83,4 @@ jobs:
           node e2e/platform-partners-settlements-journey.mjs || echo "platform partners settlements E2E skipped/soft-failed (non-blocking)"
           node e2e/platform-course-studio-journey.mjs || echo "platform course studio E2E skipped/soft-failed (non-blocking)"
           node e2e/platform-class-courses-journey.mjs || echo "platform class courses E2E skipped/soft-failed (non-blocking)"
+          node e2e/platform-students-journey.mjs || echo "platform students E2E skipped/soft-failed (non-blocking)"

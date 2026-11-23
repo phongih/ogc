@@ -5,6 +5,8 @@
  * contract's result shapes (ScheduleResult, RecordAttendanceResult) whatever the HTTP status.
  */
 import type {
+  LearnerProfile,
+  StudentCard,
   LearnerStudioProgress,
   MyClassCourse,
   MyLessonView,
@@ -386,6 +388,15 @@ export const platformApi = {
       row,
     ),
   partnerTrends: (s: PlatformSession) => staffRead<PartnerTrend[]>(s, "/v1/partners/trends"),
+
+  // Current Students (staff by center, class teachers) and a learner's own skill profile
+  students: (s: PlatformSession) => staffRead<StudentCard[]>(s, "/v1/students"),
+  mySkills: async (s: PlatformSession) => {
+    const r = await send(s, "GET", "/v1/me/skills");
+    if (r.status === 404 || r.status === 403) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as LearnerProfile;
+  },
 
   // Class courses (class teachers propose, staff with courses:link decide) and My Learning
   classCourses: (s: PlatformSession) => staffRead<StudioOverview>(s, "/v1/class-courses"),

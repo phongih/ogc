@@ -95,6 +95,8 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 | `POST /v1/class-courses/link` `{classId, courseRef, prepHoursPerWeek}`             | staff with `courses:link` at the class's center                   | `link`                                                       |
 | `POST /v1/class-courses/:id/reject\|unlink` `{reason}` · `…/prep` `{hours}`        | staff with `courses:link` at the class's center                   | `reject` / `unlink` / `setPrepHours`                         |
 | `GET /v1/me/class-courses` · `…/:ref/:lessonId` · `POST …/:ref/:lessonId/complete` | the learner (self)                                                | `ClassCoursePlayerPort.mine` / `lesson` / `complete`         |
+| `GET /v1/students`                                                                 | staff (`students:view` by center), class teachers (own classes)   | `StudentsPort.list`                                          |
+| `GET /v1/me/skills`                                                                | the learner (self)                                                | `LearningProfilePort.getProfile`                             |
 | `GET /v1/access/admin`                                                             | Org Admin (IIOS decides)                                          | `IiosPolicyAdminPort.getAdminView` → IIOS                    |
 | `POST /v1/access/policies` `{name, description, rules}`                            | Org Admin                                                         | `createPolicy` → IIOS                                        |
 | `PUT /v1/access/policies/:ref` `{expectedVersion, …}`                              | Org Admin, not a policy that restricts them                       | `revisePolicy` → IIOS                                        |
@@ -179,6 +181,15 @@ Part B (migration 0010: `class_course_link`, `course_progress`, `course_lesson_d
 - A learner of the class takes the course in My courses, pinned to the version of their first completed lesson. Quiz answers stay hidden until the lesson is completed; every question and reflection must be answered. A completed lesson and the pin are final: insert-only for `ogc_app`, and a trigger refuses updates.
 - Staff and the class teacher see each learner's completion: lessons completed of the version they are on, and the last activity.
 - Not on the Platform yet: the skill profile the demo feeds with quiz scores, Current Students and the Decision Engine's "no class course activity" rule.
+
+## Skill profile and Current Students
+
+Migration 0011: `placement_result` (the demo's synthetic placement per learner, loaded by the seed; read-only for `ogc_app`).
+
+- A learner's profile is the placement seed with assessed evidence folded in by the shared, pure mastery logic in `@ogc/contracts` (`mastery.ts`, moved there from the web app so the demo and the API run the same code). On the Platform the evidence is the quiz score of each completed class-course lesson (Use of English).
+- Current Students gives each learner one of three care levels — OK, Watch, Needs support — always with the evidence behind it and never a psychological label: a low or dropping skill (with its source: placement test only or class-course quizzes), absences in a row, attended below 80% of at least 3 marked sessions, a make-up whose deadline is close or past. Staff see the learners of their `students:view` centers, a class teacher those of their own classes; learners and guardians do not. Overdue tuition is shown to staff with `billing:manage` for information only and never changes the level. Suggestions are for people; nothing acts on its own.
+- Thresholds are the Decision Engine's defaults (skill below 60, drop of 5, 2 absences in a row, make-up deadline within 3 days) until the engine's rules arrive on the Platform.
+- Not on the Platform: practice attempts and speaking reviews, so there is no "no practice" or "speaking returned" evidence yet.
 
 ## Access policies
 

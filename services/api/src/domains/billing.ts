@@ -324,6 +324,23 @@ const STATUS: Record<BillingRefusal, number> = {
   no_fee_line: 409,
 };
 
+/** Current Students: what each learner still has to pay and how much is overdue (information only). */
+export async function tuitionByLearner(
+  tx: TenantTx,
+  now: number,
+): Promise<Map<string, { balanceVnd: number; overdueVnd: number }>> {
+  const out = new Map<string, { balanceVnd: number; overdueVnd: number }>();
+  for (const i of await loadInvoices(tx)) {
+    if (!i.learnerId) continue;
+    const v = view(i, new Map(), now);
+    const t = out.get(i.learnerId) ?? { balanceVnd: 0, overdueVnd: 0 };
+    t.balanceVnd += v.balanceVnd;
+    if (v.daysOverdue > 0) t.overdueVnd += v.balanceVnd;
+    out.set(i.learnerId, t);
+  }
+  return out;
+}
+
 export function registerBilling(app: Api): void {
   const isStaff = (c: Caller) => c.ctx.role === "staff";
   const mayAt = (c: Caller, centerId?: string) =>

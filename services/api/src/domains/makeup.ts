@@ -33,7 +33,7 @@ import { clashes, snapshot } from "./schedule.js";
 
 const DAY = 86_400_000;
 
-interface Ledger {
+export interface Ledger {
   classes: Map<
     string,
     { name: string; centerId: string; teacherId: string | null; courseId: string | null }

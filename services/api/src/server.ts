@@ -29,6 +29,7 @@ import { registerBilling } from "./domains/billing.js";
 import { registerPartners } from "./domains/partners.js";
 import { registerCourses } from "./domains/courses.js";
 import { registerClassCourses } from "./domains/classCourses.js";
+import { registerStudents } from "./domains/students.js";
 import { registerAttendance } from "./domains/attendance.js";
 import { registerMakeup } from "./domains/makeup.js";
 import { registerWorkforce } from "./domains/workforce.js";
@@ -252,6 +253,7 @@ export function buildApi(deps: ApiDeps): Api {
   registerPartners(app);
   registerCourses(app);
   registerClassCourses(app);
+  registerStudents(app);
   registerAccess(app, deps.iios);
   return app;
 }

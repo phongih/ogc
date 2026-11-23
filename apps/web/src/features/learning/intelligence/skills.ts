@@ -1,4 +1,8 @@
 import type { ActivityKind, AssessmentType, Skill } from "@ogc/contracts";
+import { ALL_SKILLS, skillLabel } from "@ogc/contracts";
+
+// ALL_SKILLS and skillLabel live in @ogc/contracts (owner 23/11); re-exported for existing imports.
+export { ALL_SKILLS, skillLabel };
 
 // Deterministic ActivityKind → Skill mapping for LI-1.
 //   reading   → reading
@@ -11,9 +15,6 @@ export const SKILL_BY_KIND: Record<ActivityKind, Skill> = {
   quiz: "use_of_english",
   speaking: "speaking",
 };
-
-// Canonical skill order — the single source of iteration + tie-break order.
-export const ALL_SKILLS: readonly Skill[] = ["reading", "use_of_english", "speaking"] as const;
 
 export function skillForKind(kind: ActivityKind): Skill {
   return SKILL_BY_KIND[kind];
@@ -30,15 +31,4 @@ export const ASSESSMENT_BY_KIND: Record<ActivityKind, AssessmentType> = {
 
 export function assessmentTypeForKind(kind: ActivityKind): AssessmentType {
   return ASSESSMENT_BY_KIND[kind];
-}
-
-export function skillLabel(skill: Skill): string {
-  switch (skill) {
-    case "reading":
-      return "Reading";
-    case "use_of_english":
-      return "Use of English";
-    case "speaking":
-      return "Speaking";
-  }
 }
