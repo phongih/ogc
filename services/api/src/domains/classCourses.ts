@@ -24,6 +24,7 @@ import type {
   LinkStatus,
   MyClassCourse,
   MyLessonView,
+  SkillEvidence,
   StudioCourse,
   StudioOverview,
   StudioRefusal,
@@ -197,6 +198,63 @@ export async function prepHoursByTeacher(
         ...(out.get(r.teacher_id) ?? []),
         { classId: r.class_id, className: r.name, hours: Number(r.prep_hours) },
       ]);
+  return out;
+}
+
+/** Current Students: completion of each learner in the course linked to one of their classes. */
+export async function studioByLearner(
+  tx: TenantTx,
+): Promise<
+  Map<
+    string,
+    { title: string; completedLessons: number; totalLessons: number; lastActivityAt: string | null }
+  >
+> {
+  const b = await loadBook(tx);
+  const out = new Map<
+    string,
+    { title: string; completedLessons: number; totalLessons: number; lastActivityAt: string | null }
+  >();
+  const classes = [...b.classes.entries()].sort((a, z) => a[1].name.localeCompare(z[1].name));
+  for (const [id] of classes) {
+    const l = activeLinkOf(b, id);
+    if (!l) continue;
+    for (const r of b.roster.get(id) ?? []) {
+      if (out.has(r.learnerId)) continue;
+      const p = completionOf(b, l.courseRef, r.learnerId);
+      if (p)
+        out.set(r.learnerId, {
+          title: p.title,
+          completedLessons: p.completedLessons,
+          totalLessons: p.totalLessons,
+          lastActivityAt: p.lastActivityAt,
+        });
+    }
+  }
+  return out;
+}
+
+/** Skill profile: each completed class-course lesson with a quiz is one piece of Use of English evidence. */
+export async function quizEvidence(tx: TenantTx): Promise<Map<string, SkillEvidence[]>> {
+  const rows = await tx
+    .selectFrom("course_lesson_done as d")
+    .innerJoin("course_progress as p", (j) =>
+      j.onRef("p.learner_id", "=", "d.learner_id").onRef("p.course_ref", "=", "d.course_ref"),
+    )
+    .select(["d.learner_id", "d.course_ref", "d.lesson_id", "d.at", "d.score", "p.version"])
+    .where("d.score", "is not", null)
+    .execute();
+  const out = new Map<string, SkillEvidence[]>();
+  for (const r of rows)
+    out.set(r.learner_id, [
+      ...(out.get(r.learner_id) ?? []),
+      {
+        attemptId: `CS:${r.course_ref}:v${r.version}:${r.lesson_id}`,
+        skill: "use_of_english",
+        score: r.score!,
+        at: r.at.toISOString(),
+      },
+    ]);
   return out;
 }
 

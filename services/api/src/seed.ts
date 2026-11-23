@@ -846,6 +846,7 @@ export async function seedDev(
       for (const org of SYNTHETIC_ORGS) {
         await scope(org);
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        await c.query("delete from placement_result");
         await c.query("delete from course_lesson_done");
         await c.query("delete from course_progress");
         await c.query("delete from class_course_link");
@@ -1014,6 +1015,13 @@ export async function seedDev(
     await seedPartners(c, now);
     await seedCourses(c, now, { tara: TARA, ben: BEN });
     await seedClassCourses(c, now, { a2Morning: A2M, b1Evening: B1E, an: L(3) });
+    // Skill profile: the demo's synthetic placement results (Khoa and Vy have none, as in the demo).
+    await c.query(
+      `insert into placement_result (org_id, learner_id, cefr_band, reading, use_of_english, speaking) values
+        ($1, $2, 'A2', 70, 65, 55), ($1, $3, 'A2', 68, 52, 60), ($1, $4, 'A2', 58, 64, 62),
+        ($1, $5, 'B1', 72, 70, 66), ($1, $6, 'B1', 75, 74, 71)`,
+      [NOVA, L(1), L(2), L(3), L(4), L(5)],
+    );
 
     // ── Lumen Edu (a second tenant, for isolation) ────────────────────────────────────────
     await scope(LUMEN);
@@ -1040,6 +1048,10 @@ export async function seedDev(
     );
     await c.query(
       "insert into roster (org_id, class_id, learner_id) values ($1, 'lumen-k1', '00000000-0000-4000-8000-0000000Lo201')",
+      [LUMEN],
+    );
+    await c.query(
+      "insert into placement_result (org_id, learner_id, cefr_band, reading, use_of_english, speaking) values ($1, '00000000-0000-4000-8000-0000000Lo201', 'A2', 60, 60, 60)",
       [LUMEN],
     );
     await c.query(

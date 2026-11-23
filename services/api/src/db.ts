@@ -380,6 +380,14 @@ export interface CourseLessonDoneTable {
   answers: unknown;
   reflections: unknown;
 }
+export interface PlacementResultTable {
+  org_id: string;
+  learner_id: string;
+  cefr_band: string;
+  reading: number;
+  use_of_english: number;
+  speaking: number;
+}
 export interface SettlementBatchTable {
   org_id: string;
   id: string;
@@ -440,6 +448,7 @@ export interface DB {
   class_course_link: ClassCourseLinkTable;
   course_progress: CourseProgressTable;
   course_lesson_done: CourseLessonDoneTable;
+  placement_result: PlacementResultTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

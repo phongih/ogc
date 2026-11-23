@@ -19,6 +19,7 @@ import { PlatformWorkforcePage } from "./pages/WorkforcePage";
 import { PlatformAdmissionsPage } from "./pages/AdmissionsPage";
 import { PlatformBillingPage, PlatformTuitionPage } from "./pages/BillingPage";
 import { PlatformPartnersPage } from "./pages/PartnersPage";
+import { PlatformStudentsPage } from "./pages/StudentsPage";
 import {
   PlatformClassLessonPage,
   PlatformCoursePage,
@@ -74,6 +75,9 @@ function Shell({ children }: { children: ReactNode }) {
             {session.role === "staff" ? <Link to="/partners">Partners</Link> : null}
             {session.role === "staff" || session.role === "teacher" ? (
               <Link to="/courses">Courses</Link>
+            ) : null}
+            {session.role === "staff" || session.role === "teacher" ? (
+              <Link to="/students">Students</Link>
             ) : null}
             {session.role === "learner" || session.role === "guardian" ? (
               <Link to="/my-makeups">Make-ups</Link>
@@ -214,6 +218,14 @@ export function App() {
                 element={
                   <Protected>
                     <PlatformPartnersPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/students"
+                element={
+                  <Protected>
+                    <PlatformStudentsPage />
                   </Protected>
                 }
               />
