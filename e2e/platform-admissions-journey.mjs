@@ -19,8 +19,8 @@ runPlatformJourney("platform admissions E2E", async ({ browser, base, check }) =
   await page.getByRole("table", { name: "Funnel" }).waitFor();
   const funnel = await page.getByRole("table", { name: "Funnel" }).textContent();
   check(
-    "[sam] dashboard: every step counted from 14 leads",
-    /New → Assigned\d+ of 14/.test(funnel ?? ""),
+    "[sam] dashboard: every step counted from 16 leads (14 + 2 referrals)",
+    /New → Assigned\d+ of 16/.test(funnel ?? ""),
   );
   const sam = await apiAs("iios-principal-staff-1");
   const dash = await sam("/v1/admissions/dashboard");
@@ -28,7 +28,7 @@ runPlatformJourney("platform admissions E2E", async ({ browser, base, check }) =
     "[sam] lead → enrolled shows its numerator and denominator",
     (await page.getByTestId("lead-to-enrolled").textContent()) ===
       (dash.leadToEnrolled.pct === null ? "—" : `${dash.leadToEnrolled.pct}%`) &&
-      (await page.getByText(`${dash.leadToEnrolled.reached} of 14 leads`).count()) === 1,
+      (await page.getByText(`${dash.leadToEnrolled.reached} of 16 leads`).count()) === 1,
   );
 
   // Pipeline: add a synthetic lead

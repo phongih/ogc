@@ -17,6 +17,10 @@ import type {
   LearnerStudioProgress,
   MyClassCourse,
   MyLessonView,
+  MyReferrals,
+  ReferralLead,
+  ReferralProgram,
+  GrowthResult,
   CourseSpeakingReviewItem,
   SpeakingReviewQueue,
   StudioCourse,
@@ -498,6 +502,52 @@ export const platformApi = {
       `/v1/me/class-courses/${encodeURIComponent(ref)}/${encodeURIComponent(lessonId)}/speaking/${encodeURIComponent(blockId)}`,
       { choices },
     ),
+  // Growth · referrals (slice 6): the referrer's page, staff's funnel, the public /join page.
+  myReferrals: (s: PlatformSession) => staffRead<MyReferrals>(s, "/v1/me/referrals"),
+  referralLeads: (s: PlatformSession) => staffRead<ReferralLead[]>(s, "/v1/growth/leads"),
+  referralProgram: (s: PlatformSession) => staffRead<ReferralProgram>(s, "/v1/growth/program"),
+  decideReferral: (s: PlatformSession, id: string, verb: "confirm" | "reject", reason = "") =>
+    result<GrowthResult>(
+      s,
+      "POST",
+      `/v1/growth/leads/${encodeURIComponent(id)}/${verb}`,
+      verb === "reject" ? { reason } : {},
+    ),
+  joinInfo: async (code: string) => {
+    const r = await send(null, "GET", `/v1/public/referrals/${encodeURIComponent(code)}`);
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as {
+      valid: boolean;
+      centerNames: string[];
+      courses: { code: string; title: string }[];
+    };
+  },
+  joinLead: async (
+    code: string,
+    input: {
+      learnerName: string;
+      courseCode: string;
+      centerName: string;
+      campaignId: string | null;
+    },
+  ): Promise<{ ok: true } | { ok: false; reason: string; detail?: string }> => {
+    const r = await send(
+      null,
+      "POST",
+      `/v1/public/referrals/${encodeURIComponent(code)}/leads`,
+      input,
+    );
+    const b = r.body as { ok?: boolean; reason?: string; detail?: string } | null;
+    if (b && typeof b === "object" && "ok" in b) return b as { ok: true };
+    if (r.status === 429)
+      return {
+        ok: false,
+        reason: "too_many_requests",
+        detail: "too many enquiries — try again later",
+      };
+    throw new ApiError(r.status, r.body);
+  },
+
   // Speaking review: the class teacher decides; center staff only see the queue.
   speakingReviews: (s: PlatformSession) =>
     staffRead<SpeakingReviewQueue>(s, "/v1/speaking-reviews"),

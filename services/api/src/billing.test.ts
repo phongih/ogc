@@ -124,8 +124,9 @@ describe.skipIf(!hasPg)("billing — API", () => {
     expect(periods.find((p) => p.current)?.period).toBe("Term 1");
 
     const all = await invoices(sam);
-    expect(all).toHaveLength(7);
-    expect(all.map((i) => i.no)).toEqual([7, 6, 5, 4, 3, 2, 1].map((n) => `INV-2026-000${n}`));
+    expect(all).toHaveLength(8); // 7 Term 1 + Bao T.'s first invoice (Growth seed)
+    expect(all.map((i) => i.no)).toEqual([8, 7, 6, 5, 4, 3, 2, 1].map((n) => `INV-2026-000${n}`));
+    expect(all[0]).toMatchObject({ learnerName: "Bao T.", status: "paid", subtotalVnd: 6_900_000 });
     expect(all.find((i) => i.learnerName === "Linh N.")).toMatchObject({
       payerName: "Mai (Guardian)",
       status: "paid",
@@ -158,7 +159,7 @@ describe.skipIf(!hasPg)("billing — API", () => {
     expect(r).toMatchObject({
       outstandingVnd: 19_200_000,
       overdueVnd: 19_200_000,
-      collectedVnd: 32_100_000,
+      collectedVnd: 39_000_000, // incl. Bao T.'s first invoice
       creditAppliedVnd: 0,
     });
     expect(r.overdue.map((i) => i.learnerName).sort()).toEqual(["An P.", "Huy D.", "Vy H."]);
@@ -167,8 +168,8 @@ describe.skipIf(!hasPg)("billing — API", () => {
       ["Nova English — Thu Duc", 8_400_000],
     ]);
     const pays = (await sam("GET", "/v1/billing/payments")).json() as Payment[];
-    expect(pays).toHaveLength(5);
-    expect(pays.reduce((s, p) => s + p.amountVnd, 0)).toBe(32_100_000);
+    expect(pays).toHaveLength(6);
+    expect(pays.reduce((s, p) => s + p.amountVnd, 0)).toBe(39_000_000);
   });
 
   it("maker-checker: staff propose; another Org Admin decides; duplicates and own proposals refused", async () => {
@@ -249,7 +250,7 @@ describe.skipIf(!hasPg)("billing — API", () => {
     expect(g.json()).toEqual({ ok: true, created: 7, existing: 0, skippedNoLine: [] });
     const linh = (await invoices(sam)).filter((i) => i.learnerName === "Linh N.")[0];
     expect(linh).toMatchObject({
-      no: "INV-2026-0008",
+      no: "INV-2026-0009",
       subtotalVnd: 7_350_000,
       dueDate: "2026-12-10",
       payerName: "Mai (Guardian)",
@@ -264,7 +265,7 @@ describe.skipIf(!hasPg)("billing — API", () => {
       period: "Term 2",
     });
     expect(again.json()).toEqual({ ok: true, created: 0, existing: 7, skippedNoLine: [] });
-    expect(await invoices(sam)).toHaveLength(14);
+    expect(await invoices(sam)).toHaveLength(15);
     // a period without a tuition line is reported, not invoiced
     const none = await sam("POST", "/v1/billing/invoices/generate", {
       year: "2027-2028",
@@ -304,7 +305,7 @@ describe.skipIf(!hasPg)("billing — API", () => {
       amountVnd: 900_000,
       method: "cash",
     });
-    expect(part.json()).toEqual({ ok: true, receiptNo: "RC-2026-0006" });
+    expect(part.json()).toEqual({ ok: true, receiptNo: "RC-2026-0007" });
     expect(await inv(sam, "An P.")).toMatchObject({
       status: "partially_paid",
       paidVnd: 3_900_000,
@@ -318,8 +319,8 @@ describe.skipIf(!hasPg)("billing — API", () => {
     expect(paid).toMatchObject({ status: "paid", balanceVnd: 0, daysOverdue: 0 });
     expect(paid.payments.map((p) => [p.receiptNo, p.recordedBy])).toEqual([
       ["RC-2026-0003", "Sam (Org Staff)"],
-      ["RC-2026-0006", "Sam (Org Staff)"],
       ["RC-2026-0007", "Sam (Org Staff)"],
+      ["RC-2026-0008", "Sam (Org Staff)"],
     ]);
     expect(
       (
@@ -355,7 +356,7 @@ describe.skipIf(!hasPg)("billing — API", () => {
       ).statusCode,
     ).toBe(409);
     const r = (await sam("GET", "/v1/billing/receivables")).json() as Receivables;
-    expect(r).toMatchObject({ outstandingVnd: 6_900_000, collectedVnd: 36_000_000 });
+    expect(r).toMatchObject({ outstandingVnd: 6_900_000, collectedVnd: 42_900_000 });
   });
 
   it("a regenerated invoice is never due before 7 days after it is issued", async () => {
@@ -368,7 +369,7 @@ describe.skipIf(!hasPg)("billing — API", () => {
       (i) => i.learnerName === "Huy D." && i.status !== "void",
     )!;
     // Term 1 was due 15/09; issued 23/11 → due 30/11, not "69 days overdue" at once
-    expect(again).toMatchObject({ no: "INV-2026-0008", dueDate: "2026-11-30", daysOverdue: 0 });
+    expect(again).toMatchObject({ no: "INV-2026-0009", dueDate: "2026-11-30", daysOverdue: 0 });
   });
 
   it("a center's own line beats the all-centers line; a learner in two classes of one course is billed once", async () => {
@@ -465,7 +466,7 @@ describe.skipIf(!hasPg)("billing — API", () => {
 
     const yen = await leadOf(sam, "Yen T."); // ENG-A2, District 1, placement
     const r = await sam("POST", "/v1/billing/invoices/first", { leadId: yen.id });
-    expect(r.json()).toEqual({ ok: true, invoiceNo: "INV-2026-0008" });
+    expect(r.json()).toEqual({ ok: true, invoiceNo: "INV-2026-0009" });
     // Term 1 ends within 30 days → Term 2's tuition, due 10/12 (not before 7 days after issue)
     const first = await inv(sam, "Yen T.");
     expect(first).toMatchObject({
@@ -477,7 +478,7 @@ describe.skipIf(!hasPg)("billing — API", () => {
     expect(first.lines.map((l) => l.description)).toEqual(["ENG-A2 · Tuition · Term 2 2026-2027"]);
     expect(await leadOf(sam, "Yen T.")).toMatchObject({
       stage: "offer",
-      invoiceNo: "INV-2026-0008",
+      invoiceNo: "INV-2026-0009",
     });
     expect((await sam("POST", "/v1/billing/invoices/first", { leadId: yen.id })).statusCode).toBe(
       409,
@@ -542,6 +543,7 @@ describe.skipIf(!hasPg)("billing — API", () => {
     const mine = await invoices(sam);
     expect(mine.map((i) => i.learnerName).sort()).toEqual([
       "An P.",
+      "Bao T.",
       "Khoa L.",
       "Linh N.",
       "Minh T.",

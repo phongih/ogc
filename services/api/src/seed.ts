@@ -15,6 +15,7 @@
 import pg from "pg";
 import { DEFAULT_ENGINE_RULES, commissionFor } from "@ogc/contracts";
 import { cycleOf } from "./domains/partners.js";
+import { codeOf } from "./domains/growth.js";
 import { seedClassCourses, seedCourses, seedLumenCourse } from "./seedCourses.js";
 
 export const NOVA = "00000000-0000-4000-8000-000000000001";
@@ -831,6 +832,133 @@ async function seedLeads(c: pg.Client, now: number): Promise<void> {
   }
 }
 
+/**
+ * Growth (owner 23/11, slice 6): the referral program (5%, cap 2.000.000 ₫, Tết 2027 +2%), Minh as
+ * the adult learner who may refer, codes for Mai and Minh, and Mai's two referrals — Bao T., whose
+ * first invoice (Term 2) was paid in full two days ago and waits for staff to confirm the reward,
+ * and "Linh N.", her own child (flagged: same household, duplicate). Wallets start empty.
+ */
+async function seedGrowth(c: pg.Client, now: number, org: string): Promise<void> {
+  const ago = (d: number) => new Date(now - d * DAY);
+  await c.query(
+    "insert into referral_program (org_id, enabled, reward_pct, cap_vnd, updated_by) values ($1, true, 5, 2000000, 'seed')",
+    [org],
+  );
+  await c.query(
+    "insert into referral_campaign (org_id, id, name, active, bonus_pct) values ($1, 'camp-tet-2027', 'Tết 2027 — bring a friend', true, 2)",
+    [org],
+  );
+  if (org !== NOVA) return;
+  await c.query("update learner set adult = true where id = $1", [L(2)]);
+  const MAI = "iios-principal-guardian-1";
+  const MINH = "iios-principal-learner-2";
+  for (const p of [MAI, MINH])
+    await c.query(
+      "insert into referral_code (code, org_id, principal_id) values ($1, $2, $3) on conflict (code) do nothing",
+      [codeOf(p), org, p],
+    );
+  await c.query(
+    "insert into referral_click (org_id, code, clicks) values ($1, $2, 5), ($1, $3, 0)",
+    [org, codeOf(MAI), codeOf(MINH)],
+  );
+  const lead = async (
+    id: string,
+    name: string,
+    created: number,
+    path: [string, number, string][],
+    extra: {
+      campaign: string | null;
+      assigned: string | null;
+      invoiceNo: string | null;
+      paid: number | null;
+    },
+  ) => {
+    await c.query(
+      `insert into lead (org_id, id, learner_name, course_code, center_id, source, referrer_name, campaign_id,
+         stage, assigned_to, invoice_no, first_payment_vnd, created_at, referrer_principal_id, referral_code)
+       values ($1, $2, $3, 'ENG-A2', $4, 'referral', 'Mai (Guardian)', $5, $6, $7, $8, $9, $10, $11, $12)`,
+      [
+        org,
+        id,
+        name,
+        D1,
+        extra.campaign,
+        path.length ? path[path.length - 1][0] : "new",
+        extra.assigned,
+        extra.invoiceNo,
+        extra.paid,
+        ago(created),
+        MAI,
+        codeOf(MAI),
+      ],
+    );
+    const h: [string, Date, string][] = [
+      ["new", ago(created), `Referral (${codeOf(MAI)})`],
+      ...path.map(([st, d, by]) => [st, ago(d), by] as [string, Date, string]),
+    ];
+    for (const [n, [st, at, by]] of h.entries())
+      await c.query(
+        "insert into lead_history (org_id, lead_id, seq, stage, at, by_name) values ($1, $2, $3, $4, $5, $6)",
+        [org, id, n + 1, st, at, by],
+      );
+  };
+  // Bao T.: first invoice = A2 Term 2 tuition (Term 1 ends within 30 days), paid in full.
+  const fee = await c.query<{ id: string; amount_vnd: string; due: string; year: string }>(
+    `select id, amount_vnd, due_date::text as due, year from fee_line
+      where course_code = 'ENG-A2' and kind = 'tuition' and period = 'Term 2' and status = 'approved'`,
+  );
+  const f = fee.rows[0];
+  const n = (await c.query<{ n: number }>("select count(*)::int as n from invoice")).rows[0].n + 1;
+  const issued = ago(5);
+  const invNo = `INV-${issued.toISOString().slice(0, 4)}-${String(n).padStart(4, "0")}`;
+  await lead(
+    "ADM-15",
+    "Bao T.",
+    9,
+    [
+      ["assigned", 8, "Sam (Org Staff)"],
+      ["contacted", 7, "Sam (Org Staff)"],
+      ["placement", 6, "Sam (Org Staff)"],
+      ["offer", 5, "Sam (Org Staff)"],
+      ["enrolled", 2, "Sam (Org Staff)"],
+    ],
+    {
+      campaign: "camp-tet-2027",
+      assigned: "iios-principal-staff-1",
+      invoiceNo: invNo,
+      paid: Number(f.amount_vnd),
+    },
+  );
+  await c.query(
+    `insert into invoice (org_id, id, no, center_id, learner_name, lead_id, subtotal_vnd, issued_at, due_date)
+     values ($1, $2, $3, $4, 'Bao T.', 'ADM-15', $5, $6, greatest($7::date, ($6::timestamptz + interval '7 hours')::date + 7))`,
+    [org, `I-${n}`, invNo, D1, f.amount_vnd, issued, f.due],
+  );
+  await c.query(
+    "insert into invoice_line (org_id, invoice_id, fee_line_id, description, amount_vnd) values ($1, $2, $3, $4, $5)",
+    [org, `I-${n}`, f.id, `ENG-A2 · Tuition · Term 2 ${f.year}`, f.amount_vnd],
+  );
+  const p = (await c.query<{ n: number }>("select count(*)::int as n from payment")).rows[0].n + 1;
+  await c.query(
+    `insert into payment (org_id, id, invoice_id, amount_vnd, method, receipt_no, at, recorded_by)
+     values ($1, $2, $3, $4, 'bank_transfer', $5, $6, 'Sam (Org Staff)')`,
+    [
+      org,
+      `P-${p}`,
+      `I-${n}`,
+      f.amount_vnd,
+      `RC-${ago(2).toISOString().slice(0, 4)}-${String(p).padStart(4, "0")}`,
+      ago(2),
+    ],
+  );
+  await lead("ADM-16", "Linh N.", 1, [], {
+    campaign: null,
+    assigned: null,
+    invoiceNo: null,
+    paid: null,
+  });
+}
+
 /** The Decision Engine's fixed rule set (R-1… in the shared default order); the caller scoped the org. */
 async function seedEngineRules(c: pg.Client): Promise<void> {
   for (const [i, r] of DEFAULT_ENGINE_RULES.entries())
@@ -877,6 +1005,14 @@ export async function seedDev(
         ])
           await c.query(`delete from ${t}`);
         await c.query("delete from placement_result");
+        for (const t of [
+          "wallet_entry",
+          "referral_reward",
+          "referral_click",
+          "referral_campaign",
+          "referral_program",
+        ])
+          await c.query(`delete from ${t}`);
         await c.query("delete from course_speaking_attempt");
         await c.query("delete from course_lesson_done");
         await c.query("delete from course_progress");
@@ -1044,6 +1180,7 @@ export async function seedDev(
     await seedLeads(c, now);
     await seedBilling(c, now);
     await seedPartners(c, now);
+    await seedGrowth(c, now, NOVA);
     await seedCourses(c, now, { tara: TARA, ben: BEN });
     await seedClassCourses(c, now, { a2Morning: A2M, b1Evening: B1E, an: L(3), linh: L(1) });
     await seedEngineRules(c);
@@ -1070,6 +1207,7 @@ export async function seedDev(
       [LUMEN],
     );
     await seedLumenCourse(c, now);
+    await seedGrowth(c, now, LUMEN);
     await seedEngineRules(c);
     await c.query(
       "insert into learner (org_id, id, display_name) values ($1, '00000000-0000-4000-8000-0000000Lo201', 'Learner (Lumen)')",

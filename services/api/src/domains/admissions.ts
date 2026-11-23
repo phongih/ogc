@@ -405,6 +405,54 @@ export async function markLeadPaid(
   await addHistory(tx, orgId, leadId, "enrolled", at, by);
 }
 
+/** Growth (/join): a referral lead enters the one pipeline at "new". The caller holds the
+ *  admissions lock of the organization. */
+export async function createReferralLead(
+  tx: TenantTx,
+  orgId: string,
+  input: {
+    learnerName: string;
+    courseCode: string;
+    centerId: string;
+    referrerName: string;
+    referrerPrincipalId: string;
+    code: string;
+    campaignId: string | null;
+  },
+  at: Date,
+): Promise<string> {
+  const { rows } = await sql<{ n: number }>`
+    select coalesce(max((substring(id from 5))::int), 0)::int as n from lead where id ~ '^ADM-[0-9]+$'`.execute(
+    tx,
+  );
+  const id = `ADM-${rows[0].n + 1}`;
+  await tx
+    .insertInto("lead")
+    .values({
+      org_id: orgId,
+      id,
+      learner_name: input.learnerName,
+      course_code: input.courseCode,
+      center_id: input.centerId,
+      source: "referral",
+      referrer_name: input.referrerName,
+      campaign_id: input.campaignId,
+      channel: null,
+      note: "",
+      stage: "new",
+      assigned_to: null,
+      invoice_no: null,
+      first_payment_vnd: null,
+      lost_reason: null,
+      created_at: at,
+      referrer_principal_id: input.referrerPrincipalId,
+      referral_code: input.code,
+    })
+    .execute();
+  await addHistory(tx, orgId, id, "new", at, `Referral (${input.code})`);
+  return id;
+}
+
 // ── routes ───────────────────────────────────────────────────────────────────────────────────
 const STATUS: Record<AdmissionsRefusal, number> = {
   not_staff: 403,

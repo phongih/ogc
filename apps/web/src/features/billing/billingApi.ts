@@ -68,7 +68,7 @@ export interface TuitionApi {
   key: readonly unknown[];
   subtitle: string;
   note: string;
-  showWallet: boolean; // referral credit (demo only until the Growth slice)
+  showWallet: boolean; // referral credit waiting for the next invoice
   getMine(): Promise<MyBilling | null>;
 }
 export const TuitionApiContext = createContext<TuitionApi | null>(null);

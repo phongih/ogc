@@ -31,6 +31,7 @@ import { registerCourses } from "./domains/courses.js";
 import { registerClassCourses } from "./domains/classCourses.js";
 import { registerStudents } from "./domains/students.js";
 import { registerEngine } from "./domains/engine.js";
+import { registerGrowth } from "./domains/growth.js";
 import { registerAttendance } from "./domains/attendance.js";
 import { registerMakeup } from "./domains/makeup.js";
 import { registerWorkforce } from "./domains/workforce.js";
@@ -43,7 +44,7 @@ declare module "fastify" {
     grant: IiosGrantedContext | null;
   }
   interface FastifyContextConfig {
-    public?: boolean; // no grant needed (health only)
+    public?: boolean; // no grant needed (health, dev login, the /join page)
   }
 }
 
@@ -95,6 +96,8 @@ export function buildApi(deps: ApiDeps): Api {
     logger: deps.logger ?? false,
     bodyLimit: 64 * 1024,
     genReqId: () => randomUUID(),
+    // nginx on the same machine proxies /v1: trust its X-Forwarded-For (rate limits of /join)
+    trustProxy: ["127.0.0.1", "::1"],
   });
   const app = fastify as unknown as Api;
   app.decorateRequest("grant", null);
@@ -256,6 +259,7 @@ export function buildApi(deps: ApiDeps): Api {
   registerClassCourses(app);
   registerStudents(app);
   registerEngine(app);
+  registerGrowth(app, deps.db, deps.now ?? Date.now);
   registerAccess(app, deps.iios);
   return app;
 }

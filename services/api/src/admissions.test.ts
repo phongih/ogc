@@ -94,7 +94,7 @@ describe.skipIf(!hasPg)("admissions — API", () => {
   it("lists the seeded pipeline ranked by an explainable score", async () => {
     const sam = await as(SAM);
     const all = await leads(sam);
-    expect(all).toHaveLength(14);
+    expect(all).toHaveLength(16); // 14 + Mai's two referrals (Growth seed)
     for (const l of all) {
       expect(l.score.parts.map((p) => p.key)).toEqual([
         "source",
@@ -144,18 +144,18 @@ describe.skipIf(!hasPg)("admissions — API", () => {
     expect(d.conversions.map((c) => c.reached)).toEqual(
       order.slice(1).map((_, i) => all.filter((l) => furthest(l) >= i + 1).length),
     );
-    expect(d.total).toBe(14);
-    expect(d.byStage.reduce((s, x) => s + x.count, 0)).toBe(14);
-    expect(d.open + d.enrolled + d.lost).toBe(14);
+    expect(d.total).toBe(16);
+    expect(d.byStage.reduce((s, x) => s + x.count, 0)).toBe(16);
+    expect(d.open + d.enrolled + d.lost).toBe(16);
     for (const c of d.conversions) {
       expect(c.reached).toBeLessThanOrEqual(c.of);
       if (c.pct !== null) expect(c.pct).toBeLessThanOrEqual(100);
     }
     // Reached counts the furthest stage ever: every lead reached "new".
-    expect(d.conversions[0].of).toBe(14);
-    expect(d.leadToEnrolled).toMatchObject({ reached: d.enrolled, of: 14 });
+    expect(d.conversions[0].of).toBe(16);
+    expect(d.leadToEnrolled).toMatchObject({ reached: d.enrolled, of: 16 });
     expect(d.bands.hot + d.bands.warm + d.bands.cold).toBe(d.open);
-    expect(d.bySource.reduce((s, x) => s + x.leads, 0)).toBe(14);
+    expect(d.bySource.reduce((s, x) => s + x.leads, 0)).toBe(16);
     expect(d.counselors.map((c) => c.name).sort()).toEqual([
       "Olivia (Org Admin)",
       "Sam (Org Staff)",
@@ -166,10 +166,10 @@ describe.skipIf(!hasPg)("admissions — API", () => {
     const sam = await as(SAM);
     const ok = await sam("POST", "/v1/admissions/leads", draft());
     expect(ok.statusCode).toBe(200);
-    expect(ok.json()).toEqual({ ok: true, id: "ADM-15" });
+    expect(ok.json()).toEqual({ ok: true, id: "ADM-17" });
     const mai = await lead(sam, "Mai Q.");
     expect(mai).toMatchObject({
-      id: "ADM-15",
+      id: "ADM-17",
       stage: "new",
       source: "walk_in",
       assignedTo: null,
@@ -193,7 +193,7 @@ describe.skipIf(!hasPg)("admissions — API", () => {
       expect(r.statusCode, JSON.stringify(over)).toBe(422);
       expect(r.json().detail).toMatch(detail);
     }
-    expect(await leads(sam)).toHaveLength(15);
+    expect(await leads(sam)).toHaveLength(17);
   });
 
   it("center scope: a District 1 front desk sees and acts on District 1 leads only", async () => {

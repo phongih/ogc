@@ -64,7 +64,7 @@ export function PlatformTuitionApi({ children }: { children: ReactNode }) {
       key: ["tuition", s.principalId],
       subtitle: "Invoices and payments · staging",
       note: "Staging, synthetic data — nothing is charged or paid. Pay at your center; staff record the payment.",
-      showWallet: false,
+      showWallet: true,
       getMine: () => platformApi.myBilling(s),
     }),
     [s],

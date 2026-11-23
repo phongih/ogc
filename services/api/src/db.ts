@@ -52,6 +52,7 @@ export interface LearnerTable {
   principal_id: string | null;
   display_name: string;
   pays_own_tuition: Generated<boolean>;
+  adult: Generated<boolean>;
 }
 export interface ClassTable {
   org_id: string;
@@ -163,6 +164,8 @@ export interface LeadTable {
   first_payment_vnd: string | number | null; // bigint: pg returns a string
   lost_reason: string | null;
   created_at: Date;
+  referrer_principal_id?: string | null;
+  referral_code?: string | null;
 }
 export interface LeadHistoryTable {
   org_id: string;
@@ -396,6 +399,52 @@ export interface CourseSpeakingAttemptTable {
   reviewed_by: string | null;
   note: string | null;
 }
+export interface ReferralCodeTable {
+  code: string;
+  org_id: string;
+  principal_id: string;
+}
+export interface ReferralProgramTable {
+  org_id: string;
+  enabled: boolean;
+  reward_pct: string | number;
+  cap_vnd: string | number;
+  updated_by: string;
+  updated_at: Generated<Date>;
+}
+export interface ReferralCampaignTable {
+  org_id: string;
+  id: string;
+  name: string;
+  active: boolean;
+  bonus_pct: string | number;
+}
+export interface ReferralClickTable {
+  org_id: string;
+  code: string;
+  clicks: Generated<number>;
+}
+export interface ReferralRewardTable {
+  org_id: string;
+  lead_id: string;
+  status: "confirmed" | "rejected";
+  reward_vnd: string | number | null;
+  pct: string | number | null;
+  at: Date;
+  by_name: string;
+  reason: string | null;
+}
+export interface WalletEntryTable {
+  org_id: string;
+  id: string;
+  principal_id: string;
+  at: Date;
+  kind: "credit" | "applied";
+  amount_vnd: string | number;
+  note: string;
+  lead_id: string | null;
+  invoice_id: string | null;
+}
 export interface PlacementResultTable {
   org_id: string;
   learner_id: string;
@@ -533,6 +582,12 @@ export interface DB {
   engine_notification: EngineNotificationTable;
   engine_job: EngineJobTable;
   course_speaking_attempt: CourseSpeakingAttemptTable;
+  referral_code: ReferralCodeTable;
+  referral_program: ReferralProgramTable;
+  referral_campaign: ReferralCampaignTable;
+  referral_click: ReferralClickTable;
+  referral_reward: ReferralRewardTable;
+  wallet_entry: WalletEntryTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;
