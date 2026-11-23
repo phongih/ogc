@@ -9,14 +9,20 @@
  * Every endpoint requires the client secret (Authorization: Bearer <secret>). It refuses to start
  * without a key of at least 32 bytes and refuses NODE_ENV=production (see main.ts).
  */
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
+import { IiosGrantedContext, type IiosContextResolution } from "@ogc/contracts";
 import {
-  IiosGrantedContext,
-  type GrantNarrowing,
-  type IiosContextResolution,
-} from "@ogc/contracts";
-import { MEMBERS, ORGS, seedPolicies, type Member, type StoredPolicy } from "./seed.js";
+  adminView,
+  isOrgAdmin,
+  memoryStore,
+  narrowingFor,
+  ops,
+  type AdminCall,
+  type PolicyRecord,
+  type PolicyStore,
+} from "./policies.js";
+import { MEMBERS, ORGS, seedPolicies, type Member } from "./seed.js";
 import { open, sign } from "./token.js";
 
 export interface IiosMockOptions {
@@ -24,10 +30,12 @@ export interface IiosMockOptions {
   clientId: string; // the one client allowed (OGC)
   clientSecret: string;
   now?: () => number; // ms, for tests
+  /** Where policies live. Default: in memory (`state`); main.ts passes the PostgreSQL store. */
+  store?: PolicyStore;
 }
 
 export interface IiosMockState {
-  policies: Map<string, StoredPolicy>;
+  policies: Map<string, PolicyRecord>; // the memory store's data (unused with a PostgreSQL store)
   attachments: Map<string, string>; // principalId → policy ref
   revoked: Set<string>; // grant ids
 }
@@ -46,7 +54,8 @@ export function buildIiosMock(opts: IiosMockOptions): {
     attachments: new Map(),
     revoked: new Set(),
   };
-  const app = Fastify({ logger: false, bodyLimit: 16 * 1024 });
+  const store = opts.store ?? memoryStore(state);
+  const app = Fastify({ logger: false, bodyLimit: 32 * 1024 });
   const secret = Buffer.from(opts.clientSecret);
 
   app.addHook("onRequest", async (req, reply) => {
@@ -58,16 +67,6 @@ export function buildIiosMock(opts: IiosMockOptions): {
 
   const memberOf = (principalId: string, orgId: string): Member | undefined =>
     MEMBERS.find((m) => m.principalId === principalId && m.orgId === orgId);
-
-  function narrowingFor(m: Member): GrantNarrowing {
-    if (m.role === "admin") return { state: "none" }; // an Org Admin is never narrowed
-    const ref = state.attachments.get(m.principalId);
-    if (!ref) return { state: "none" };
-    const p = state.policies.get(ref);
-    if (!p || p.status !== "active" || p.orgId !== m.orgId || p.rules.length === 0)
-      return { state: "unavailable" }; // fail-closed: attached but unresolvable
-    return { state: "policy", policyRef: p.ref, version: p.version, name: p.name, rules: p.rules };
-  }
 
   // Dev login: issue a grant for a synthetic member of the organization.
   app.post("/v1/dev/grants", async (req, reply) => {
@@ -113,7 +112,7 @@ export function buildIiosMock(opts: IiosMockOptions): {
       purpose: p.purpose,
       ...(p.ac ? { activeCenter: p.ac } : {}),
       orgAdmin: m.role === "admin",
-      narrowing: narrowingFor(m),
+      narrowing: narrowingFor(m, await store.read(m.orgId)),
       requestId: p.rid,
       grantRef: p.jti,
       expiresAt: new Date(p.exp * 1000).toISOString(),
@@ -139,6 +138,67 @@ export function buildIiosMock(opts: IiosMockOptions): {
       role: m.role,
     })),
   );
+
+  // ── access policy administration (OGC-ADR-039 option C) ─────────────────────────────────
+  // Called server-to-server by the OGC API with the CALLER'S grant. IIOS opens the grant itself
+  // and decides admin from its own member data; a caller's flag is never trusted.
+  const callerOf = (b: Record<string, unknown>): AdminCall | null => {
+    const p = open(opts.key, typeof b.grant === "string" ? b.grant : "");
+    if (!p || p.cid !== opts.clientId || state.revoked.has(p.jti) || p.exp * 1000 <= now())
+      return null;
+    if (typeof b.orgId !== "string" || b.orgId !== p.org) return null;
+    const m = memberOf(p.sub, p.org);
+    if (!m || m.role === null) return null;
+    return {
+      viewer: p.sub,
+      orgId: p.org,
+      nowIso: new Date(now()).toISOString(),
+      newRef: () => `policy-${randomUUID().slice(0, 8)}`,
+    };
+  };
+  const body = (req: { body: unknown }) => (req.body ?? {}) as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === "number" && Number.isInteger(v) ? v : -1);
+
+  app.post("/v1/admin/policies/view", async (req, reply) => {
+    const c = callerOf(body(req));
+    if (!c) return reply.code(401).send({ error: "grant" });
+    if (!isOrgAdmin(c.viewer, c.orgId)) return reply.code(403).send({ error: "not_admin" });
+    return adminView(await store.read(c.orgId), c.viewer, c.orgId);
+  });
+  app.post("/v1/admin/policies/create", async (req, reply) => {
+    const b = body(req);
+    const c = callerOf(b);
+    if (!c) return reply.code(401).send({ error: "grant" });
+    const input = (b.input ?? {}) as Parameters<typeof ops.create>[2];
+    return store.write(c.orgId, (s) => ops.create(s, c, input));
+  });
+  app.post("/v1/admin/policies/revise", async (req, reply) => {
+    const b = body(req);
+    const c = callerOf(b);
+    if (!c) return reply.code(401).send({ error: "grant" });
+    const patch = (b.patch ?? {}) as Parameters<typeof ops.revise>[4];
+    return store.write(c.orgId, (s) =>
+      ops.revise(s, c, String(b.ref ?? ""), num(b.expectedVersion), patch),
+    );
+  });
+  app.post("/v1/admin/policies/retire", async (req, reply) => {
+    const b = body(req);
+    const c = callerOf(b);
+    if (!c) return reply.code(401).send({ error: "grant" });
+    return store.write(c.orgId, (s) =>
+      ops.retire(s, c, String(b.ref ?? ""), num(b.expectedVersion)),
+    );
+  });
+  app.post("/v1/admin/attach", async (req, reply) => {
+    const b = body(req);
+    const c = callerOf(b);
+    if (!c) return reply.code(401).send({ error: "grant" });
+    const ref =
+      b.policyRef === null ? null : typeof b.policyRef === "string" ? b.policyRef : undefined;
+    if (ref === undefined)
+      return { ok: false, reason: "invalid", detail: "policyRef", path: "policyRef" };
+    return store.write(c.orgId, (s) => ops.attach(s, c, String(b.principalId ?? ""), ref));
+  });
 
   app.get("/v1/orgs/:orgId", async (req, reply) => {
     const o = ORGS.find((x) => x.id === (req.params as { orgId: string }).orgId);

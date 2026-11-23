@@ -165,10 +165,16 @@ importers:
       fastify:
         specifier: 5.1.0
         version: 5.1.0
+      pg:
+        specifier: 8.13.1
+        version: 8.13.1
     devDependencies:
       '@types/node':
         specifier: 22.7.4
         version: 22.7.4
+      '@types/pg':
+        specifier: 8.11.10
+        version: 8.11.10
       esbuild:
         specifier: 0.21.5
         version: 0.21.5

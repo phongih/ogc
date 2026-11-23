@@ -23,6 +23,7 @@ import { audit, type AuditEntry } from "./audit.js";
 import { withTenant, type Db, type TenantTx } from "./db.js";
 import { idempotent, KEY_FORMAT } from "./idempotency.js";
 import type { IiosClient } from "./iios.js";
+import { registerAccess } from "./domains/access.js";
 import { registerAttendance } from "./domains/attendance.js";
 import { registerSchedule } from "./domains/schedule.js";
 
@@ -236,5 +237,6 @@ export function buildApi(deps: ApiDeps): Api {
 
   registerSchedule(app);
   registerAttendance(app);
+  registerAccess(app, deps.iios);
   return app;
 }

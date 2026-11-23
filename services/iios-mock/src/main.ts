@@ -1,4 +1,7 @@
 /* MOCK IIOS process entry (ADR-040). Dev / staging only — refuses production. */
+import pg from "pg";
+import { migrate, pgStore, seedIfMissing } from "./pgStore.js";
+import { seedPolicies } from "./seed.js";
 import { buildIiosMock } from "./server.js";
 
 function need(name: string): string {
@@ -13,10 +16,27 @@ if (process.env.NODE_ENV === "production")
   );
 
 const key = Buffer.from(need("IIOS_MOCK_KEY"), "base64");
+
+// Access policies: in the mock IIOS's own database when IIOS_MOCK_DATABASE_URL is set (VM 2), so
+// they survive restarts; otherwise in memory (local dev), reset on every start.
+const dbUrl = process.env.IIOS_MOCK_DATABASE_URL;
+let store;
+if (dbUrl) {
+  const pool = new pg.Pool({ connectionString: dbUrl, max: 4 });
+  const applied = await migrate(pool);
+  const added = await seedIfMissing(pool, seedPolicies());
+  console.log(
+    `iios-mock: policies in PostgreSQL (migrations applied: ${applied.join(", ") || "none"}; seed policies added: ${added})`,
+  );
+  store = pgStore(pool);
+} else
+  console.log("iios-mock: policies in memory (IIOS_MOCK_DATABASE_URL not set) — lost on restart");
+
 const { app } = buildIiosMock({
   key,
   clientId: process.env.IIOS_MOCK_CLIENT_ID ?? "ogc",
   clientSecret: need("IIOS_MOCK_CLIENT_SECRET"),
+  ...(store ? { store } : {}),
 });
 const port = Number(process.env.PORT ?? 8790);
 await app.listen({ host: process.env.HOST ?? "127.0.0.1", port });

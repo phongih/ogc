@@ -45,8 +45,17 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 | `GET /v1/me/to-mark`                                    | teachers                                               | `listToMark`                                |
 | `GET /v1/me/classes`                                    | teachers (403 `not_a_teacher` otherwise)               | — (teacher home)                            |
 | `GET /v1/dev/personas`, `POST /v1/dev/login`            | public, only with `OGC_DEV_LOGIN=1` (staging)          | — (mock IIOS issues the grant)              |
+| `GET /v1/access/admin`                                  | Org Admin (IIOS decides)                               | `IiosPolicyAdminPort.getAdminView` → IIOS   |
+| `POST /v1/access/policies` `{name, description, rules}` | Org Admin                                              | `createPolicy` → IIOS                       |
+| `PUT /v1/access/policies/:ref` `{expectedVersion, …}`   | Org Admin, not a policy that restricts them            | `revisePolicy` → IIOS                       |
+| `POST /v1/access/policies/:ref/retire`                  | Org Admin, not while in use                            | `retirePolicy` → IIOS                       |
+| `PUT /v1/access/members/:principalId/policy`            | Org Admin, never their own membership                  | `attachPolicy` → IIOS                       |
 
 Schedule writes return the contract's `ScheduleResult` and attendance writes return `RecordAttendanceResult`; the HTTP status matches the outcome (404, 403, 409, 422).
+
+## Access policies
+
+OGC-ADR-039 option C: IIOS stores and decides access policies; OGC keeps no copy and writes no authorization relation. The `/v1/access/*` routes present the caller's own grant to IIOS, which re-checks that the caller administers the organization and applies the rules (closed catalog, versions, append-only history, no self-change, fail-closed). The API adds the request id, idempotency for writes and an audit row per decision. IIOS answers are mapped to 200 / 403 `not_admin` / 404 `not_found` / 422 `invalid` (with `path`) / 409 for the other refusals. If IIOS cannot answer, the API returns 503 and stores nothing under the idempotency key. A policy attached here narrows the member's next request, because IIOS puts it in the grant's `narrowing`.
 
 ## Synthetic data
 
