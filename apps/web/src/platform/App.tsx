@@ -17,6 +17,7 @@ import { MakeupsPage } from "./pages/MakeupsPage";
 import { MyMakeupsPage } from "./pages/MyMakeupsPage";
 import { PlatformWorkforcePage } from "./pages/WorkforcePage";
 import { PlatformAdmissionsPage } from "./pages/AdmissionsPage";
+import { PlatformBillingPage, PlatformTuitionPage } from "./pages/BillingPage";
 
 interface Ctx {
   session: PlatformSession | null;
@@ -62,8 +63,12 @@ function Shell({ children }: { children: ReactNode }) {
             {session.role === "staff" ? <Link to="/makeups">Make-ups</Link> : null}
             {session.role === "staff" ? <Link to="/workforce">Workforce</Link> : null}
             {session.role === "staff" ? <Link to="/admissions">Admissions</Link> : null}
+            {session.role === "staff" ? <Link to="/billing">Billing</Link> : null}
             {session.role === "learner" || session.role === "guardian" ? (
               <Link to="/my-makeups">Make-ups</Link>
+            ) : null}
+            {session.role === "learner" || session.role === "guardian" ? (
+              <Link to="/tuition">Tuition</Link>
             ) : null}
             {session.role === "teacher" ? <Link to="/teaching">Teaching</Link> : null}
             {session.orgAdmin ? <Link to="/access">Access</Link> : null}
@@ -181,6 +186,22 @@ export function App() {
                 element={
                   <Protected>
                     <MyMakeupsPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/billing"
+                element={
+                  <Protected>
+                    <PlatformBillingPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/tuition"
+                element={
+                  <Protected>
+                    <PlatformTuitionPage />
                   </Protected>
                 }
               />

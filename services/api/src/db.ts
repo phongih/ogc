@@ -51,6 +51,7 @@ export interface LearnerTable {
   id: string;
   principal_id: string | null;
   display_name: string;
+  pays_own_tuition: Generated<boolean>;
 }
 export interface ClassTable {
   org_id: string;
@@ -93,6 +94,7 @@ export interface GuardianLinkTable {
   org_id: string;
   guardian_principal_id: string;
   learner_id: string;
+  guardian_name: string | null;
 }
 export interface MakeupBookingTable {
   org_id: string;
@@ -189,6 +191,62 @@ export interface AdmissionsSettingsTable {
   updated_at: Generated<Date>;
 }
 
+// Dates (`date` columns) are read as text (`::text`) — node-pg would turn them into local Dates.
+export interface FeeLineTable {
+  org_id: string;
+  id: string;
+  year: string;
+  course_code: string;
+  center_id: string | null;
+  kind: "tuition" | "materials";
+  period: string;
+  from_date: string;
+  to_date: string;
+  due_date: string;
+  amount_vnd: string | number; // bigint: pg returns a string
+  status: "pending" | "approved" | "rejected" | "retired";
+  proposed_by: string;
+  proposed_by_name: string;
+  proposed_at: Date;
+  decided_by_name: string | null;
+  decided_at: Date | null;
+  note: string | null;
+}
+export interface InvoiceTable {
+  org_id: string;
+  id: string;
+  no: string;
+  center_id: string;
+  learner_name: string;
+  learner_id: string | null;
+  lead_id: string | null;
+  payer_principal_id: string | null;
+  payer_name: string | null;
+  subtotal_vnd: string | number;
+  credit_applied_vnd: Generated<string | number>;
+  issued_at: Date;
+  due_date: string;
+  void_reason: string | null;
+  voided_at: Date | null;
+}
+export interface InvoiceLineTable {
+  org_id: string;
+  invoice_id: string;
+  fee_line_id: string;
+  description: string;
+  amount_vnd: string | number;
+}
+export interface PaymentTable {
+  org_id: string;
+  id: string;
+  invoice_id: string;
+  amount_vnd: string | number;
+  method: "cash" | "bank_transfer" | "card";
+  receipt_no: string;
+  at: Date;
+  recorded_by: string;
+}
+
 export interface DB {
   center: CenterTable;
   teacher: TeacherTable;
@@ -208,6 +266,10 @@ export interface DB {
   lead_history: LeadHistoryTable;
   lead_activity: LeadActivityTable;
   admissions_settings: AdmissionsSettingsTable;
+  fee_line: FeeLineTable;
+  invoice: InvoiceTable;
+  invoice_line: InvoiceLineTable;
+  payment: PaymentTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

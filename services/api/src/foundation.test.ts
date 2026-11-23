@@ -45,6 +45,7 @@ describe.skipIf(!hasPg)("foundation — PostgreSQL", () => {
           "0003_makeup.sql",
           "0004_workforce.sql",
           "0005_admissions.sql",
+          "0006_billing.sql",
         ],
       });
     });

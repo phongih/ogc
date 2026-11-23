@@ -6,6 +6,14 @@
  */
 import type {
   AccessAdminView,
+  BillingResult,
+  FeeLine,
+  FeeLineDraft,
+  Invoice,
+  MyBilling,
+  Payment,
+  PaymentMethod,
+  Receivables,
   AdmissionsDashboard,
   AdmissionsResult,
   Lead,
@@ -275,7 +283,59 @@ export const platformApi = {
   updateAdmissionsSettings: (s: PlatformSession, next: ScoringSettings) =>
     result<AdmissionsResult>(s, "PUT", "/v1/admissions/settings", next),
 
-  // Attendance (teachers)
+  // Billing (staff; billing:manage by center; an Org Admin decides fee lines) — synthetic, nothing is charged
+  billingOptions: (s: PlatformSession) =>
+    staffRead<{
+      centers: { id: string; name: string }[];
+      courseCodes: string[];
+      allCenters: boolean;
+    }>(s, "/v1/billing/options"),
+  billingYears: (s: PlatformSession) => staffRead<string[]>(s, "/v1/billing/years"),
+  feeLines: (s: PlatformSession, year: string) =>
+    staffRead<FeeLine[]>(s, `/v1/billing/fee-lines?year=${encodeURIComponent(year)}`),
+  proposeFeeLine: (s: PlatformSession, d: FeeLineDraft) =>
+    result<BillingResult>(s, "POST", "/v1/billing/fee-lines", d),
+  decideFeeLine: (
+    s: PlatformSession,
+    id: string,
+    verb: "approve" | "reject" | "retire",
+    note = "",
+  ) =>
+    result<BillingResult>(s, "POST", `/v1/billing/fee-lines/${encodeURIComponent(id)}/${verb}`, {
+      note,
+    }),
+  billingPeriods: (s: PlatformSession) =>
+    staffRead<{ year: string; period: string; from: string; to: string; current: boolean }[]>(
+      s,
+      "/v1/billing/periods",
+    ),
+  generateInvoices: (s: PlatformSession, year: string, period: string) =>
+    result<BillingResult<{ created: number; existing: number; skippedNoLine: string[] }>>(
+      s,
+      "POST",
+      "/v1/billing/invoices/generate",
+      { year, period },
+    ),
+  issueFirstInvoice: (s: PlatformSession, leadId: string) =>
+    result<BillingResult<{ invoiceNo: string }>>(s, "POST", "/v1/billing/invoices/first", {
+      leadId,
+    }),
+  invoices: (s: PlatformSession) => staffRead<Invoice[]>(s, "/v1/billing/invoices"),
+  recordPayment: (s: PlatformSession, id: string, amountVnd: number, method: PaymentMethod) =>
+    result<BillingResult<{ receiptNo: string }>>(
+      s,
+      "POST",
+      `/v1/billing/invoices/${encodeURIComponent(id)}/payments`,
+      { amountVnd, method },
+    ),
+  voidInvoice: (s: PlatformSession, id: string, reason: string) =>
+    result<BillingResult>(s, "POST", `/v1/billing/invoices/${encodeURIComponent(id)}/void`, {
+      reason,
+    }),
+  payments: (s: PlatformSession) => staffRead<Payment[]>(s, "/v1/billing/payments"),
+  receivables: (s: PlatformSession) => staffRead<Receivables>(s, "/v1/billing/receivables"),
+  myBilling: (s: PlatformSession) => staffRead<MyBilling>(s, "/v1/me/billing"),
+
   myClasses: (s: PlatformSession) => read<MyClass[]>(s, "/v1/me/classes"),
   toMark: (s: PlatformSession) => read<ClassSession[]>(s, "/v1/me/to-mark"),
   classSessions: (s: PlatformSession, classId: string) =>

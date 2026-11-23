@@ -1,10 +1,11 @@
-// Admissions on the Platform: the shared view (features/admissions) over the Platform API. The
-// first-invoice and refer-to-partner actions arrive with the Billing and Partner slices.
+// Admissions on the Platform: the shared view (features/admissions) over the Platform API, with
+// Billing's "Issue first invoice"; "Refer to partner" arrives with the Partner slice.
 import { useMemo, type ReactNode } from "react";
 import { AdmissionsApiContext, type AdmissionsApi } from "../features/admissions/admissionsApi";
 import { platformApi } from "./client";
 import { useSignedIn } from "./App";
 import { PolicyBanner, useMyPlatformAccess } from "./workforce";
+import { PlatformLeadActions } from "./billing";
 
 function useCanManage(): boolean {
   const q = useMyPlatformAccess();
@@ -19,8 +20,8 @@ export function PlatformAdmissionsApi({ children }: { children: ReactNode }) {
       subtitle: "Pipeline · lead score · funnel · staging",
       back: null,
       Banner: PolicyBanner,
-      LeadActions: null,
-      billingLink: null,
+      LeadActions: PlatformLeadActions,
+      billingLink: "/billing",
       useCanManage,
       options: () => platformApi.admissionsOptions(s),
       listLeads: () => platformApi.leads(s),

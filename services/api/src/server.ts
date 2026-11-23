@@ -25,6 +25,7 @@ import { idempotent, KEY_FORMAT } from "./idempotency.js";
 import type { IiosClient } from "./iios.js";
 import { registerAccess } from "./domains/access.js";
 import { registerAdmissions } from "./domains/admissions.js";
+import { registerBilling } from "./domains/billing.js";
 import { registerAttendance } from "./domains/attendance.js";
 import { registerMakeup } from "./domains/makeup.js";
 import { registerWorkforce } from "./domains/workforce.js";
@@ -243,6 +244,7 @@ export function buildApi(deps: ApiDeps): Api {
   registerMakeup(app);
   registerWorkforce(app);
   registerAdmissions(app);
+  registerBilling(app);
   registerAccess(app, deps.iios);
   return app;
 }
