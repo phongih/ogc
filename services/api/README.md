@@ -19,6 +19,7 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 | `IIOS_URL`, `IIOS_CLIENT_SECRET` | `main`    | Where to resolve grants, and the client credential    |
 | `IIOS_TIMEOUT_MS`                | `main`    | Default 2000; a timeout refuses the request (503)     |
 | `HOST`, `PORT`                   | `main`    | Default `127.0.0.1:8788`                              |
+| `OGC_DEV_LOGIN=1`                | `main`    | Staging dev sign-in routes; refused in production     |
 
 ## Requests
 
@@ -42,6 +43,8 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 | `GET` / `PUT /v1/sessions/:id/attendance`               | owner or that session's substitute (`attendance:mark`) | `getSessionAttendance` / `recordAttendance` |
 | `GET /v1/classes/:id/attendance-summary`                | the class teacher                                      | `getClassSummary`                           |
 | `GET /v1/me/to-mark`                                    | teachers                                               | `listToMark`                                |
+| `GET /v1/me/classes`                                    | teachers (403 `not_a_teacher` otherwise)               | — (teacher home)                            |
+| `GET /v1/dev/personas`, `POST /v1/dev/login`            | public, only with `OGC_DEV_LOGIN=1` (staging)          | — (mock IIOS issues the grant)              |
 
 Schedule writes return the contract's `ScheduleResult` and attendance writes return `RecordAttendanceResult`; the HTTP status matches the outcome (404, 403, 409, 422).
 

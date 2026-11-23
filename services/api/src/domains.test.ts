@@ -224,6 +224,17 @@ describe.skipIf(!hasPg)("schedule & attendance — API", () => {
   });
 
   describe("attendance (teachers)", () => {
+    it("my classes: a teacher's own classes; staff are not teachers", async () => {
+      const mine = (await (await as(TARA_P))("GET", "/v1/me/classes")).json();
+      expect(
+        mine.map((c: { className: string; learnerCount: number }) => [c.className, c.learnerCount]),
+      ).toEqual([
+        ["A2 Morning — Mon/Wed", 3],
+        ["B1 Evening — Tue/Thu", 2],
+      ]);
+      expect((await (await as(SAM))("GET", "/v1/me/classes")).statusCode).toBe(403);
+    });
+
     it("Tara: her classes' sessions and to-mark; Ben sees none of hers", async () => {
       const tara = await as(TARA_P);
       const list = (await tara("GET", `/v1/classes/${A2M}/sessions`)).json();

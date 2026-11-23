@@ -13,8 +13,21 @@ export type ResolveOutcome =
   | { kind: "denied"; state: Exclude<IiosContextResolution["state"], "valid"> }
   | { kind: "unavailable"; detail: string };
 
+export interface DevMember {
+  principalId: string;
+  orgId: string;
+  orgName: string;
+  displayName: string;
+  role: string;
+}
+
 export interface IiosClient {
   resolve(grant: string, intendedOrgId: string): Promise<ResolveOutcome>;
+  /** Staging only (mock IIOS): list synthetic members and issue a grant for one of them. */
+  dev?: {
+    members(): Promise<DevMember[] | null>;
+    issue(principalId: string, orgId: string): Promise<{ grant: string; expiresAt: string } | null>;
+  };
 }
 
 export function httpIiosClient(opts: {
@@ -22,7 +35,38 @@ export function httpIiosClient(opts: {
   clientSecret: string;
   timeoutMs?: number;
 }): IiosClient {
+  const call = async (method: "GET" | "POST", path: string, body?: unknown) => {
+    try {
+      const res = await fetch(`${opts.baseUrl}${path}`, {
+        method,
+        headers: {
+          ...(body ? { "content-type": "application/json" } : {}),
+          authorization: `Bearer ${opts.clientSecret}`,
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? 2000),
+      });
+      return res.status === 200 ? ((await res.json()) as unknown) : null;
+    } catch {
+      return null;
+    }
+  };
   return {
+    dev: {
+      async members() {
+        const r = await call("GET", "/v1/dev/members");
+        return Array.isArray(r) ? (r as DevMember[]) : null;
+      },
+      async issue(principalId, orgId) {
+        const r = (await call("POST", "/v1/dev/grants", { principalId, orgId })) as {
+          grant?: unknown;
+          expiresAt?: unknown;
+        } | null;
+        return r && typeof r.grant === "string" && typeof r.expiresAt === "string"
+          ? { grant: r.grant, expiresAt: r.expiresAt }
+          : null;
+      },
+    },
     async resolve(grant, intendedOrgId) {
       let res: Response;
       try {

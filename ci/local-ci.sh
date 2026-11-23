@@ -33,8 +33,11 @@ pnpm --filter @ogc/api test
 pnpm --filter @ogc/iios-mock build
 pnpm --filter @ogc/api build
 
-echo "== build: web =="
+echo "== build: web (demo + Platform) and the bundle guard (ADR-040 §5) =="
 pnpm --filter @ogc/web build
+pnpm --filter @ogc/web build:platform
+node ops/release/check-bundle.mjs demo apps/web/dist
+node ops/release/check-bundle.mjs platform apps/web/dist-platform
 
 echo "== test: release toolkit (ops/release) =="
 node ops/release/test/release.test.mjs
@@ -67,6 +70,12 @@ if node -e "require('module').createRequire('/opt/npm-tools/node_modules/').reso
   node e2e/forecast-journey.mjs
   node e2e/partners-journey.mjs
   node e2e/studio-journey.mjs
+  if [ -n "${OGC_TEST_PG_ADMIN_URL:-}" ]; then
+    echo "== e2e: Platform (browser → /v1 → API → mock IIOS + PostgreSQL) =="
+    node e2e/platform-journey.mjs
+  else
+    echo "== e2e: Platform NOT RUN — OGC_TEST_PG_ADMIN_URL not set =="
+  fi
 else
   echo "== e2e: NOT RUN — Playwright unavailable (core gates unaffected) =="
 fi

@@ -129,6 +129,17 @@ export function buildIiosMock(opts: IiosMockOptions): {
     return { ok: true };
   });
 
+  // Dev login (staging): who may be picked. Synthetic members with a role, per organization.
+  app.get("/v1/dev/members", async () =>
+    MEMBERS.filter((m) => m.role !== null).map((m) => ({
+      principalId: m.principalId,
+      orgId: m.orgId,
+      orgName: ORGS.find((o) => o.id === m.orgId)?.name ?? m.orgId,
+      displayName: m.displayName,
+      role: m.role,
+    })),
+  );
+
   app.get("/v1/orgs/:orgId", async (req, reply) => {
     const o = ORGS.find((x) => x.id === (req.params as { orgId: string }).orgId);
     return o

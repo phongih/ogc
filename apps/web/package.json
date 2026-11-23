@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
+    "build:platform": "tsc -p tsconfig.json && vite build -c vite.platform.config.ts",
+    "dev:platform": "vite -c vite.platform.config.ts",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run"

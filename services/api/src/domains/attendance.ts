@@ -133,6 +133,27 @@ const sessionById = (tx: TenantTx, id: string) =>
   >;
 
 export function registerAttendance(app: Api): void {
+  // The teacher's own classes (Teaching home).
+  app.secured("GET", "/v1/me/classes", async (caller, _req, reply) => {
+    const out = await caller.tenant(async (tx) => {
+      const me = await teacherIdOf(tx, caller);
+      if (!me) return null;
+      const rows = await tx
+        .selectFrom("class")
+        .innerJoin("center", "center.id", "class.center_id")
+        .select(["class.id as classId", "class.name as className", "center.name as centerName"])
+        .where("class.teacher_id", "=", me)
+        .orderBy("class.name")
+        .execute();
+      const counts = await tx.selectFrom("roster").select(["class_id"]).execute();
+      return rows.map((r) => ({
+        ...r,
+        learnerCount: counts.filter((c) => c.class_id === r.classId).length,
+      }));
+    });
+    return out ?? reply.code(403).send({ error: "not_a_teacher" });
+  });
+
   app.secured("GET", "/v1/classes/:id/sessions", async (caller, req, reply) => {
     const id = (req.params as { id: string }).id;
     const out = await caller.tenant(async (tx) => {
