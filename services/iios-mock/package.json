@@ -1,0 +1,26 @@
+{
+  "name": "@ogc/iios-mock",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MOCK IIOS for OGC Platform dev/staging (ADR-040). Synthetic principals only. Holds a dev signing key; never for production.",
+  "exports": {
+    ".": "./src/server.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/main.mjs --external:fastify",
+    "start": "node dist/main.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ogc/contracts": "workspace:*",
+    "fastify": "5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.7.4",
+    "esbuild": "0.21.5",
+    "typescript": "5.6.2",
+    "vitest": "2.1.1"
+  }
+}
