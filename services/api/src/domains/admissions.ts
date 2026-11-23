@@ -353,6 +353,35 @@ export async function attachFirstInvoice(
     await addHistory(tx, orgId, leadId, next, at, by);
   }
 }
+/** Why this lead cannot go to a partner, or null (open, and no first invoice waiting). */
+export async function canReferOut(tx: TenantTx, leadId: string): Promise<string | null> {
+  const l = await tx
+    .selectFrom("lead")
+    .select(["stage", "invoice_no"])
+    .where("id", "=", leadId)
+    .executeTakeFirst();
+  if (!l) return "lead not found";
+  if (l.stage === "offer")
+    return `first invoice ${l.invoice_no} is open — void it in Billing first`;
+  if (!OPEN_STAGES.includes(l.stage)) return "the lead is closed";
+  return null;
+}
+/** Partner Commissions: the lead closes here as "Referred to partner: <name>". */
+export async function referLeadOut(
+  tx: TenantTx,
+  orgId: string,
+  leadId: string,
+  partnerName: string,
+  at: Date,
+  by: string,
+) {
+  await tx
+    .updateTable("lead")
+    .set({ stage: "lost", lost_reason: `Referred to partner: ${partnerName}`.slice(0, 200) })
+    .where("id", "=", leadId)
+    .execute();
+  await addHistory(tx, orgId, leadId, "lost", at, by);
+}
 /** The first invoice is paid in full: enrolled, with the amount from the invoice. */
 export async function markLeadPaid(
   tx: TenantTx,

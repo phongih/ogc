@@ -6,6 +6,13 @@
  */
 import type {
   AccessAdminView,
+  ActivityEntry,
+  CommissionEntry,
+  Partner,
+  PartnerFit,
+  PartnersOverview,
+  PartnersResult,
+  TierRuleDraft,
   BillingResult,
   FeeLine,
   FeeLineDraft,
@@ -282,6 +289,48 @@ export const platformApi = {
     ),
   updateAdmissionsSettings: (s: PlatformSession, next: ScoringSettings) =>
     result<AdmissionsResult>(s, "PUT", "/v1/admissions/settings", next),
+
+  // Partner Commissions (staff with partners:manage; an Org Admin activates rules and approves)
+  partnersOverview: (s: PlatformSession) => staffRead<PartnersOverview>(s, "/v1/partners/overview"),
+  partners: (s: PlatformSession) => staffRead<Partner[]>(s, "/v1/partners"),
+  partnerEntries: (s: PlatformSession) => staffRead<CommissionEntry[]>(s, "/v1/partners/entries"),
+  partnerActivity: (s: PlatformSession) => staffRead<ActivityEntry[]>(s, "/v1/partners/activity"),
+  suggestPartners: (s: PlatformSession, leadId: string) =>
+    staffRead<PartnerFit[]>(s, `/v1/partners/suggest/${encodeURIComponent(leadId)}`),
+  referLead: (s: PlatformSession, leadId: string, partnerId: string) =>
+    result<PartnersResult>(s, "POST", "/v1/partners/refer", { leadId, partnerId }),
+  partnerEntryStep: (
+    s: PlatformSession,
+    id: string,
+    step: "enrolled" | "reject" | "approve",
+    body: object = {},
+  ) =>
+    result<PartnersResult>(
+      s,
+      "POST",
+      `/v1/partners/entries/${encodeURIComponent(id)}/${step}`,
+      body,
+    ),
+  proposePartnerRule: (s: PlatformSession, partnerId: string, d: TierRuleDraft) =>
+    result<PartnersResult>(s, "POST", `/v1/partners/${encodeURIComponent(partnerId)}/rules`, d),
+  decidePartnerRule: (s: PlatformSession, ruleId: string, decision: "activate" | "reject") =>
+    result<PartnersResult>(
+      s,
+      "POST",
+      `/v1/partners/rules/${encodeURIComponent(ruleId)}/${decision}`,
+      {},
+    ),
+  actOnPartnerSignal: (
+    s: PlatformSession,
+    signalId: string,
+    action: "follow" | "snooze" | "dismiss",
+    note?: string,
+  ) =>
+    result<PartnersResult>(s, "POST", "/v1/partners/signals/act", {
+      signalId,
+      action,
+      ...(note ? { note } : {}),
+    }),
 
   // Billing (staff; billing:manage by center; an Org Admin decides fee lines) — synthetic, nothing is charged
   billingOptions: (s: PlatformSession) =>

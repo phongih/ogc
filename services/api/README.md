@@ -29,55 +29,62 @@ Fastify + Kysely + PostgreSQL 16. Synthetic data only until the gates in ADR-040
 
 ## Routes (slice 1)
 
-| Route                                                                     | Who                                                        | Port it serves                                       |
-| ------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------- |
-| `GET /v1/health`                                                          | public                                                     | —                                                    |
-| `GET /v1/me/access`                                                       | any grant                                                  | `MyAccessPort`                                       |
-| `GET /v1/schedule`                                                        | staff (`schedule:manage`, narrowed by center)              | `SchedulePort.getOverview`                           |
-| `POST /v1/sessions/:id/reschedule` `{at}`                                 | staff                                                      | `reschedule`                                         |
-| `POST /v1/sessions/:id/cancel` `{replacementAt}`                          | staff                                                      | `cancelWithReplacement`                              |
-| `POST /v1/classes/:id/sessions` `{title, at}`                             | staff                                                      | `addSession`                                         |
-| `PUT /v1/classes/:id/teacher` `{teacherId}`                               | staff (not if `classTeacher` is read-only)                 | `assignTeacher`                                      |
-| `PUT /v1/sessions/:id/substitute` `{teacherId \| null}`                   | staff (not if `substitute` is read-only)                   | `setSubstitute`                                      |
-| `GET /v1/classes/:id/sessions`                                            | the class teacher                                          | `AttendancePort.listClassSessions`                   |
-| `GET` / `PUT /v1/sessions/:id/attendance`                                 | owner or that session's substitute (`attendance:mark`)     | `getSessionAttendance` / `recordAttendance`          |
-| `GET /v1/classes/:id/attendance-summary`                                  | the class teacher                                          | `getClassSummary`                                    |
-| `GET /v1/me/to-mark`                                                      | teachers                                                   | `listToMark`                                         |
-| `GET /v1/me/classes`                                                      | teachers (403 `not_a_teacher` otherwise)                   | — (teacher home)                                     |
-| `GET /v1/dev/personas`, `POST /v1/dev/login`                              | public, only with `OGC_DEV_LOGIN=1` (staging)              | — (mock IIOS issues the grant)                       |
-| `GET /v1/makeups`                                                         | staff (`makeup:manage`, narrowed by center)                | `MakeupPort.getBoard`                                |
-| `GET /v1/makeups/:item/options`                                           | staff                                                      | `listOptions`                                        |
-| `POST /v1/makeups/:item/book` `{sessionId}`                               | staff                                                      | `book`                                               |
-| `POST /v1/makeups/:item/makeup-session` `{at, teacherId}`                 | staff                                                      | `openMakeupSession`                                  |
-| `POST /v1/makeups/:item/self-study`                                       | staff                                                      | `assignSelfStudy`                                    |
-| `GET /v1/me/makeups`                                                      | learner (own) · guardian (linked, read-only)               | `listMine`                                           |
-| `POST /v1/me/makeups/:item/self-study` `{note}`                           | learner (own item)                                         | `submitSelfStudy`                                    |
-| `GET /v1/me/makeups/to-confirm`                                           | the learner's own class teacher                            | `listToConfirm`                                      |
-| `POST /v1/makeups/:item/confirm` / `…/return` `{note}`                    | the learner's own class teacher                            | `confirmSelfStudy` / `returnSelfStudy`               |
-| `GET /v1/workforce`                                                       | staff                                                      | `WorkforcePort.getOverview`                          |
-| `PUT /v1/workforce/teachers/:id/target`                                   | staff with `workforce:manage`                              | `setTarget`                                          |
-| `PUT /v1/workforce/settings` `{underPct, overPct}`                        | staff with `workforce:manage`                              | `updateSettings`                                     |
-| `GET /v1/workforce/suggest/class/:id` · `…/session/:id`                   | staff (suggest only, nothing assigned)                     | `suggestForClass` / `suggestForSession`              |
-| `GET /v1/admissions/leads` · `…/dashboard` · `…/options`                  | staff (leads at centers `admissions:manage` allows)        | `AdmissionsPort.listLeads` / `getDashboard`          |
-| `GET /v1/admissions/counselors` · `…/settings`                            | staff                                                      | `counselors` / `getSettings`                         |
-| `POST /v1/admissions/leads` (a `LeadDraft`)                               | staff with `admissions:manage` at the center               | `createLead`                                         |
-| `PUT /v1/admissions/leads/:id/assign` `{principalId}`                     | staff with `admissions:manage` at the lead's center        | `assign`                                             |
-| `PUT /v1/admissions/leads/:id/stage` `{stage, reason?}`                   | staff with `admissions:manage` at the lead's center        | `moveStage`                                          |
-| `POST /v1/admissions/leads/:id/activities` `{kind, text}`                 | staff with `admissions:manage` at the lead's center        | `logActivity`                                        |
-| `PUT /v1/admissions/settings` (a `ScoringSettings`)                       | staff with `admissions:manage` (no center limit)           | `updateSettings`                                     |
-| `GET /v1/billing/years` · `…/fee-lines?year=` · `…/options`               | staff                                                      | `BillingPort.years` / `listFeeLines`                 |
-| `POST /v1/billing/fee-lines` (a `FeeLineDraft`)                           | staff with `billing:manage` (all centers: no center limit) | `proposeFeeLine`                                     |
-| `POST /v1/billing/fee-lines/:id/approve` · `…/reject` · `…/retire`        | Org Admin, never their own proposal                        | `approveFeeLine` / `rejectFeeLine` / `retireFeeLine` |
-| `GET /v1/billing/periods` · `…/invoices` · `…/payments` · `…/receivables` | staff (invoices at centers `billing:manage` allows)        | `periods` / `listInvoices` / …                       |
-| `POST /v1/billing/invoices/generate` `{year, period}`                     | staff with `billing:manage`                                | `generateInvoices`                                   |
-| `POST /v1/billing/invoices/first` `{leadId}`                              | staff with `billing:manage` at the lead's center           | `issueFirstInvoice`                                  |
-| `POST /v1/billing/invoices/:id/payments` · `…/void`                       | staff with `billing:manage` at the invoice's center        | `recordPayment` / `voidInvoice`                      |
-| `GET /v1/me/billing`                                                      | guardian, or a learner who pays their own                  | `getMine`                                            |
-| `GET /v1/access/admin`                                                    | Org Admin (IIOS decides)                                   | `IiosPolicyAdminPort.getAdminView` → IIOS            |
-| `POST /v1/access/policies` `{name, description, rules}`                   | Org Admin                                                  | `createPolicy` → IIOS                                |
-| `PUT /v1/access/policies/:ref` `{expectedVersion, …}`                     | Org Admin, not a policy that restricts them                | `revisePolicy` → IIOS                                |
-| `POST /v1/access/policies/:ref/retire`                                    | Org Admin, not while in use                                | `retirePolicy` → IIOS                                |
-| `PUT /v1/access/members/:principalId/policy`                              | Org Admin, never their own membership                      | `attachPolicy` → IIOS                                |
+| Route                                                                            | Who                                                               | Port it serves                                       |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------- |
+| `GET /v1/health`                                                                 | public                                                            | —                                                    |
+| `GET /v1/me/access`                                                              | any grant                                                         | `MyAccessPort`                                       |
+| `GET /v1/schedule`                                                               | staff (`schedule:manage`, narrowed by center)                     | `SchedulePort.getOverview`                           |
+| `POST /v1/sessions/:id/reschedule` `{at}`                                        | staff                                                             | `reschedule`                                         |
+| `POST /v1/sessions/:id/cancel` `{replacementAt}`                                 | staff                                                             | `cancelWithReplacement`                              |
+| `POST /v1/classes/:id/sessions` `{title, at}`                                    | staff                                                             | `addSession`                                         |
+| `PUT /v1/classes/:id/teacher` `{teacherId}`                                      | staff (not if `classTeacher` is read-only)                        | `assignTeacher`                                      |
+| `PUT /v1/sessions/:id/substitute` `{teacherId \| null}`                          | staff (not if `substitute` is read-only)                          | `setSubstitute`                                      |
+| `GET /v1/classes/:id/sessions`                                                   | the class teacher                                                 | `AttendancePort.listClassSessions`                   |
+| `GET` / `PUT /v1/sessions/:id/attendance`                                        | owner or that session's substitute (`attendance:mark`)            | `getSessionAttendance` / `recordAttendance`          |
+| `GET /v1/classes/:id/attendance-summary`                                         | the class teacher                                                 | `getClassSummary`                                    |
+| `GET /v1/me/to-mark`                                                             | teachers                                                          | `listToMark`                                         |
+| `GET /v1/me/classes`                                                             | teachers (403 `not_a_teacher` otherwise)                          | — (teacher home)                                     |
+| `GET /v1/dev/personas`, `POST /v1/dev/login`                                     | public, only with `OGC_DEV_LOGIN=1` (staging)                     | — (mock IIOS issues the grant)                       |
+| `GET /v1/makeups`                                                                | staff (`makeup:manage`, narrowed by center)                       | `MakeupPort.getBoard`                                |
+| `GET /v1/makeups/:item/options`                                                  | staff                                                             | `listOptions`                                        |
+| `POST /v1/makeups/:item/book` `{sessionId}`                                      | staff                                                             | `book`                                               |
+| `POST /v1/makeups/:item/makeup-session` `{at, teacherId}`                        | staff                                                             | `openMakeupSession`                                  |
+| `POST /v1/makeups/:item/self-study`                                              | staff                                                             | `assignSelfStudy`                                    |
+| `GET /v1/me/makeups`                                                             | learner (own) · guardian (linked, read-only)                      | `listMine`                                           |
+| `POST /v1/me/makeups/:item/self-study` `{note}`                                  | learner (own item)                                                | `submitSelfStudy`                                    |
+| `GET /v1/me/makeups/to-confirm`                                                  | the learner's own class teacher                                   | `listToConfirm`                                      |
+| `POST /v1/makeups/:item/confirm` / `…/return` `{note}`                           | the learner's own class teacher                                   | `confirmSelfStudy` / `returnSelfStudy`               |
+| `GET /v1/workforce`                                                              | staff                                                             | `WorkforcePort.getOverview`                          |
+| `PUT /v1/workforce/teachers/:id/target`                                          | staff with `workforce:manage`                                     | `setTarget`                                          |
+| `PUT /v1/workforce/settings` `{underPct, overPct}`                               | staff with `workforce:manage`                                     | `updateSettings`                                     |
+| `GET /v1/workforce/suggest/class/:id` · `…/session/:id`                          | staff (suggest only, nothing assigned)                            | `suggestForClass` / `suggestForSession`              |
+| `GET /v1/admissions/leads` · `…/dashboard` · `…/options`                         | staff (leads at centers `admissions:manage` allows)               | `AdmissionsPort.listLeads` / `getDashboard`          |
+| `GET /v1/admissions/counselors` · `…/settings`                                   | staff                                                             | `counselors` / `getSettings`                         |
+| `POST /v1/admissions/leads` (a `LeadDraft`)                                      | staff with `admissions:manage` at the center                      | `createLead`                                         |
+| `PUT /v1/admissions/leads/:id/assign` `{principalId}`                            | staff with `admissions:manage` at the lead's center               | `assign`                                             |
+| `PUT /v1/admissions/leads/:id/stage` `{stage, reason?}`                          | staff with `admissions:manage` at the lead's center               | `moveStage`                                          |
+| `POST /v1/admissions/leads/:id/activities` `{kind, text}`                        | staff with `admissions:manage` at the lead's center               | `logActivity`                                        |
+| `PUT /v1/admissions/settings` (a `ScoringSettings`)                              | staff with `admissions:manage` (no center limit)                  | `updateSettings`                                     |
+| `GET /v1/billing/years` · `…/fee-lines?year=` · `…/options`                      | staff                                                             | `BillingPort.years` / `listFeeLines`                 |
+| `POST /v1/billing/fee-lines` (a `FeeLineDraft`)                                  | staff with `billing:manage` (all centers: no center limit)        | `proposeFeeLine`                                     |
+| `POST /v1/billing/fee-lines/:id/approve` · `…/reject` · `…/retire`               | Org Admin, never their own proposal                               | `approveFeeLine` / `rejectFeeLine` / `retireFeeLine` |
+| `GET /v1/billing/periods` · `…/invoices` · `…/payments` · `…/receivables`        | staff (invoices at centers `billing:manage` allows)               | `periods` / `listInvoices` / …                       |
+| `POST /v1/billing/invoices/generate` `{year, period}`                            | staff with `billing:manage`                                       | `generateInvoices`                                   |
+| `POST /v1/billing/invoices/first` `{leadId}`                                     | staff with `billing:manage` at the lead's center                  | `issueFirstInvoice`                                  |
+| `POST /v1/billing/invoices/:id/payments` · `…/void`                              | staff with `billing:manage` at the invoice's center               | `recordPayment` / `voidInvoice`                      |
+| `GET /v1/me/billing`                                                             | guardian, or a learner who pays their own                         | `getMine`                                            |
+| `GET /v1/partners/overview` · `/v1/partners` · `…/entries` · `…/activity`        | staff with `partners:manage`                                      | `PartnersPort.getOverview` / `listPartners` / …      |
+| `GET /v1/partners/suggest/:leadId`                                               | staff with `partners:manage` (ranked by fit, never by commission) | `suggestPartners`                                    |
+| `POST /v1/partners/refer` `{leadId, partnerId}`                                  | `partners:manage` + `admissions:manage` at the lead's center      | `referLead`                                          |
+| `POST /v1/partners/entries/:id/enrolled` · `…/reject` `{reason}`                 | staff with `partners:manage`                                      | `markEnrolled` / `reject`                            |
+| `POST /v1/partners/entries/:id/approve`                                          | Org Admin, not the one who recorded the enrolment                 | `approve`                                            |
+| `POST /v1/partners/:partnerId/rules` · `/v1/partners/rules/:id/activate\|reject` | staff propose; another Org Admin decides                          | `proposeRule` / `decideRule`                         |
+| `POST /v1/partners/signals/act` `{signalId, action, note?}`                      | staff with `partners:manage`                                      | `actOnSignal`                                        |
+| `GET /v1/access/admin`                                                           | Org Admin (IIOS decides)                                          | `IiosPolicyAdminPort.getAdminView` → IIOS            |
+| `POST /v1/access/policies` `{name, description, rules}`                          | Org Admin                                                         | `createPolicy` → IIOS                                |
+| `PUT /v1/access/policies/:ref` `{expectedVersion, …}`                            | Org Admin, not a policy that restricts them                       | `revisePolicy` → IIOS                                |
+| `POST /v1/access/policies/:ref/retire`                                           | Org Admin, not while in use                                       | `retirePolicy` → IIOS                                |
+| `PUT /v1/access/members/:principalId/policy`                                     | Org Admin, never their own membership                             | `attachPolicy` → IIOS                                |
 
 Schedule writes return the contract's `ScheduleResult` and attendance writes return `RecordAttendanceResult`; the HTTP status matches the outcome (404, 403, 409, 422).
 
@@ -125,6 +132,18 @@ Fee plans, invoices, payments and receivables (migration 0006: `fee_line`, `invo
 - The payer is the learner's guardian, or the learner when they pay their own. A minor sees no invoices.
 
 Not on the Platform yet: the referral wallet (Growth), reminders, refunds, tax invoices.
+
+## Partner Commissions (core)
+
+Leads handed to partner centers, tiered commissions, signals and an activity log (migration 0007: `partner`, `partner_rule`, `commission_entry`, `partner_activity`, `partner_signal_mark`), with the demo's rules. SYNTHETIC: a mock receivable, nothing is invoiced or paid.
+
+- A lead goes out from Admissions ("Refer to partner") and closes there as "Referred to partner: <name>". Only a reference code (`LR-…`), a short display name and the course go to the partner. A lead is referred once.
+- Suggestions are ranked by fit for the learner: the course taught, near the learner's center, retention. The commission is shown for information only and never used to rank.
+- Staff record what the partner reports (enrolled within the attribution window, or rejected with a reason). An Org Admin approves after the clawback window, or the cycle end for a retroactive rule, and never approves an enrolment they recorded. Approving locks the amount.
+- Staff propose a tier rule version; another Org Admin activates or rejects it. An enrolment keeps the version in force when it was recorded.
+- Signals (near the next tier, stale referral, high rejection rate, overdue settlement) only suggest: follow, snooze for 7 days, or dismiss with a reason. Every step is appended to the activity log.
+
+Next: settlement batches, partner report import, trends.
 
 ## Access policies
 

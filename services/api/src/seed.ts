@@ -13,6 +13,8 @@
  *        is kept)
  */
 import pg from "pg";
+import { commissionFor } from "@ogc/contracts";
+import { cycleOf } from "./domains/partners.js";
 
 export const NOVA = "00000000-0000-4000-8000-000000000001";
 export const LUMEN = "00000000-0000-4000-8000-000000000002";
@@ -435,6 +437,316 @@ async function seedBilling(c: pg.Client, now: number): Promise<void> {
   }
 }
 
+/**
+ * The demo's partner sample (Lotus, Sao Mai with v2 waiting, Hanoi Bridge) and its 15 ledger
+ * entries, dated from `now`: Lotus has 3 enrolments this month and one approved entry past its due
+ * date; Sao Mai a stale referral and two rejections; last month's paid entries were settled in
+ * ST-LOTUS-01 and ST-BRIDGE-01 (the batches themselves arrive with the settlements slice).
+ */
+async function seedPartners(c: pg.Client, now: number): Promise<void> {
+  const D1_ = D1;
+  const partners = [
+    ["PTN-LOTUS", "Lotus English — Binh Thanh", ["ENG-A2", "ENG-B1"], [D1_, THU_DUC], 82, 15],
+    ["PTN-SAOMAI", "Sao Mai IELTS Academy — District 3", ["IELTS-B2", "ENG-B1"], [D1_], 74, 20],
+    ["PTN-BRIDGE", "Hanoi Bridge English — Dong Da", ["ENG-A2"], [CENTER_CAU_GIAY], 68, 15],
+  ] as const;
+  for (const [id, name, courses, near, ret, days] of partners)
+    await c.query(
+      "insert into partner (org_id, id, name, courses, near_center_ids, retention_pct, settlement_days) values ($1, $2, $3, $4, $5, $6, $7)",
+      [NOVA, id, name, courses, near, ret, days],
+    );
+  type Rule = {
+    id: string;
+    partner: string;
+    version: number;
+    status: string;
+    cycle: "monthly" | "quarterly";
+    mode: "progressive" | "retroactive";
+    tiers: { minCount: number; amountVnd: number }[];
+    attr: number;
+    claw: number;
+  };
+  const rules: Rule[] = [
+    {
+      id: "TR-1",
+      partner: "PTN-LOTUS",
+      version: 1,
+      status: "active",
+      cycle: "monthly",
+      mode: "progressive",
+      tiers: [
+        { minCount: 1, amountVnd: 1_000_000 },
+        { minCount: 4, amountVnd: 2_000_000 },
+        { minCount: 8, amountVnd: 3_000_000 },
+      ],
+      attr: 60,
+      claw: 7,
+    },
+    {
+      id: "TR-2",
+      partner: "PTN-SAOMAI",
+      version: 1,
+      status: "active",
+      cycle: "quarterly",
+      mode: "retroactive",
+      tiers: [
+        { minCount: 1, amountVnd: 1_500_000 },
+        { minCount: 4, amountVnd: 2_500_000 },
+      ],
+      attr: 30,
+      claw: 14,
+    },
+    {
+      id: "TR-3",
+      partner: "PTN-SAOMAI",
+      version: 2,
+      status: "pending",
+      cycle: "quarterly",
+      mode: "retroactive",
+      tiers: [
+        { minCount: 1, amountVnd: 1_500_000 },
+        { minCount: 4, amountVnd: 2_500_000 },
+        { minCount: 8, amountVnd: 3_500_000 },
+      ],
+      attr: 30,
+      claw: 14,
+    },
+    {
+      id: "TR-4",
+      partner: "PTN-BRIDGE",
+      version: 1,
+      status: "active",
+      cycle: "monthly",
+      mode: "progressive",
+      tiers: [
+        { minCount: 1, amountVnd: 800_000 },
+        { minCount: 5, amountVnd: 1_500_000 },
+      ],
+      attr: 30,
+      claw: 7,
+    },
+  ];
+  for (const r of rules) {
+    const pending = r.status === "pending";
+    await c.query(
+      `insert into partner_rule (org_id, id, partner_id, version, status, cycle, mode, tiers, attribution_window_days,
+         clawback_window_days, proposed_by, proposed_by_name, proposed_at, decided_by_name, decided_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'iios-principal-staff-1', 'Sam (Org Staff)', $11, $12, $13)`,
+      [
+        NOVA,
+        r.id,
+        r.partner,
+        r.version,
+        r.status,
+        r.cycle,
+        r.mode,
+        JSON.stringify(r.tiers),
+        r.attr,
+        r.claw,
+        new Date(now - (pending ? 2 : 120) * DAY),
+        pending ? null : "Olivia (Org Admin)",
+        pending ? null : new Date(now - 119 * DAY),
+      ],
+    );
+  }
+  const ruleOf = (pid: string) => rules.find((r) => r.partner === pid && r.status === "active")!;
+  const monthStart = cycleOf("monthly", now).start;
+  const inMonth = (h: number) => Math.min(now - 3_600_000, monthStart + h * 3_600_000);
+  const lastMonth = cycleOf("monthly", monthStart - DAY).start;
+  type S = {
+    p: string;
+    name: string;
+    course: string;
+    referred: number;
+    enrolled?: number;
+    status: string;
+    approvedAgo?: number;
+    batch?: string;
+    reason?: string;
+  };
+  const S: S[] = [
+    {
+      p: "PTN-LOTUS",
+      name: "Quan B.",
+      course: "ENG-A2",
+      referred: inMonth(10) - 6 * DAY,
+      enrolled: inMonth(10),
+      status: "enrolled",
+    },
+    {
+      p: "PTN-LOTUS",
+      name: "Nhi P.",
+      course: "ENG-B1",
+      referred: inMonth(30) - 5 * DAY,
+      enrolled: inMonth(30),
+      status: "enrolled",
+    },
+    {
+      p: "PTN-LOTUS",
+      name: "Dat H.",
+      course: "ENG-A2",
+      referred: inMonth(60) - 4 * DAY,
+      enrolled: inMonth(60),
+      status: "enrolled",
+    },
+    {
+      p: "PTN-LOTUS",
+      name: "Mai L.",
+      course: "ENG-B1",
+      referred: now - 5 * DAY,
+      status: "referred",
+    },
+    {
+      p: "PTN-LOTUS",
+      name: "Son K.",
+      course: "ENG-A2",
+      referred: now - 12 * DAY,
+      status: "referred",
+    },
+    {
+      p: "PTN-LOTUS",
+      name: "Ha T.",
+      course: "ENG-A2",
+      referred: lastMonth + 2 * DAY - 9 * DAY,
+      enrolled: lastMonth + 2 * DAY,
+      status: "paid",
+      approvedAgo: 40,
+      batch: "ST-LOTUS-01",
+    },
+    {
+      p: "PTN-LOTUS",
+      name: "Long V.",
+      course: "ENG-B1",
+      referred: lastMonth + 4 * DAY - 9 * DAY,
+      enrolled: lastMonth + 4 * DAY,
+      status: "paid",
+      approvedAgo: 40,
+      batch: "ST-LOTUS-01",
+    },
+    {
+      p: "PTN-LOTUS",
+      name: "Trang N.",
+      course: "ENG-A2",
+      referred: lastMonth + 6 * DAY - 8 * DAY,
+      enrolled: lastMonth + 6 * DAY,
+      status: "approved",
+      approvedAgo: 30,
+    },
+    {
+      p: "PTN-SAOMAI",
+      name: "Khanh D.",
+      course: "IELTS-B2",
+      referred: now - 26 * DAY,
+      enrolled: now - 20 * DAY,
+      status: "enrolled",
+    },
+    {
+      p: "PTN-SAOMAI",
+      name: "Phuong A.",
+      course: "IELTS-B2",
+      referred: now - 24 * DAY,
+      enrolled: now - 16 * DAY,
+      status: "enrolled",
+    },
+    {
+      p: "PTN-SAOMAI",
+      name: "Tuan M.",
+      course: "ENG-B1",
+      referred: now - 25 * DAY,
+      status: "referred",
+    },
+    {
+      p: "PTN-SAOMAI",
+      name: "Lan C.",
+      course: "IELTS-B2",
+      referred: now - 22 * DAY,
+      status: "rejected",
+      reason: "already a learner at the partner",
+    },
+    {
+      p: "PTN-SAOMAI",
+      name: "Bich T.",
+      course: "IELTS-B2",
+      referred: now - 19 * DAY,
+      status: "rejected",
+      reason: "did not enrol within the window",
+    },
+    {
+      p: "PTN-BRIDGE",
+      name: "Hoa G.",
+      course: "ENG-A2",
+      referred: now - 3 * DAY,
+      status: "referred",
+    },
+    {
+      p: "PTN-BRIDGE",
+      name: "Vinh Q.",
+      course: "ENG-A2",
+      referred: lastMonth + 3 * DAY - 7 * DAY,
+      enrolled: lastMonth + 3 * DAY,
+      status: "paid",
+      approvedAgo: 35,
+      batch: "ST-BRIDGE-01",
+    },
+  ];
+  const settle = Object.fromEntries(partners.map(([id, , , , , days]) => [id, days]));
+  for (const [i, s] of S.entries()) {
+    const rule = ruleOf(s.p);
+    const locked = s.status === "approved" || s.status === "paid";
+    let amount: number | null = null;
+    let tier: number | null = null;
+    if (locked && s.enrolled) {
+      // as approval would have locked it: the n-th counted enrolment of its cycle
+      const key = cycleOf(rule.cycle, s.enrolled).key;
+      const same = S.filter(
+        (x) =>
+          x.p === s.p &&
+          x.enrolled &&
+          x.status !== "rejected" &&
+          x.status !== "referred" &&
+          cycleOf(rule.cycle, x.enrolled).key === key,
+      )
+        .map((x) => x.enrolled!)
+        .sort((a, b) => a - b);
+      const c = commissionFor(rule, same.indexOf(s.enrolled) + 1, same.length);
+      amount = c.amountVnd;
+      tier = c.tierIndex;
+    }
+    // never approved before the enrolment it approves
+    const approvedAt = s.approvedAgo
+      ? Math.max(now - s.approvedAgo * DAY, (s.enrolled ?? now) + DAY)
+      : null;
+    await c.query(
+      `insert into commission_entry (org_id, id, partner_id, lead_id, lead_ref_code, learner_display_name, course_code,
+         referred_at, expires_at, enrolled_at, enrolled_by, status, applied_rule_id, locked_amount_vnd, locked_tier_index,
+         approved_at, due_date, reject_reason, settled_batch_id, updated_by_name, updated_at)
+       values ($1, $2, $3, null, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+      [
+        NOVA,
+        `CE-${i + 1}`,
+        s.p,
+        `LR-${1001 + i}`,
+        s.name,
+        s.course,
+        new Date(s.referred),
+        new Date(s.referred + rule.attr * DAY),
+        s.enrolled ? new Date(s.enrolled) : null,
+        s.enrolled ? "iios-principal-staff-1" : null,
+        s.status,
+        s.enrolled ? rule.id : null,
+        amount,
+        tier,
+        approvedAt ? new Date(approvedAt) : null,
+        approvedAt ? new Date(approvedAt + settle[s.p] * DAY) : null,
+        s.reason ?? null,
+        s.batch ?? null,
+        locked ? "Olivia (Org Admin)" : "Sam (Org Staff)",
+        new Date(now - DAY),
+      ],
+    );
+  }
+}
+
 async function seedLeads(c: pg.Client, now: number): Promise<void> {
   const ago = (d: number, h = 0) => new Date(now - d * DAY - h * 3_600_000);
   for (const [i, s] of LEAD_SEEDS.entries()) {
@@ -492,6 +804,11 @@ export async function seedDev(
       for (const org of SYNTHETIC_ORGS) {
         await scope(org);
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        await c.query("delete from partner_signal_mark");
+        await c.query("delete from partner_activity");
+        await c.query("delete from commission_entry");
+        await c.query("delete from partner_rule");
+        await c.query("delete from partner");
         await c.query("delete from payment");
         await c.query("delete from invoice_line");
         await c.query("delete from invoice");
@@ -644,6 +961,7 @@ export async function seedDev(
     );
     await seedLeads(c, now);
     await seedBilling(c, now);
+    await seedPartners(c, now);
 
     // ── Lumen Edu (a second tenant, for isolation) ────────────────────────────────────────
     await scope(LUMEN);

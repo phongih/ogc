@@ -2,29 +2,34 @@
  * Admissions → "Refer to partner" (owner 22/11). Partners for this lead, ranked by FIT FOR THE
  * LEARNER (course taught, near the learner's center, how many learners stay). The commission is
  * shown for information only and never changes the order. Referring closes the lead at OGC.
+ * Shared by the demo and the Platform: the caller passes a `ReferApi`.
  */
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PartnersResult } from "@ogc/contracts";
-import { partners as api } from "../../lib/api";
-import { useViewer } from "../../app/iiosGate";
-import { refreshLearningState } from "../../lib/invalidate";
 import { Button } from "../../ui";
 import { Refused } from "./refused";
+import type { ReferApi } from "./partnersApi";
 
-export function ReferToPartner({ leadId, learnerName }: { leadId: string; learnerName: string }) {
-  const viewer = useViewer();
+export function ReferToPartner({
+  leadId,
+  learnerName,
+  api,
+}: {
+  leadId: string;
+  learnerName: string;
+  api: ReferApi;
+}) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const q = useQuery({
-    queryKey: ["partner-fit", viewer, leadId],
-    queryFn: () => api.suggestPartners(viewer, leadId),
+    queryKey: [...api.key, "partner-fit", leadId],
+    queryFn: () => api.suggest(leadId),
     enabled: open,
   });
   const act = useMutation({
-    mutationFn: (partnerId: string): Promise<PartnersResult> =>
-      api.referLead(viewer, leadId, partnerId),
-    onSuccess: () => refreshLearningState(qc),
+    mutationFn: (partnerId: string): Promise<PartnersResult> => api.refer(leadId, partnerId),
+    onSuccess: () => api.onChanged(qc),
   });
   if (!open)
     return (

@@ -11,6 +11,7 @@ import { Button } from "../../ui";
 import { AccessBanner } from "../access/AccessBanner";
 import { useMyAccess } from "../access/useMyAccess";
 import { ReferToPartner } from "../partners/ReferToPartner";
+import { useDemoReferApi } from "../partners/demoPartnersApi";
 import { AdmissionsApiContext, type AdmissionsApi } from "./admissionsApi";
 import { Refused, useAdmissionsAction } from "./AdmissionsView";
 
@@ -22,10 +23,11 @@ function DemoLeadActions({ lead: l }: { lead: Lead }) {
   const me = useMyAccess();
   const canBill = me.data?.allowed["billing:manage"] ?? true;
   const canRefer = me.data?.allowed["partners:manage"] ?? false;
+  const referApi = useDemoReferApi();
   return (
     <>
       {canRefer && l.stage !== "offer" ? (
-        <ReferToPartner leadId={l.id} learnerName={l.learnerName} />
+        <ReferToPartner leadId={l.id} learnerName={l.learnerName} api={referApi} />
       ) : null}
       {l.stage === "placement" ? (
         <Button
