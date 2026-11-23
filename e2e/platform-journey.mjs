@@ -25,6 +25,7 @@ const HOST = "127.0.0.1";
 const IIOS_PORT = 18790;
 const API_PORT = 18788;
 const ADMIN_URL = process.env.OGC_TEST_PG_ADMIN_URL ?? "";
+const NOVA = "00000000-0000-4000-8000-000000000001";
 
 const req = createRequire(join(ROOT, "services/api/package.json"));
 const pg = req("pg");
@@ -106,6 +107,24 @@ function centerLocal(d, hour) {
   const day0 = Math.floor(Date.now() / 86400000) * 86400000;
   const t = new Date(day0 + d * 86400000 + (hour - 7) * 3600000 + 7 * 3600000);
   return `${t.toISOString().slice(0, 10)}T${String(hour).padStart(2, "0")}:00`;
+}
+
+/** Tara's next B1 Evening slot (session k2-p1) as "YYYY-MM-DDTHH:MM" center time, read via the API. */
+async function nextB1Evening() {
+  const api = `http://${HOST}:${API_PORT}`;
+  const login = await fetch(`${api}/v1/dev/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ principalId: "iios-principal-staff-1", orgId: NOVA }),
+  });
+  const { grant } = await login.json();
+  const o = await (
+    await fetch(`${api}/v1/schedule`, {
+      headers: { authorization: `Bearer ${grant}`, "x-ogc-org": NOVA },
+    })
+  ).json();
+  const at = o.classes.flatMap((c) => c.sessions).find((x) => x.id === "k2-p1").at;
+  return new Date(Date.parse(at) + 7 * 3600000).toISOString().slice(0, 16);
 }
 
 async function main() {
@@ -204,7 +223,7 @@ async function main() {
     );
 
     const row = page.getByTestId("session-k1-p1");
-    await row.getByLabel("New time for k1-p1").fill(centerLocal(2, 18)); // Tara teaches B1 Evening then
+    await row.getByLabel("New time for k1-p1").fill(await nextB1Evening()); // Tara teaches B1 Evening then
     await row.getByRole("button", { name: "Reschedule" }).click();
     const refusal = row.getByTestId("refusal");
     await refusal.waitFor();

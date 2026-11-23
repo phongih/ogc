@@ -100,7 +100,7 @@ describe.skipIf(!hasPg)("schedule & attendance — API", () => {
         learnerCount: 3,
         centerName: "Nova English — District 1",
       });
-      expect(a2.sessions.find((s: { id: string }) => s.id === sid("k1", -4))).toMatchObject({
+      expect(a2.sessions.find((s: { id: string }) => s.id === sid("k1", -2))).toMatchObject({
         started: true,
         marked: true,
       });
@@ -142,11 +142,11 @@ describe.skipIf(!hasPg)("schedule & attendance — API", () => {
       ).toBe("in_past");
       // Tara's A2 Morning moved onto her B1 Evening slot → clash with a plain sentence.
       const clash = (
-        await sam("POST", `/v1/sessions/${sid("k1", 1)}/reschedule`, { at: future(2, 11) })
+        await sam("POST", `/v1/sessions/${sid("k1", 1)}/reschedule`, { at: future(1, 11) })
       ).json();
       expect(clash).toMatchObject({ ok: false, reason: "clash" });
       expect(clash.clashes[0]).toMatch(
-        /^Tara already teaches B1 Evening — Tue\/Thu on Wed, 25\/11\/2026, 18:00$/,
+        /^Tara already teaches B1 Evening — Tue\/Thu on Tue, 24\/11\/2026, 18:00$/,
       );
       const ok = await sam("POST", `/v1/sessions/${sid("k1", 1)}/reschedule`, { at: future(6, 2) });
       expect(ok.statusCode).toBe(200);
@@ -159,25 +159,25 @@ describe.skipIf(!hasPg)("schedule & attendance — API", () => {
     it("cancel requires a replacement; the replacement links both ways", async () => {
       const sam = await as(SAM);
       const r = (
-        await sam("POST", `/v1/sessions/${sid("k2", 2)}/cancel`, { replacementAt: future(7, 11) })
+        await sam("POST", `/v1/sessions/${sid("k2", 1)}/cancel`, { replacementAt: future(7, 11) })
       ).json();
       expect(r.ok).toBe(true);
-      const old = r.classSchedule.sessions.find((s: { id: string }) => s.id === sid("k2", 2));
+      const old = r.classSchedule.sessions.find((s: { id: string }) => s.id === sid("k2", 1));
       const repl = r.classSchedule.sessions.find(
-        (s: { replaces: string | null }) => s.replaces === sid("k2", 2),
+        (s: { replaces: string | null }) => s.replaces === sid("k2", 1),
       );
       expect(old).toMatchObject({ state: "cancelled", replacedBy: repl.id });
       expect(repl).toMatchObject({ state: "scheduled", title: "B1 — Unit 3", at: future(7, 11) });
       expect(
         (
-          await sam("POST", `/v1/sessions/${sid("k2", 2)}/cancel`, { replacementAt: future(8, 11) })
+          await sam("POST", `/v1/sessions/${sid("k2", 1)}/cancel`, { replacementAt: future(8, 11) })
         ).json().reason,
       ).toBe("cancelled");
     });
 
     it("substitute: same teacher refused; Ben clashes (busy with A2 Evening); Mia fits", async () => {
       const sam = await as(SAM);
-      const s = sid("k2", 2);
+      const s = sid("k2", 1);
       expect(
         (await sam("PUT", `/v1/sessions/${s}/substitute`, { teacherId: TARA })).json().reason,
       ).toBe("same_teacher");
@@ -239,11 +239,11 @@ describe.skipIf(!hasPg)("schedule & attendance — API", () => {
       const tara = await as(TARA_P);
       const list = (await tara("GET", `/v1/classes/${A2M}/sessions`)).json();
       expect(list.map((s: { id: string; status: string }) => [s.id, s.status])).toEqual([
-        [sid("k1", 3), "upcoming"],
+        [sid("k1", 2), "upcoming"],
         [sid("k1", 1), "upcoming"],
         [sid("k1", -1), "to_mark"],
-        [sid("k1", -4), "marked"],
-        [sid("k1", -6), "marked"],
+        [sid("k1", -2), "marked"],
+        [sid("k1", -3), "marked"],
       ]);
       expect((await tara("GET", "/v1/me/to-mark")).json().map((s: { id: string }) => s.id)).toEqual(
         [sid("k1", -1)],
