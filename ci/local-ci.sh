@@ -24,6 +24,15 @@ pnpm --filter @ogc/web test
 echo "== test: catalog-api backend (contract + negative + leakage + throttle) =="
 pnpm --filter @ogc/catalog-api test
 
+# Platform backend (ADR-040). Needs a PostgreSQL superuser URL in OGC_TEST_PG_ADMIN_URL; without
+# it the database tests are skipped here (reported) — they always run in GitHub CI.
+echo "== test + build: iios-mock, api (Platform, ADR-040) =="
+pnpm --filter @ogc/iios-mock test
+[ -n "${OGC_TEST_PG_ADMIN_URL:-}" ] || echo "   NOTE: OGC_TEST_PG_ADMIN_URL not set — database tests SKIPPED locally"
+pnpm --filter @ogc/api test
+pnpm --filter @ogc/iios-mock build
+pnpm --filter @ogc/api build
+
 echo "== build: web =="
 pnpm --filter @ogc/web build
 

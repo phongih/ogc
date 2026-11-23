@@ -1,0 +1,204 @@
+/*
+ * OGC Platform API (ADR-040). Request pipeline, in order:
+ *   request id → grant resolve at IIOS (fail-closed) → authorize() from @ogc/contracts (the same
+ *   evaluator the demo runs) → handler inside the DAK (one tenant-scoped transaction) → audit.
+ *
+ * Headers: `Authorization: Bearer <IIOS grant>` and `X-OGC-Org: <organization id>` (the tenant the
+ * caller intends to act in — IIOS decides whether the grant covers it). Writes also need
+ * `Idempotency-Key`.
+ */
+import { randomUUID } from "node:crypto";
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
+import { sql } from "kysely";
+import {
+  POLICY_CATALOG,
+  authorize,
+  roleHolds,
+  type AuthzResource,
+  type IiosGrantedContext,
+  type PolicyAction,
+} from "@ogc/contracts";
+import { audit, type AuditEntry } from "./audit.js";
+import { withTenant, type Db, type TenantTx } from "./db.js";
+import { idempotent, KEY_FORMAT } from "./idempotency.js";
+import type { IiosClient } from "./iios.js";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+declare module "fastify" {
+  interface FastifyRequest {
+    grant: IiosGrantedContext | null;
+  }
+  interface FastifyContextConfig {
+    public?: boolean; // no grant needed (health only)
+  }
+}
+
+export interface ApiDeps {
+  db: Db;
+  iios: IiosClient;
+  logger?: boolean;
+}
+
+/** What a route handler gets: the decided grant and helpers bound to it. */
+export interface Caller {
+  ctx: IiosGrantedContext;
+  requestId: string;
+  /** Allowed → the read-only fields; denied → audited and a 403 is sent (returns null). */
+  authorize(action: PolicyAction, res: Omit<AuthzResource, "orgId">): Promise<string[] | null>;
+  /** One tenant-scoped transaction (RLS on `ctx.orgId`). */
+  tenant<T>(fn: (tx: TenantTx) => Promise<T>): Promise<T>;
+  /** A write: idempotency key checked, work + audit + stored result in one transaction. */
+  write<T>(
+    route: string,
+    body: unknown,
+    work: (tx: TenantTx) => Promise<{ status: number; body: T; audit: AuditEntry }>,
+  ): Promise<void>;
+}
+
+export type Handler = (
+  caller: Caller,
+  req: FastifyRequest,
+  reply: FastifyReply,
+) => Promise<unknown>;
+
+type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+export type Api = FastifyInstance & {
+  /** Register a route that needs a decided grant; the handler gets a `Caller`. */
+  secured: (method: Method, url: string, h: Handler) => void;
+};
+
+export function buildApi(deps: ApiDeps): Api {
+  const fastify = Fastify({
+    logger: deps.logger ?? false,
+    bodyLimit: 64 * 1024,
+    genReqId: () => randomUUID(),
+  });
+  const app = fastify as unknown as Api;
+  app.decorateRequest("grant", null);
+
+  app.addHook("onSend", async (req, reply) => {
+    reply.header("x-request-id", req.id);
+    reply.header("cache-control", "no-store");
+  });
+
+  // Grant resolution for every non-public route. Fail-closed.
+  app.addHook("preHandler", async (req, reply) => {
+    if (req.routeOptions.config.public) return;
+    const h = req.headers.authorization ?? "";
+    const grant = h.startsWith("Bearer ") ? h.slice(7).trim() : "";
+    const org = String(req.headers["x-ogc-org"] ?? "");
+    if (!grant) return reply.code(401).send({ error: "iios_denied", state: "missing" });
+    if (!UUID.test(org)) return reply.code(400).send({ error: "bad_org_header" });
+    const r = await deps.iios.resolve(grant, org);
+    if (r.kind === "unavailable") {
+      req.log.warn({ detail: r.detail }, "iios unavailable — refusing");
+      return reply.code(503).send({ error: "iios_unavailable" });
+    }
+    if (r.kind === "denied") return reply.code(401).send({ error: "iios_denied", state: r.state });
+    req.grant = r.context;
+  });
+
+  app.setErrorHandler((err, req, reply) => {
+    req.log.error({ err }, "unhandled");
+    const status = err.statusCode && err.statusCode < 500 ? err.statusCode : 500;
+    return reply.code(status).send({ error: status === 500 ? "internal" : "bad_request" });
+  });
+
+  app.secured = (method, url, h) => {
+    app.route({
+      method,
+      url,
+      handler: async (req, reply) => {
+        const ctx = req.grant;
+        if (!ctx) return reply.code(401).send({ error: "iios_denied", state: "missing" });
+        const scope = { orgId: ctx.orgId, principalId: ctx.principalId, requestId: req.id };
+        const caller: Caller = {
+          ctx,
+          requestId: req.id,
+          tenant: (fn) => withTenant(deps.db, scope, fn),
+          async authorize(action, res) {
+            const d = authorize(ctx, action, { orgId: ctx.orgId, ...res });
+            if (d.allow) return d.readonly;
+            await withTenant(deps.db, scope, (tx) =>
+              audit(tx, ctx, req.id, {
+                action,
+                resource: { ...res },
+                outcome: "denied",
+                reason: d.reason,
+              }),
+            );
+            await reply.code(403).send({ error: "forbidden", reason: d.reason });
+            return null;
+          },
+          async write(route, body, work) {
+            const key = String(req.headers["idempotency-key"] ?? "");
+            if (!KEY_FORMAT.test(key)) {
+              await reply.code(400).send({ error: "idempotency_key_required" });
+              return;
+            }
+            const out = await withTenant(deps.db, scope, (tx) =>
+              idempotent(
+                tx,
+                { orgId: ctx.orgId, principalId: ctx.principalId, key, route, body },
+                async () => {
+                  const w = await work(tx);
+                  await audit(tx, ctx, req.id, w.audit);
+                  return { status: w.status, body: w.body };
+                },
+              ),
+            );
+            if (out.kind === "conflict")
+              await reply.code(409).send({ error: "idempotency_key_reused" });
+            else {
+              if (out.kind === "replay") reply.header("idempotent-replay", "true");
+              await reply.code(out.status).send(out.body);
+            }
+          },
+        };
+        return h(caller, req, reply);
+      },
+    });
+  };
+
+  // ── routes ────────────────────────────────────────────────────────────────────────────────
+  app.get("/v1/health", { config: { public: true } }, async (_req, reply) => {
+    try {
+      await sql`select 1`.execute(deps.db);
+      return { ok: true };
+    } catch {
+      return reply.code(503).send({ ok: false });
+    }
+  });
+
+  // What the caller may do (for the UI's hints); enforcement stays per route.
+  app.secured("GET", "/v1/me/access", async ({ ctx }) => {
+    const n = ctx.narrowing ?? { state: "none" as const };
+    const allowed = POLICY_CATALOG.map((c) => c.action).filter(
+      (a) =>
+        roleHolds(ctx.role, a) &&
+        n.state !== "unavailable" &&
+        (n.state === "none" || n.rules.some((r) => r.action === a)),
+    );
+    return {
+      orgId: ctx.orgId,
+      principalId: ctx.principalId,
+      role: ctx.role,
+      orgAdmin: ctx.orgAdmin ?? false,
+      activeCenter: ctx.activeCenter ?? null,
+      narrowing:
+        n.state === "policy"
+          ? {
+              state: "policy",
+              policyRef: n.policyRef,
+              version: n.version,
+              name: n.name,
+              rules: n.rules,
+            }
+          : n,
+      allowed,
+    };
+  });
+
+  return app;
+}
