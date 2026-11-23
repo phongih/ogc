@@ -13,7 +13,7 @@
  *        is kept)
  */
 import pg from "pg";
-import { commissionFor } from "@ogc/contracts";
+import { DEFAULT_ENGINE_RULES, commissionFor } from "@ogc/contracts";
 import { cycleOf } from "./domains/partners.js";
 import { seedClassCourses, seedCourses, seedLumenCourse } from "./seedCourses.js";
 
@@ -831,6 +831,27 @@ async function seedLeads(c: pg.Client, now: number): Promise<void> {
   }
 }
 
+/** The Decision Engine's fixed rule set (R-1… in the shared default order); the caller scoped the org. */
+async function seedEngineRules(c: pg.Client): Promise<void> {
+  for (const [i, r] of DEFAULT_ENGINE_RULES.entries())
+    await c.query(
+      `insert into engine_rule (org_id, id, kind, category, name, description, enabled, priority, cooldown_min, params, actions)
+       values (ogc_current_org(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        `R-${i + 1}`,
+        r.kind,
+        r.category,
+        r.name,
+        r.description,
+        r.enabled,
+        r.priority,
+        r.cooldownMin,
+        JSON.stringify(r.params),
+        r.actions,
+      ],
+    );
+}
+
 export async function seedDev(
   ownerUrl: string,
   now = Date.now(),
@@ -846,6 +867,15 @@ export async function seedDev(
       for (const org of SYNTHETIC_ORGS) {
         await scope(org);
         // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        for (const t of [
+          "engine_notification",
+          "engine_action",
+          "engine_fired",
+          "engine_event",
+          "engine_job",
+          "engine_rule",
+        ])
+          await c.query(`delete from ${t}`);
         await c.query("delete from placement_result");
         await c.query("delete from course_lesson_done");
         await c.query("delete from course_progress");
@@ -1015,6 +1045,7 @@ export async function seedDev(
     await seedPartners(c, now);
     await seedCourses(c, now, { tara: TARA, ben: BEN });
     await seedClassCourses(c, now, { a2Morning: A2M, b1Evening: B1E, an: L(3) });
+    await seedEngineRules(c);
     // Skill profile: the demo's synthetic placement results (Khoa and Vy have none, as in the demo).
     await c.query(
       `insert into placement_result (org_id, learner_id, cefr_band, reading, use_of_english, speaking) values
@@ -1038,6 +1069,7 @@ export async function seedDev(
       [LUMEN],
     );
     await seedLumenCourse(c, now);
+    await seedEngineRules(c);
     await c.query(
       "insert into learner (org_id, id, display_name) values ($1, '00000000-0000-4000-8000-0000000Lo201', 'Learner (Lumen)')",
       [LUMEN],

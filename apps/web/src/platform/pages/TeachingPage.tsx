@@ -7,6 +7,8 @@ import { platformApi } from "../client";
 import { useSignedIn } from "../App";
 import { SelfStudyToConfirmView } from "../../features/makeup/SelfStudyToConfirmView";
 import { PlatformMakeupApi } from "../makeup";
+import { EngineNotificationsView } from "../../features/engine/EngineNotificationsView";
+import { PlatformNotificationsApi } from "../engine";
 
 export function TeachingPage() {
   const session = useSignedIn();
@@ -29,6 +31,11 @@ export function TeachingPage() {
   return (
     <section>
       <PageHeader title="Teaching" subtitle="Times are center time (Asia/Ho_Chi_Minh)." />
+      <div className="mb-4">
+        <PlatformNotificationsApi>
+          <EngineNotificationsView />
+        </PlatformNotificationsApi>
+      </div>
       <div className="mb-4">
         <PlatformMakeupApi>
           <SelfStudyToConfirmView />
