@@ -1,9 +1,16 @@
 /*
  * Synthetic dev / staging data for the Platform (ADR-040 §6: synthetic only). Mirrors the demo's
  * fixtures (same ids and names) so the two runtimes can be compared. Loaded by the OWNER role —
- * reference data is not writable by `ogc_app`. Sessions are placed relative to `now`.
+ * reference data is not writable by `ogc_app`.
  *
- * CLI: DATABASE_URL_MIGRATE=… node dist/seed.mjs   (refuses if the organization already has data)
+ * Sessions follow each class's weekly slot in CENTER time (Asia/Ho_Chi_Minh, UTC+7, no DST), like
+ * the demo: "A2 Morning — Mon/Wed" meets Mondays and Wednesdays at 09:00. Ids count from `now`:
+ * `k1-m1` is the class's latest slot that has started, `k1-m2` the one before; `k1-p1` the next one.
+ *
+ * CLI: DATABASE_URL_MIGRATE=… node dist/seed.mjs            (refuses if the data is already there)
+ *      DATABASE_URL_MIGRATE=… node dist/seed.mjs --reset    (staging: delete the two synthetic
+ *        organizations' rows, then seed again — one transaction; the audit log is append-only and
+ *        is kept)
  */
 import pg from "pg";
 
@@ -20,18 +27,74 @@ export const MIA = "00000000-0000-4000-8000-00000000t003";
 export const L = (n: number) => `00000000-0000-4000-8000-00000000L00${n}`;
 
 const DAY = 86_400_000;
+const HOUR = 3_600_000;
+const CENTER_OFFSET = 7 * HOUR; // Asia/Ho_Chi_Minh
 
-/** Session id for class `k` on day offset `d` (e.g. sid("k1", -6) = "k1-m6"). */
-export const sid = (k: string, d: number) => `${k}-${d < 0 ? "m" : "p"}${Math.abs(d)}`;
+/**
+ * Session id for class `k`: n < 0 counts back from `now` (-1 = latest started slot), n > 0 forward
+ * (1 = next slot). E.g. sid("k1", -1) = "k1-m1", sid("k1", 2) = "k1-p2".
+ */
+export const sid = (k: string, n: number) => `${k}-${n < 0 ? "m" : "p"}${Math.abs(n)}`;
 
-export async function seedDev(ownerUrl: string, now = Date.now()): Promise<void> {
-  const day0 = Math.floor(now / DAY) * DAY; // UTC midnight of today
-  const at = (d: number, utcHour: number) => new Date(day0 + d * DAY + utcHour * 3600_000);
+/**
+ * The `past` latest slots that have started (newest first) and the `ahead` next ones, for a class
+ * meeting on `weekdays` (0 = Sunday) at `hour`:`minute` center time.
+ */
+export function weeklySlots(
+  now: number,
+  weekdays: number[],
+  hour: number,
+  minute: number,
+  past: number,
+  ahead: number,
+): { past: Date[]; ahead: Date[] } {
+  const day0 = Math.floor((now + CENTER_OFFSET) / DAY); // today, center calendar
+  const all: number[] = [];
+  for (let d = -35; d <= 35; d++) {
+    const midnight = (day0 + d) * DAY; // center-local midnight, expressed as if UTC
+    if (!weekdays.includes(new Date(midnight).getUTCDay())) continue;
+    all.push(midnight + hour * HOUR + minute * 60_000 - CENTER_OFFSET);
+  }
+  return {
+    past: all
+      .filter((t) => t <= now)
+      .slice(-past)
+      .reverse()
+      .map((t) => new Date(t)),
+    ahead: all
+      .filter((t) => t > now)
+      .slice(0, ahead)
+      .map((t) => new Date(t)),
+  };
+}
+
+/** The two synthetic organizations; `--reset` touches nothing else. */
+export const SYNTHETIC_ORGS = [
+  "00000000-0000-4000-8000-000000000001",
+  "00000000-0000-4000-8000-000000000002",
+] as const;
+
+export async function seedDev(
+  ownerUrl: string,
+  now = Date.now(),
+  opts: { reset?: boolean } = {},
+): Promise<void> {
   const c = new pg.Client({ connectionString: ownerUrl });
   await c.connect();
   try {
     await c.query("begin");
     const scope = (org: string) => c.query("select set_config('app.org_id', $1, true)", [org]);
+
+    if (opts.reset)
+      for (const org of SYNTHETIC_ORGS) {
+        await scope(org);
+        // children first (composite FKs); sessions point at each other via replaces/replaced_by
+        await c.query("delete from attendance");
+        await c.query("update session set replaced_by = null, replaces = null");
+        for (const t of ["session", "roster", "class", "learner", "teacher", "center"])
+          await c.query(`delete from ${t}`);
+        await c.query("delete from idempotency_key");
+      }
 
     // ── Nova Learning ──────────────────────────────────────────────────────────────────────
     await scope(NOVA);
@@ -74,37 +137,44 @@ export async function seedDev(ownerUrl: string, now = Date.now()): Promise<void>
           cls,
           L(l),
         ]);
-    // A2 Morning 09:00 center time (02:00Z); both evening classes 18:00 (11:00Z) on the same days,
-    // so Ben is busy whenever B1 Evening meets.
-    const sessions: [string, string, number, number, string][] = [
-      ["k1", A2M, -6, 2, "A2 — Unit 4"],
-      ["k1", A2M, -4, 2, "A2 — Unit 5"],
-      ["k1", A2M, -1, 2, "A2 — Unit 6"],
-      ["k1", A2M, 1, 2, "A2 — Unit 7"],
-      ["k1", A2M, 3, 2, "A2 — Unit 8"],
-      ["k2", B1E, -5, 11, "B1 — Unit 2"],
-      ["k2", B1E, 2, 11, "B1 — Unit 3"],
-      ["k2", B1E, 4, 11, "B1 — Unit 4"],
-      ["k3", A2E, -5, 11, "A2 — Unit 4"],
-      ["k3", A2E, 2, 11, "A2 — Unit 5"],
-      ["k3", A2E, 4, 11, "A2 — Unit 6"],
+    // Weekly slots in center time. A2 Morning Mon/Wed 09:00; both evening classes Tue/Thu 18:00,
+    // so Ben (A2 Evening) is busy whenever Tara's B1 Evening meets.
+    const morning = weeklySlots(now, [1, 3], 9, 0, 3, 2);
+    const evening = weeklySlots(now, [2, 4], 18, 0, 1, 2);
+    const sessions: [string, string, Date[], Date[], string[]][] = [
+      [
+        "k1",
+        A2M,
+        morning.past,
+        morning.ahead,
+        ["A2 — Unit 4", "A2 — Unit 5", "A2 — Unit 6", "A2 — Unit 7", "A2 — Unit 8"],
+      ],
+      ["k2", B1E, evening.past, evening.ahead, ["B1 — Unit 2", "B1 — Unit 3", "B1 — Unit 4"]],
+      ["k3", A2E, evening.past, evening.ahead, ["A2 — Unit 4", "A2 — Unit 5", "A2 — Unit 6"]],
     ];
-    for (const [k, cls, d, h, title] of sessions)
-      await c.query(
-        "insert into session (org_id, id, class_id, title, at) values ($1, $2, $3, $4, $5)",
-        [NOVA, sid(k, d), cls, title, at(d, h)],
-      );
+    for (const [k, cls, past, ahead, titles] of sessions) {
+      // oldest first: m<past>…m1, then p1…p<ahead>
+      const rows: [string, Date][] = [
+        ...past.map((d, i) => [sid(k, -(i + 1)), d] as [string, Date]).reverse(),
+        ...ahead.map((d, i) => [sid(k, i + 1), d] as [string, Date]),
+      ];
+      for (const [i, [id, d]] of rows.entries())
+        await c.query(
+          "insert into session (org_id, id, class_id, title, at) values ($1, $2, $3, $4, $5)",
+          [NOVA, id, cls, titles[i], d],
+        );
+    }
     const marks: [string, number, string][] = [
-      [sid("k1", -6), 1, "present"],
-      [sid("k1", -6), 2, "present"],
-      [sid("k1", -6), 3, "present"],
-      [sid("k1", -4), 1, "present"],
-      [sid("k1", -4), 2, "late"],
-      [sid("k1", -4), 3, "absent"],
-      [sid("k2", -5), 4, "absent"],
-      [sid("k2", -5), 5, "present"],
-      [sid("k3", -5), 6, "present"],
-      [sid("k3", -5), 7, "present"],
+      [sid("k1", -3), 1, "present"],
+      [sid("k1", -3), 2, "present"],
+      [sid("k1", -3), 3, "present"],
+      [sid("k1", -2), 1, "present"],
+      [sid("k1", -2), 2, "late"],
+      [sid("k1", -2), 3, "absent"],
+      [sid("k2", -1), 4, "absent"],
+      [sid("k2", -1), 5, "present"],
+      [sid("k3", -1), 6, "present"],
+      [sid("k3", -1), 7, "present"],
     ];
     for (const [s, l, m] of marks)
       await c.query(
@@ -136,7 +206,7 @@ export async function seedDev(ownerUrl: string, now = Date.now()): Promise<void>
     );
     await c.query(
       "insert into session (org_id, id, class_id, title, at) values ($1, 'lumen-s1', 'lumen-k1', 'Starter — Unit 1', $2)",
-      [LUMEN, at(1, 2)],
+      [LUMEN, weeklySlots(now, [6], 9, 0, 0, 1).ahead[0]],
     );
     await c.query("commit");
   } catch (e) {
@@ -150,6 +220,12 @@ export async function seedDev(ownerUrl: string, now = Date.now()): Promise<void>
 if (import.meta.url === `file://${process.argv[1]}`) {
   const url = process.env.DATABASE_URL_MIGRATE;
   if (!url) throw new Error("seed: DATABASE_URL_MIGRATE is required (the owner role)");
-  await seedDev(url);
-  console.log("seed: synthetic dev data loaded (Nova Learning, Lumen Edu)");
+  const args = process.argv.slice(2);
+  if (args.some((a) => a !== "--reset"))
+    throw new Error(`seed: unknown argument ${args.join(" ")}`);
+  const reset = args.includes("--reset");
+  await seedDev(url, Date.now(), { reset });
+  console.log(
+    `seed: synthetic dev data ${reset ? "reset and reloaded" : "loaded"} (Nova Learning, Lumen Edu)`,
+  );
 }
