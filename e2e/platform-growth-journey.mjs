@@ -66,6 +66,7 @@ runPlatformJourney("platform growth E2E", async ({ browser, base, check }) => {
   // 3) Sam: the funnel — Cuong V. new, Linh N. flagged; confirm Bao T.'s reward
   await signIn("Sam (Org Staff)", "Schedule");
   await nav().getByRole("link", { name: "Growth" }).click();
+  await tab("Funnel");
   await page.getByRole("list", { name: "Referral leads" }).waitFor();
   const funnel = (await page.getByRole("list", { name: "Referral leads" }).textContent()) ?? "";
   check(
@@ -131,7 +132,24 @@ runPlatformJourney("platform growth E2E", async ({ browser, base, check }) => {
       wallet.includes("+483.000"),
   );
 
-  // 6) Linh (a minor) has no link
+  // 6) Sam: the dashboard and the program (part B)
+  await signIn("Sam (Org Staff)", "Schedule");
+  await nav().getByRole("link", { name: "Growth" }).click();
+  await tab("Dashboard");
+  await page.getByTestId("k-factor").waitFor();
+  check(
+    "[sam] K-factor 0.50 (1 confirmed / 2 referrers); credit issued 483.000 ₫",
+    (await page.getByTestId("k-factor").textContent()) === "0.50" &&
+      (await page.getByText("483.000 ₫").count()) >= 1,
+  );
+  await tab("Program");
+  await page.getByLabel("Reward percent").fill("6");
+  await page.getByRole("button", { name: "Save program" }).click();
+  await page.getByRole("status").filter({ hasText: "Saved." }).waitFor();
+  const prog = await (await apiAs("iios-principal-staff-1"))("/v1/growth/program");
+  check("[sam] program saved: 6 % of the first payment", prog.rewardPct === 6);
+
+  // 7) Linh (a minor) has no link
   await signIn("Linh (Learner)", "My make-ups");
   await nav().getByRole("link", { name: "Refer a friend" }).click();
   await page.getByText("Referrals are for guardians and adult learners").waitFor();

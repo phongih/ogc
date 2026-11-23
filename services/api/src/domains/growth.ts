@@ -13,12 +13,17 @@
  *    Vietnamese diacritics (owner 23/11: stricter than the demo);
  *  - the reward is wallet credit: (program % + active campaign %) of the first payment, capped;
  *    Billing applies it to the referrer's invoices issued later (domains/billing.ts).
+ * Part B (owner 23/11): staff metrics — K-factor, cohorts by month of the lead, campaigns, top
+ * referrers, an LTV proxy (first payment vs the course's approved tuition) — and the program
+ * settings (on / off, %, cap, campaign on / off and bonus; the campaign list is fixed), changed by
+ * staff with growth:manage.
  * SYNTHETIC: nothing is charged, paid or credited for real.
  */
 import { sql } from "kysely";
 import { authorize } from "@ogc/contracts";
 import type {
   FraudFlag,
+  GrowthMetrics,
   GrowthRefusal,
   LeadStage,
   MyReferrals,
@@ -420,6 +425,190 @@ export function registerGrowth(app: Api, db: Db, now: () => number): void {
     if (!isStaff(caller)) return reply.code(403).send({ error: "not_staff" });
     return caller.tenant((tx) => programOf(tx));
   });
+
+  // ── part B: metrics and program settings ───────────────────────────────────────────────────
+  const monthOf = (iso: string) =>
+    new Date(Date.parse(iso) + 7 * 3_600_000).toISOString().slice(0, 7); // center time
+
+  app.secured("GET", "/v1/growth/metrics", async (caller, _req, reply) => {
+    if (!isStaff(caller)) return reply.code(403).send({ error: "not_staff" });
+    return caller.tenant(async (tx): Promise<GrowthMetrics> => {
+      const b = await loadBook(tx);
+      const program = await programOf(tx);
+      const clicks = await tx.selectFrom("referral_click").select(["code", "clicks"]).execute();
+      const tuition = await tx
+        .selectFrom("fee_line")
+        .select(["course_code", "amount_vnd"])
+        .where("status", "=", "approved")
+        .where("kind", "=", "tuition")
+        .execute();
+      const refs = b.referrers;
+      const all = b.leads;
+      const confirmed = all.filter((l) => l.status === "confirmed");
+      const thisMonth = monthOf(new Date(caller.now()).toISOString());
+      const months = [...new Set(all.map((l) => monthOf(l.createdAt)))].sort();
+      // LTV proxy: referred learners' first payment vs the approved tuition of their course.
+      const listOf = (code: string) => {
+        const xs = tuition.filter((t) => t.course_code === code).map((t) => Number(t.amount_vnd));
+        return xs.length ? xs.reduce((t, x) => t + x, 0) / xs.length : null;
+      };
+      const pairs = confirmed
+        .map((l) => ({ paid: l.firstPaymentVnd ?? 0, list: listOf(l.courseCode) }))
+        .filter((x): x is { paid: number; list: number } => x.list !== null && x.list > 0);
+      const sumPaid = pairs.reduce((t, x) => t + x.paid, 0);
+      const sumList = pairs.reduce((t, x) => t + x.list, 0);
+      return {
+        referrers: refs.length,
+        activeReferrers: refs.filter((r) =>
+          all.some((l) => l.referrerPrincipalId === r.principalId),
+        ).length,
+        clicks: refs.reduce(
+          (t, r) => t + Number(clicks.find((c) => c.code === r.code)?.clicks ?? 0),
+          0,
+        ),
+        leads: all.length,
+        confirmed: confirmed.length,
+        confirmedThisMonth: confirmed.filter(
+          (l) => l.confirmedAt && monthOf(l.confirmedAt) === thisMonth,
+        ).length,
+        pendingRewards: all.filter((l) => l.status === "enrolled").length,
+        kFactor: refs.length ? Math.round((confirmed.length / refs.length) * 100) / 100 : 0,
+        invitesPerReferrer: refs.length ? Math.round((all.length / refs.length) * 100) / 100 : 0,
+        conversionPct: pct(confirmed.length, all.length),
+        walletIssuedVnd: confirmed.reduce((t, l) => t + (l.rewardVnd ?? 0), 0),
+        ltvUpliftPct: sumList > 0 ? Math.round(((sumPaid - sumList) / sumList) * 1000) / 10 : null,
+        cohorts: months.map((m) => {
+          const inM = all.filter((l) => monthOf(l.createdAt) === m);
+          const c = inM.filter((l) => l.status === "confirmed").length;
+          return { month: m, leads: inM.length, confirmed: c, conversionPct: pct(c, inM.length) };
+        }),
+        campaigns: program.campaigns.map((c) => ({
+          id: c.id,
+          name: c.name,
+          active: c.active,
+          leads: all.filter((l) => l.campaignId === c.id).length,
+          confirmed: all.filter((l) => l.campaignId === c.id && l.status === "confirmed").length,
+        })),
+        topReferrers: refs
+          .map((r) => {
+            const mine = all.filter((l) => l.referrerPrincipalId === r.principalId);
+            const conf = mine.filter((l) => l.status === "confirmed");
+            return {
+              name: r.name,
+              leads: mine.length,
+              confirmed: conf.length,
+              rewardVnd: conf.reduce((t, l) => t + (l.rewardVnd ?? 0), 0),
+            };
+          })
+          .filter((x) => x.leads > 0)
+          .sort(
+            (x, y) =>
+              y.confirmed - x.confirmed || y.leads - x.leads || x.name.localeCompare(y.name),
+          ),
+      };
+    });
+  });
+
+  app.secured("POST", "/v1/growth/program", async (caller, req) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    await caller.write<Result>("POST /v1/growth/program", { body }, async (tx) => {
+      let r: Result;
+      if (!isStaff(caller)) r = no("not_staff");
+      else if (!may(caller)) r = no("access_policy");
+      else {
+        await sql`select pg_advisory_xact_lock(hashtext('billing:' || ${caller.ctx.orgId}))`.execute(
+          tx,
+        );
+        r = await updateProgram(tx, caller, body);
+      }
+      return {
+        status: r.ok ? 200 : STATUS[r.reason],
+        body: r,
+        audit: {
+          action: "growth:manage",
+          resource: { program: caller.ctx.orgId },
+          outcome: r.ok ? ("allowed" as const) : ("denied" as const),
+          ...(r.ok ? { after: body } : { reason: r.reason }),
+        },
+      };
+    });
+  });
+
+  async function updateProgram(
+    tx: TenantTx,
+    caller: Caller,
+    d: Record<string, unknown>,
+  ): Promise<Result> {
+    const cur = await programOf(tx);
+    const known = new Set(["enabled", "rewardPct", "capVnd", "campaigns"]);
+    if (Object.keys(d).some((k) => !known.has(k))) return no("invalid", "unknown field");
+    const enabled = d.enabled === undefined ? cur.enabled : d.enabled;
+    const rewardPct = d.rewardPct === undefined ? cur.rewardPct : d.rewardPct;
+    const capVnd = d.capVnd === undefined ? cur.capVnd : d.capVnd;
+    if (typeof enabled !== "boolean") return no("invalid", "enabled is on or off");
+    if (
+      typeof rewardPct !== "number" ||
+      !Number.isFinite(rewardPct) ||
+      rewardPct < 0 ||
+      rewardPct > 30 ||
+      Math.round(rewardPct * 10) !== rewardPct * 10
+    )
+      return no("invalid", "reward must be 0–30% (one decimal)");
+    if (
+      typeof capVnd !== "number" ||
+      !Number.isInteger(capVnd) ||
+      capVnd < 0 ||
+      capVnd > 50_000_000
+    )
+      return no("invalid", "cap must be 0–50,000,000 VND");
+    const camps = d.campaigns === undefined ? cur.campaigns : d.campaigns;
+    if (!Array.isArray(camps)) return no("invalid", "campaigns");
+    const next: { id: string; active: boolean; bonusPct: number }[] = [];
+    for (const c of camps as Record<string, unknown>[]) {
+      const k = cur.campaigns.find((x) => x.id === c?.id);
+      if (!k) return no("invalid", "campaigns are a fixed list");
+      const bonus = c.bonusPct === undefined ? k.bonusPct : c.bonusPct;
+      const active = c.active === undefined ? k.active : c.active;
+      if (
+        typeof bonus !== "number" ||
+        !Number.isFinite(bonus) ||
+        bonus < 0 ||
+        bonus > 20 ||
+        Math.round(bonus * 10) !== bonus * 10
+      )
+        return no("invalid", "campaign bonus must be 0–20% (one decimal)");
+      if (typeof active !== "boolean") return no("invalid", "campaign on or off");
+      if (next.some((x) => x.id === k.id)) return no("invalid", "a campaign is listed twice");
+      next.push({ id: k.id, active, bonusPct: bonus });
+    }
+    const by = await staffName(tx, caller);
+    await tx
+      .insertInto("referral_program")
+      .values({
+        org_id: caller.ctx.orgId,
+        enabled,
+        reward_pct: rewardPct,
+        cap_vnd: capVnd,
+        updated_by: by,
+      })
+      .onConflict((oc) =>
+        oc.column("org_id").doUpdateSet({
+          enabled,
+          reward_pct: rewardPct,
+          cap_vnd: capVnd,
+          updated_by: by,
+          updated_at: new Date(caller.now()),
+        }),
+      )
+      .execute();
+    for (const c of next)
+      await tx
+        .updateTable("referral_campaign")
+        .set({ active: c.active, bonus_pct: c.bonusPct })
+        .where("id", "=", c.id)
+        .execute();
+    return { ok: true };
+  }
 
   const decide = (verb: "confirm" | "reject") =>
     app.secured("POST", `/v1/growth/leads/:id/${verb}`, async (caller, req) => {

@@ -107,6 +107,7 @@ async function main() {
     await page.getByText(/credit 483\.000 ₫ to Mai/).waitFor();
     check("[sam] confirmed: 5% + 2% campaign of 6,900,000 = 483,000 ₫", true);
     await page.getByRole("tab", { name: "Dashboard" }).click();
+    await page.getByTestId("k-factor").filter({ hasText: "0.50" }).waitFor({ timeout: 5_000 }).catch(() => {});
     check("[sam] K-factor 0.50 (1 confirmed / 2 referrers)", ((await page.getByTestId("k-factor").textContent()) ?? "") === "0.50");
     await shot(page, "02-sam-growth");
     await signOut();
