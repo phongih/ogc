@@ -1,5 +1,6 @@
 // Growth · referrals on the Platform (owner 23/11, slice 6): the shared views (features/growth)
-// over the Platform API. Synthetic: no credit is charged or paid for real.
+// over the Platform API: Dashboard (metrics), Funnel, Program (staff with growth:manage change it).
+// Synthetic: no credit is charged or paid for real.
 import { useMemo, type ReactNode } from "react";
 import {
   GrowthAdminApiContext,
@@ -41,10 +42,12 @@ export function PlatformGrowthAdminApi({ children }: { children: ReactNode }) {
       admissionsPath: "/admissions",
       Banner: PolicyBanner,
       useCanManage,
+      metrics: () => platformApi.referralMetrics(s),
       leads: () => platformApi.referralLeads(s),
       confirm: (id) => platformApi.decideReferral(s, id, "confirm"),
       reject: (id, reason) => platformApi.decideReferral(s, id, "reject", reason),
       program: () => platformApi.referralProgram(s),
+      updateProgram: (p) => platformApi.updateReferralProgram(s, p),
       onChanged: (qc) => qc.invalidateQueries(),
     }),
     [s],

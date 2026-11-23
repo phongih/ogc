@@ -21,6 +21,7 @@ import type {
   ReferralLead,
   ReferralProgram,
   GrowthResult,
+  GrowthMetrics,
   CourseSpeakingReviewItem,
   SpeakingReviewQueue,
   StudioCourse,
@@ -506,6 +507,9 @@ export const platformApi = {
   myReferrals: (s: PlatformSession) => staffRead<MyReferrals>(s, "/v1/me/referrals"),
   referralLeads: (s: PlatformSession) => staffRead<ReferralLead[]>(s, "/v1/growth/leads"),
   referralProgram: (s: PlatformSession) => staffRead<ReferralProgram>(s, "/v1/growth/program"),
+  referralMetrics: (s: PlatformSession) => staffRead<GrowthMetrics>(s, "/v1/growth/metrics"),
+  updateReferralProgram: (s: PlatformSession, p: ReferralProgram) =>
+    result<GrowthResult>(s, "POST", "/v1/growth/program", p),
   decideReferral: (s: PlatformSession, id: string, verb: "confirm" | "reject", reason = "") =>
     result<GrowthResult>(
       s,

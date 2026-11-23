@@ -2,8 +2,7 @@
  * Growth Engine (center staff) — owner decisions 22/11. Dashboard (K-factor, cohorts, LTV proxy,
  * campaigns, top referrers), the lead → placement → enrolled → confirmed funnel with anti-fraud
  * flags, and the program settings. Tuition credit is MOCK: nothing is charged or paid. Shared by
- * the demo and the Platform through GrowthAdminApi (the Platform offers the funnel and a read-only
- * program first; metrics and program editing follow).
+ * the demo and the Platform through GrowthAdminApi.
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -108,7 +107,7 @@ function Dashboard() {
           }
           hint={
             d.ltvUpliftPct === null
-              ? "needs confirmed referrals and a fee schedule (center wizard)"
+              ? "needs confirmed referrals and a list price for the course"
               : "first payment of referred learners vs list price"
           }
         />
@@ -295,13 +294,20 @@ function LeadCard({ lead: l }: { lead: ReferralLead }) {
 function Program() {
   const api = useGrowthAdminApi();
   const q = useQuery({ queryKey: [...api.key, "program"], queryFn: () => api.program() });
+  // The result lives here, so "Saved." survives the form being reset to the saved values.
+  const act = useGrowthAction();
   if (!q.data) return <Spinner label="Loading the program" />;
-  return <ProgramForm key={JSON.stringify(q.data)} program={q.data} />;
+  return <ProgramForm key={JSON.stringify(q.data)} program={q.data} act={act} />;
 }
 
-function ProgramForm({ program }: { program: ReferralProgram }) {
+function ProgramForm({
+  program,
+  act,
+}: {
+  program: ReferralProgram;
+  act: ReturnType<typeof useGrowthAction>;
+}) {
   const api = useGrowthAdminApi();
-  const act = useGrowthAction();
   const can = api.useCanManage() && !!api.updateProgram;
   const [d, setD] = useState<ReferralProgram>(structuredClone(program));
   const num = "w-32 rounded-ogc border border-border bg-surface p-1";

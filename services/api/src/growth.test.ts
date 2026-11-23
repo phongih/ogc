@@ -5,7 +5,15 @@ import { randomBytes } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import pg from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { Invoice, Lead, MyBilling, MyReferrals, ReferralLead } from "@ogc/contracts";
+import type {
+  GrowthMetrics,
+  Invoice,
+  Lead,
+  MyBilling,
+  MyReferrals,
+  ReferralLead,
+  ReferralProgram,
+} from "@ogc/contracts";
 import { buildIiosMock, type IiosMockState } from "@ogc/iios-mock";
 import { httpIiosClient } from "./iios.js";
 import { buildApi } from "./server.js";
@@ -427,5 +435,116 @@ describe.skipIf(!hasPg)("growth · referrals — API", () => {
     await expect(
       ownerQuery("update invoice set credit_applied_vnd = subtotal_vnd + 1 where id = 'I-1'"),
     ).rejects.toThrow(/credit_applied_vnd_check/);
+  });
+
+  // ── part B: metrics and program settings ─────────────────────────────────────────────────
+  const metrics = async (c: Call) => (await c("GET", "/v1/growth/metrics")).json() as GrowthMetrics;
+  const program = async (c: Call) =>
+    (await c("GET", "/v1/growth/program")).json() as ReferralProgram;
+
+  it("metrics: K-factor, cohorts, campaigns, top referrers, LTV proxy — staff only", async () => {
+    const sam = await as(SAM);
+    expect(await metrics(sam)).toMatchObject({
+      referrers: 2,
+      activeReferrers: 1,
+      clicks: 5,
+      leads: 2,
+      confirmed: 0,
+      pendingRewards: 1,
+      kFactor: 0,
+      invitesPerReferrer: 1,
+      conversionPct: 0,
+      walletIssuedVnd: 0,
+      ltvUpliftPct: null,
+      cohorts: [{ month: "2026-11", leads: 2, confirmed: 0, conversionPct: 0 }],
+      campaigns: [{ id: "camp-tet-2027", active: true, leads: 1, confirmed: 0 }],
+      topReferrers: [{ name: "Mai (Guardian)", leads: 2, confirmed: 0, rewardVnd: 0 }],
+    });
+    await sam("POST", `/v1/growth/leads/${(await ref(sam, "Bao T.")).id}/confirm`, {});
+    await join(MINH_CODE, "Quang H.", {}, "192.0.2.60");
+    expect(await metrics(sam)).toMatchObject({
+      activeReferrers: 2,
+      leads: 3,
+      confirmed: 1,
+      confirmedThisMonth: 1,
+      pendingRewards: 0,
+      kFactor: 0.5,
+      invitesPerReferrer: 1.5,
+      conversionPct: 33.3,
+      walletIssuedVnd: 483_000,
+      ltvUpliftPct: 0, // 6.900.000 paid vs the A2 tuition list price 6.900.000
+      campaigns: [{ leads: 1, confirmed: 1 }],
+      topReferrers: [
+        { name: "Mai (Guardian)", leads: 2, confirmed: 1, rewardVnd: 483_000 },
+        { name: "Minh T.", leads: 1, confirmed: 0, rewardVnd: 0 },
+      ],
+    });
+    now += 31 * 86_400_000; // next month: still confirmed, no longer "this month"
+    expect(await metrics(sam)).toMatchObject({ confirmed: 1, confirmedThisMonth: 0 });
+    for (const p of [TARA, MAI, LINH])
+      expect((await (await as(p))("GET", "/v1/growth/metrics")).statusCode).toBe(403);
+  });
+
+  it("program: staff with growth:manage change it within the ranges; the reward follows", async () => {
+    const sam = await as(SAM);
+    for (const [body, detail] of [
+      [{ rewardPct: 31 }, /0–30%/],
+      [{ rewardPct: 5.55 }, /one decimal/],
+      [{ capVnd: 1.5 }, /cap/],
+      [{ capVnd: 60_000_000 }, /cap/],
+      [{ enabled: "yes" }, /on or off/],
+      [{ campaigns: [{ id: "camp-new", active: true, bonusPct: 1 }] }, /fixed list/],
+      [{ campaigns: [{ id: "camp-tet-2027", bonusPct: 21 }] }, /0–20%/],
+      [{ campaigns: [{ id: "camp-tet-2027" }, { id: "camp-tet-2027" }] }, /twice/],
+      [{ payout: "cash" }, /unknown field/],
+    ] as const) {
+      const r = await sam("POST", "/v1/growth/program", body);
+      expect(r.statusCode).toBe(422);
+      expect(r.json().detail).toMatch(detail);
+    }
+    expect(await program(sam)).toMatchObject({ enabled: true, rewardPct: 5, capVnd: 2_000_000 });
+    const tara = await (await as(TARA))("POST", "/v1/growth/program", { rewardPct: 10 });
+    expect([tara.statusCode, tara.json().reason]).toEqual([403, "not_staff"]);
+    state.attachments.set(SAM, "policy-front-desk-d1");
+    const fd = await (await as(SAM))("POST", "/v1/growth/program", { rewardPct: 10 });
+    expect([fd.statusCode, fd.json().reason]).toEqual([403, "access_policy"]);
+    state.attachments.delete(SAM);
+    expect(
+      (
+        await sam("POST", "/v1/growth/program", {
+          rewardPct: 10,
+          campaigns: [{ id: "camp-tet-2027", active: true, bonusPct: 2.5 }],
+        })
+      ).json(),
+    ).toEqual({ ok: true });
+    expect(await program(sam)).toMatchObject({
+      rewardPct: 10,
+      capVnd: 2_000_000,
+      campaigns: [{ id: "camp-tet-2027", active: true, bonusPct: 2.5 }],
+    });
+    const row = await ownerQuery("select updated_by from referral_program");
+    expect(row.rows[0].updated_by).toBe("Sam (Org Staff)");
+    // the reward uses the program at the time of confirming: 12.5 % of 6.900.000
+    await sam("POST", `/v1/growth/leads/${(await ref(sam, "Bao T.")).id}/confirm`, {});
+    expect((await ref(sam, "Bao T.")).rewardVnd).toBe(862_500);
+    // a paused program: /join takes nothing, the referrer sees it paused
+    expect((await sam("POST", "/v1/growth/program", { enabled: false })).json()).toEqual({
+      ok: true,
+    });
+    expect((await pub("GET", `/v1/public/referrals/${MAI_CODE}`)).json().valid).toBe(false);
+    expect((await mine(await as(MAI))).program.enabled).toBe(false);
+    // a partial change keeps the rest as it is
+    await sam("POST", "/v1/growth/program", { capVnd: 1_000_000 });
+    await sam("POST", "/v1/growth/program", { rewardPct: 6 });
+    expect(await program(sam)).toMatchObject({ enabled: false, rewardPct: 6, capVnd: 1_000_000 });
+  });
+
+  it("a campaign switched off no longer adds its bonus", async () => {
+    const sam = await as(SAM);
+    await sam("POST", "/v1/growth/program", {
+      campaigns: [{ id: "camp-tet-2027", active: false }],
+    });
+    await sam("POST", `/v1/growth/leads/${(await ref(sam, "Bao T.")).id}/confirm`, {});
+    expect((await ref(sam, "Bao T.")).rewardVnd).toBe(345_000); // 5 % only
   });
 });
