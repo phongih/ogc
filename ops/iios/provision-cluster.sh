@@ -19,6 +19,10 @@
 #   OGC_IIOS_NO_SYSTEMD  (set to 1 to start via pg_ctl instead of systemd — for local tests)
 set -euo pipefail
 
+# Ensure sbin dirs are on PATH: runuser (util-linux) lives in /usr/sbin, which a caller's
+# trimmed PATH (e.g. `env PATH=<pgbin>:$PATH` from a non-root shell) may omit.
+export PATH="/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
 PGBIN=${OGC_IIOS_PGBIN:-/usr/lib/postgresql/16/bin}
 PGDATA=${OGC_IIOS_PGDATA:-/var/lib/ogc-iios/16/main}
 PORT=${OGC_IIOS_PORT:-5433}
