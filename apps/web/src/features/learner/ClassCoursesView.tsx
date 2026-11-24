@@ -122,6 +122,8 @@ export function ClassLessonView() {
               practice[b.id] ?? (b.kind === "time_detective" ? b.events.map((_, i) => i) : []),
             onPractice: (x) => setPractice((p) => ({ ...p, [b.id]: x })),
           };
+    // flip cards and book pages are read, not answered: interactive, with nothing to record
+    if (b.kind === "vocab" || b.kind === "book_page") return {};
     if (b.kind === "speaking") {
       const attempt = v.speaking?.find((a) => a.blockId === b.id) ?? null;
       if (!c) return { choices: speaking[b.id] ?? [], onChoose: choose(setSpeaking, b.id) };

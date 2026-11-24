@@ -54,6 +54,15 @@ runPlatformJourney("platform blocks E2E", async ({ browser, base, check }) => {
   await f("Option 1 of question 1 · block 4").fill("Rocks");
   await f("Option 2 of question 1 · block 4").fill("Sunlight");
   await f("Correct option 2 of question 1 · block 4").check();
+  await add("vocab");
+  await f("Deck title · block 5").fill("Plant words");
+  await f("Word 1 · block 5").fill("root");
+  await f("Meaning 1 · block 5").fill("the part under the ground");
+  await add("book_page");
+  await f("Book title · block 6").fill("A tiny seed");
+  await f("Page text 1 · block 6").fill("A seed is small.");
+  await editor.getByRole("button", { name: "+ page · block 6" }).click();
+  await f("Page text 2 · block 6").fill("It grows into a plant.");
   await editor.getByRole("button", { name: "Save draft" }).click();
   await page.getByText(/^Saved · revision/).waitFor();
   await page.getByRole("button", { name: "Submit for review" }).click();
@@ -99,6 +108,26 @@ runPlatformJourney("platform blocks E2E", async ({ browser, base, check }) => {
     ((await page.locator("figure").textContent()) ?? "").includes(
       "Plants by a window · Credit: Synthetic photo",
     ),
+  );
+  // reading blocks are interactive in a lesson: cards flip, pages turn
+  const deck = page.getByRole("region", { name: "Vocabulary: Plant words" });
+  check(
+    "[minh] a card shows its word until flipped",
+    !((await deck.textContent()) ?? "").includes("the part under the ground") &&
+      (await deck.getByRole("button", { name: "Flip root" }).count()) === 1,
+  );
+  await deck.getByRole("button", { name: "Flip root" }).click();
+  const book = page.getByRole("region", { name: "Book: A tiny seed" });
+  check(
+    "[minh] flipped; the book shows page 1 of 2 only",
+    ((await deck.textContent()) ?? "").includes("the part under the ground") &&
+      ((await book.textContent()) ?? "").includes("Page 1 of 2") &&
+      !((await book.textContent()) ?? "").includes("It grows into a plant."),
+  );
+  await book.getByRole("button", { name: "Next page →" }).click();
+  check(
+    "[minh] the next page",
+    ((await book.textContent()) ?? "").includes("It grows into a plant."),
   );
   await page.getByLabel("Match for root").selectOption({ label: "drinks water" });
   await page.getByLabel("Match for leaf").selectOption({ label: "catches sunlight" });
