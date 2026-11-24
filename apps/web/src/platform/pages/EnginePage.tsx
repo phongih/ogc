@@ -3,6 +3,7 @@
 import { DecisionEngineView } from "../../features/engine/DecisionEngineView";
 import { EngineNotificationsView } from "../../features/engine/EngineNotificationsView";
 import { PlatformEngineApi, PlatformNotificationsApi } from "../engine";
+import { RewardsLink } from "../rewards";
 
 export function PlatformEnginePage() {
   return (
@@ -13,6 +14,7 @@ export function PlatformEnginePage() {
       <PlatformEngineApi>
         <DecisionEngineView />
       </PlatformEngineApi>
+      <RewardsLink />
     </section>
   );
 }

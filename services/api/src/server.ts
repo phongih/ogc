@@ -35,6 +35,7 @@ import { registerEngine } from "./domains/engine.js";
 import { registerGrowth } from "./domains/growth.js";
 import { registerShowcase, shownCount } from "./domains/showcase.js";
 import { registerBrand } from "./domains/brand.js";
+import { registerRewards } from "./domains/rewards.js";
 import { fakeCredly } from "./credentials.js";
 import { registerAttendance } from "./domains/attendance.js";
 import { registerMakeup } from "./domains/makeup.js";
@@ -270,6 +271,7 @@ export function buildApi(deps: ApiDeps): Api {
   registerBrand(app, deps.db, deps.now ?? Date.now, deps.credentials ?? [fakeCredly], (tx) =>
     shownCount(tx, (deps.now ?? Date.now)()),
   );
+  registerRewards(app);
   registerAccess(app, deps.iios);
   return app;
 }

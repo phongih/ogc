@@ -250,6 +250,15 @@ Migration 0016: `brand_profile` (one per organization), `teacher_profile` (a tea
 - Public, no grant: `GET /v1/public/showcase/:slug/profile` (tagline, about, colors, centers, verified unexpired organization badges, opted-in teachers with their verified badges, number of courses shown). A course page (`…/courses/:ref`) adds the provider block and the opted-in teachers of the classes that run its catalog course. Who added or verified a badge is never public. Partners are not shown.
 - Seed (Nova): profile and colors; CR-1 verified (Credly mock), CR-2 a certificate waiting for verification, CR-3 Tara verified, CR-4 Tara revoked at the mock register (waiting), CR-5 Ben verified. Tara is public; Ben is not.
 
+## Gamification
+
+Migration 0017: `reward_settings`, `reward_rule`, `badge_rule` — only the organization's settings within the closed catalog (an organization without rows uses the defaults). Owner decisions 22/11 (demo) and 24/11 (Platform). The rules live in `@ogc/contracts` (`deriveRewards`, `streakOf`, `rankClass`, `gamificationView`, `applyGamificationUpdate`); the demo uses the same functions.
+
+- Rewards are derived from learning evidence on every read; nothing records XP, nothing is awarded by hand, nothing counts logging in. Evidence: a completed class-course lesson (activity, +10) and its quiz score (scored practice, up to +20 at 100%), a speaking rehearsal the class teacher approved (+25), a make-up done — attended, or self-study confirmed (+15). Every reward line names its evidence ("Making plans · scored 100%").
+- XP + level (100 XP per level), a streak of learning days in center time (Asia/Ho_Chi_Minh; it still stands if the last learning day was yesterday), badges (First step, Perfect score, Heard you, Caught up — before the deadline, Learning streak 7 days, Level up 5), a weekly leaderboard of the learner's class (equal XP share a rank).
+- `GET /v1/me/rewards`: a learner their own; a guardian each linked child, with the child's rank but no classmates' names. Teachers and staff → 403 (they keep seeing evidence only).
+- `GET /v1/rewards/settings` (staff), `POST /v1/rewards/settings` (staff with `rewards:manage`): enable / XP 0–100 per reward, enable / threshold 1–365 per badge (only streak and level have one), XP per level 10–1000, leaderboard on / off. Unknown fields or kinds are refused; a partial change keeps the rest; audited.
+
 ## Access policies
 
 OGC-ADR-039 option C: IIOS stores and decides access policies; OGC keeps no copy and writes no authorization relation. The `/v1/access/*` routes present the caller's own grant to IIOS, which re-checks that the caller administers the organization and applies the rules (closed catalog, versions, append-only history, no self-change, fail-closed). The API adds the request id, idempotency for writes and an audit row per decision. IIOS answers are mapped to 200 / 403 `not_admin` / 404 `not_found` / 422 `invalid` (with `path`) / 409 for the other refusals. If IIOS cannot answer, the API returns 503 and stores nothing under the idempotency key. A policy attached here narrows the member's next request, because IIOS puts it in the grant's `narrowing`.
