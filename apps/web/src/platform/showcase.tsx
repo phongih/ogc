@@ -19,6 +19,7 @@ import {
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../ui";
 import { platformApi } from "./client";
 import { useSession, useSignedIn } from "./App";
+import { ProviderBlock } from "./brand";
 
 const NEED_LABEL: Record<LearningNeed, string> = {
   exam_prep: "Exam preparation",
@@ -217,6 +218,9 @@ export function ShowcaseOrgPage() {
   return (
     <section className="space-y-4">
       <PageHeader title={`Courses at ${p.org.name}`} subtitle="Staging, synthetic data" />
+      <Link to={`/showcase/${p.org.slug}/about`} className="text-sm text-brand underline">
+        About {p.org.name} — centers, verified badges, teachers
+      </Link>
       <Card>
         <section aria-label="What are you looking for?" className="space-y-2 text-sm">
           <p className="font-medium">What are you looking for?</p>
@@ -329,6 +333,12 @@ export function ShowcaseCoursePage() {
           ))}
         </ol>
       </Card>
+      <ProviderBlock
+        slug={c.org.slug}
+        name={c.org.name}
+        brand={c.brand}
+        instructors={c.instructors}
+      />
       <Enquiry slug={c.org.slug} courseRef={c.ref} offer={c.offer} centers={c.allCenters} />
       <Link to={`/showcase/${c.org.slug}`} className="text-sm text-brand">
         ← All courses at {c.org.name}

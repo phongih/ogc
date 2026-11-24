@@ -983,6 +983,130 @@ async function seedShowcase(
     );
 }
 
+/**
+ * Brand profile (owner 24/11): Nova's profile, Tara opted in, badges in each state. SYNTHETIC —
+ * fictional issuers; Credly codes are for the fake register (…-R revoked, …-X expired).
+ */
+async function seedBrand(c: pg.Client, org: string): Promise<void> {
+  await c.query(
+    `insert into brand_profile (org_id, tagline, about, primary_color, accent_color, updated_by, updated_at)
+     values ($1, 'English that works — for school, work and travel',
+             'Nova Learning runs small English classes in District 1 and Thu Duc: everyday English, speaking for work and exam preparation. Staging, synthetic organization.',
+             '#1f4e79', '#e0a100', 'Sam (Org Staff)', now())`,
+    [org],
+  );
+  await c.query(
+    `insert into teacher_profile (org_id, teacher_id, is_public, display_name, bio, updated_at)
+     values ($1, $2, true, 'Tara', 'Teaches A2 and B1 classes. Focus: speaking confidence and clear, kind feedback.', now())`,
+    [org, TARA],
+  );
+  const SAM = ["iios-principal-staff-1", "Sam (Org Staff)"];
+  const OLIVIA = ["iios-principal-admin-1", "Olivia (Org Admin)"];
+  const rows: [
+    string,
+    string | null,
+    string,
+    string,
+    string,
+    string,
+    string,
+    string | null,
+    string[],
+    string[] | null,
+    string | null,
+  ][] = [
+    [
+      "CR-1",
+      null,
+      "Quality-reviewed language centre 2026",
+      "Saigon Learning Quality Circle (synthetic)",
+      "credly_mock",
+      "MOCK-NOVA-QR26",
+      "2026-01-15",
+      "2029-01-15",
+      SAM,
+      OLIVIA,
+      "Credly (mock): valid on 2026-01-20",
+    ],
+    [
+      "CR-2",
+      null,
+      "Child-safe learning space",
+      "Learner Safety Forum (synthetic)",
+      "certificate",
+      "CERT-LSF-0042",
+      "2026-06-01",
+      "2028-06-01",
+      SAM,
+      null,
+      null,
+    ],
+    [
+      "CR-3",
+      TARA,
+      "Speaking Assessment Coach",
+      "TESOL Practice Guild (synthetic)",
+      "credly_mock",
+      "MOCK-TARA-SAC1",
+      "2025-09-01",
+      null,
+      ["iios-principal-teacher-1", "Tara"],
+      SAM,
+      "Credly (mock): valid on 2025-09-10",
+    ],
+    [
+      "CR-4",
+      TARA,
+      "Young Learners Methods",
+      "TESOL Practice Guild (synthetic)",
+      "credly_mock",
+      "MOCK-TARA-YLM2-R",
+      "2026-03-01",
+      null,
+      ["iios-principal-teacher-1", "Tara"],
+      null,
+      null,
+    ],
+    [
+      "CR-5",
+      BEN,
+      "Exam Skills Trainer",
+      "TESOL Practice Guild (synthetic)",
+      "credly_mock",
+      "MOCK-BEN-EST1",
+      "2025-11-01",
+      "2027-11-01",
+      ["iios-principal-teacher-2", "Ben"],
+      SAM,
+      "Credly (mock): valid on 2025-11-05",
+    ],
+  ];
+  for (const [id, teacher, title, issuer, source, code, issued, expires, by, dec, note] of rows)
+    await c.query(
+      `insert into credential (org_id, id, teacher_id, title, issuer, source, badge_code, issued_on, expires_on,
+         claimed_by, claimed_by_name, claimed_at, status, decided_by, decided_by_name, decided_at, note)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $8::date + interval '2 days', $12, $13, $14,
+               case when $13::text is null then null else $8::date + interval '5 days' end, $15)`,
+      [
+        org,
+        id,
+        teacher,
+        title,
+        issuer,
+        source,
+        code,
+        issued,
+        expires,
+        by[0],
+        by[1],
+        dec ? "verified" : "claimed",
+        dec?.[0] ?? null,
+        dec?.[1] ?? null,
+        note,
+      ],
+    );
+}
+
 /** The Decision Engine's fixed rule set (R-1… in the shared default order); the caller scoped the org. */
 async function seedEngineRules(c: pg.Client): Promise<void> {
   for (const [i, r] of DEFAULT_ENGINE_RULES.entries())
@@ -1042,6 +1166,9 @@ export async function seedDev(
         await c.query("delete from course_progress");
         await c.query("delete from class_course_link");
         await c.query("delete from course_showcase");
+        await c.query("delete from credential");
+        await c.query("delete from teacher_profile");
+        await c.query("delete from brand_profile");
         await c.query("delete from course_review");
         await c.query("delete from course_version");
         await c.query("delete from authored_course");
@@ -1213,6 +1340,7 @@ export async function seedDev(
       ["CS-B1-SPEAK", "paid", "ENG-B1", ["speaking_confidence", "work_english"]],
       ["CS-IELTS-W1", "free", "IELTS-B2", ["exam_prep"]],
     ]);
+    await seedBrand(c, NOVA);
     await seedEngineRules(c);
     // Skill profile: the demo's synthetic placement results (Khoa and Vy have none, as in the demo).
     await c.query(

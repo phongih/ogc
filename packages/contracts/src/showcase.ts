@@ -13,6 +13,7 @@
  *    anything from here: staff refer a lead to a partner from Admissions.
  */
 import type { LearningNeed } from "./admissions.js";
+import type { PublicBadge, PublicInstructor } from "./brand.js";
 
 export type ShowcaseOffer = "free" | "trial" | "paid";
 export const SHOWCASE_OFFERS: readonly ShowcaseOffer[] = ["free", "trial", "paid"];
@@ -67,6 +68,10 @@ export interface ShowcaseDetail extends ShowcaseCard {
   version: number;
   path: { title: string }[]; // lesson titles only — the lesson content stays for learners
   allCenters: string[]; // centers an enquiry may name
+  /** The provider: tagline, colors and its verified badges (brand profile, owner 24/11). */
+  brand: { tagline: string; primaryColor: string; accentColor: string; badges: PublicBadge[] };
+  /** Opted-in teachers of the classes that run the catalog course (verified badges only). */
+  instructors: PublicInstructor[];
 }
 
 export type ShowcaseEnquiryKind = "consult" | "trial";

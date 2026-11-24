@@ -18,6 +18,7 @@ import {
   type AuthzResource,
   type IiosGrantedContext,
   type PolicyAction,
+  type CredentialVerifier,
 } from "@ogc/contracts";
 import { audit, type AuditEntry } from "./audit.js";
 import { withTenant, type Db, type TenantTx } from "./db.js";
@@ -32,7 +33,9 @@ import { registerClassCourses } from "./domains/classCourses.js";
 import { registerStudents } from "./domains/students.js";
 import { registerEngine } from "./domains/engine.js";
 import { registerGrowth } from "./domains/growth.js";
-import { registerShowcase } from "./domains/showcase.js";
+import { registerShowcase, shownCount } from "./domains/showcase.js";
+import { registerBrand } from "./domains/brand.js";
+import { fakeCredly } from "./credentials.js";
 import { registerAttendance } from "./domains/attendance.js";
 import { registerMakeup } from "./domains/makeup.js";
 import { registerWorkforce } from "./domains/workforce.js";
@@ -59,6 +62,8 @@ export interface ApiDeps {
    * main.ts refuses it with NODE_ENV=production. Synthetic principals only (ADR-040 §6).
    */
   devLogin?: boolean;
+  /** Badge registers (staging: the fake Credly only — a real one is later work behind a gate). */
+  credentials?: CredentialVerifier[];
 }
 
 /** What a route handler gets: the decided grant and helpers bound to it. */
@@ -262,6 +267,9 @@ export function buildApi(deps: ApiDeps): Api {
   registerEngine(app);
   registerGrowth(app, deps.db, deps.now ?? Date.now);
   registerShowcase(app, deps.db, deps.now ?? Date.now);
+  registerBrand(app, deps.db, deps.now ?? Date.now, deps.credentials ?? [fakeCredly], (tx) =>
+    shownCount(tx, (deps.now ?? Date.now)()),
+  );
   registerAccess(app, deps.iios);
   return app;
 }
