@@ -222,6 +222,31 @@ export interface CredentialTable {
   withdrawn_at: Date | null;
   withdraw_reason: string | null;
 }
+export interface RewardSettingsTable {
+  org_id: string;
+  level_size: number;
+  leaderboard_enabled: boolean;
+  updated_by: string;
+  updated_at: Date;
+}
+export interface RewardRuleTable {
+  org_id: string;
+  kind: "activity_completed" | "practice_scored" | "speaking_approved" | "makeup_done";
+  enabled: boolean;
+  xp: number;
+}
+export interface BadgeRuleTable {
+  org_id: string;
+  kind:
+    | "first_activity"
+    | "perfect_score"
+    | "speaking_approved"
+    | "makeup_on_time"
+    | "streak"
+    | "level";
+  enabled: boolean;
+  threshold: number | null;
+}
 export interface LeadHistoryTable {
   org_id: string;
   lead_id: string;
@@ -648,6 +673,9 @@ export interface DB {
   brand_profile: BrandProfileTable;
   teacher_profile: TeacherProfileTable;
   credential: CredentialTable;
+  reward_settings: RewardSettingsTable;
+  reward_rule: RewardRuleTable;
+  badge_rule: BadgeRuleTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

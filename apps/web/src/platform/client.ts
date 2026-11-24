@@ -23,6 +23,10 @@ import type {
   GrowthResult,
   GrowthMetrics,
   BrandAdmin,
+  GamificationSettings,
+  GamificationUpdate,
+  GamificationUpdateResult,
+  LearnerGamification,
   BrandProfileInput,
   BrandResult,
   CredentialClaim,
@@ -543,6 +547,12 @@ export const platformApi = {
       `/v1/courses/${encodeURIComponent(ref)}/showcase`,
       body,
     ),
+  // Gamification (owner 24/11): learner / guardian rewards, staff settings (rewards:manage).
+  myRewards: (s: PlatformSession) => read<LearnerGamification[]>(s, "/v1/me/rewards"),
+  rewardsSettings: (s: PlatformSession) =>
+    staffRead<GamificationSettings>(s, "/v1/rewards/settings"),
+  updateRewardsSettings: (s: PlatformSession, patch: GamificationUpdate) =>
+    result<GamificationUpdateResult>(s, "POST", "/v1/rewards/settings", patch),
   // Brand & provider profile (owner 24/11): staff brand page, a teacher's own public profile.
   brandAdmin: (s: PlatformSession) => staffRead<BrandAdmin>(s, "/v1/brand"),
   saveBrandProfile: (s: PlatformSession, p: BrandProfileInput) =>

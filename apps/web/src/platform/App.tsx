@@ -24,6 +24,7 @@ import { PlatformEnginePage } from "./pages/EnginePage";
 import { PlatformGrowthPage, PlatformJoinPage, PlatformReferralsPage } from "./pages/GrowthPage";
 import { ShowcaseCoursePage, ShowcaseHomePage, ShowcaseOrgPage } from "./showcase";
 import { BrandPage, MyPublicProfilePage, ShowcaseBrandPage } from "./brand";
+import { PlatformMyRewardsPage, PlatformRewardsSettingsPage } from "./rewards";
 import {
   PlatformClassLessonPage,
   PlatformCoursePage,
@@ -94,6 +95,9 @@ function Shell({ children }: { children: ReactNode }) {
             ) : null}
             {session.role === "learner" ? <Link to="/my-courses">My courses</Link> : null}
             {session.role === "learner" || session.role === "guardian" ? (
+              <Link to="/my-rewards">Rewards</Link>
+            ) : null}
+            {session.role === "learner" || session.role === "guardian" ? (
               <Link to="/referrals">Refer a friend</Link>
             ) : null}
             {session.role === "teacher" ? <Link to="/teaching">Teaching</Link> : null}
@@ -157,6 +161,22 @@ export function App() {
               <Route path="/showcase/:org" element={<ShowcaseOrgPage />} />
               <Route path="/showcase/:org/about" element={<ShowcaseBrandPage />} />
               <Route path="/showcase/:org/:ref" element={<ShowcaseCoursePage />} />
+              <Route
+                path="/my-rewards"
+                element={
+                  <Protected>
+                    <PlatformMyRewardsPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/rewards"
+                element={
+                  <Protected>
+                    <PlatformRewardsSettingsPage />
+                  </Protected>
+                }
+              />
               <Route
                 path="/brand"
                 element={

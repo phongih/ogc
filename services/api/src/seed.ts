@@ -1169,6 +1169,8 @@ export async function seedDev(
         await c.query("delete from credential");
         await c.query("delete from teacher_profile");
         await c.query("delete from brand_profile");
+        for (const t of ["badge_rule", "reward_rule", "reward_settings"])
+          await c.query(`delete from ${t}`);
         await c.query("delete from course_review");
         await c.query("delete from course_version");
         await c.query("delete from authored_course");
