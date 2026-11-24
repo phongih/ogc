@@ -42,3 +42,4 @@ export * from "./studio.js";
 export * from "./authoring.js";
 export * from "./mastery.js";
 export * from "./showcase.js";
+export * from "./brand.js";

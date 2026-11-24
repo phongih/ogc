@@ -26,6 +26,7 @@ import type { Api, Caller } from "../server.js";
 import { latest, load as loadCourses } from "./courses.js";
 import { createWebsiteLead } from "./admissions.js";
 import { LIMITS, rateLimiter } from "./growth.js";
+import { publicBrandBlock, publicInstructors } from "./brand.js";
 
 const NEED_LABEL: Record<LearningNeed, string> = {
   exam_prep: "Exam preparation",
@@ -121,6 +122,10 @@ async function cardsOf(tx: TenantTx, now: number) {
   }
   return { cards: out, centers: centers.map((c) => c.name), centerByName: centers };
 }
+
+/** How many courses the organization in scope shows (the brand page). */
+export const shownCount = async (tx: TenantTx, now: number) =>
+  (await cardsOf(tx, now)).cards.length;
 
 /** Fit for what the visitor chose — the only thing that ranks (owner 23/11). */
 export function fitOf(
@@ -344,11 +349,15 @@ export function registerShowcase(app: Api, db: Db, now: () => number): void {
           const { cards, centers } = await cardsOf(tx, now());
           const c = cards.find((x) => x.ref === p.ref);
           if (!c) return null;
+          const today = centerToday(now());
+          const code = (await settingsOf(tx)).get(c.ref)!.catalogCode!;
           return {
             ...c,
             fit: { points: 0, reasons: [] },
             org: { slug: o.slug, name: o.name },
             allCenters: centers,
+            brand: await publicBrandBlock(tx, today),
+            instructors: await publicInstructors(tx, today, code),
           };
         },
       );

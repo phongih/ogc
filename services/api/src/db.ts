@@ -183,6 +183,45 @@ export interface CourseShowcaseTable {
   updated_by: string;
   updated_at: Date;
 }
+export interface BrandProfileTable {
+  org_id: string;
+  tagline: string;
+  about: string;
+  primary_color: string;
+  accent_color: string;
+  updated_by: string;
+  updated_at: Date;
+}
+export interface TeacherProfileTable {
+  org_id: string;
+  teacher_id: string;
+  is_public: boolean;
+  display_name: string;
+  bio: string;
+  updated_at: Date;
+}
+export interface CredentialTable {
+  org_id: string;
+  id: string;
+  teacher_id: string | null;
+  title: string;
+  issuer: string;
+  source: "credly_mock" | "certificate";
+  badge_code: string;
+  issued_on: string | Date;
+  expires_on: string | Date | null;
+  claimed_by: string;
+  claimed_by_name: string;
+  claimed_at: Date;
+  status: Generated<"claimed" | "verified" | "rejected" | "withdrawn">;
+  decided_by: string | null;
+  decided_by_name: string | null;
+  decided_at: Date | null;
+  note: string | null;
+  withdrawn_by_name: string | null;
+  withdrawn_at: Date | null;
+  withdraw_reason: string | null;
+}
 export interface LeadHistoryTable {
   org_id: string;
   lead_id: string;
@@ -606,6 +645,9 @@ export interface DB {
   wallet_entry: WalletEntryTable;
   public_org: PublicOrgTable;
   course_showcase: CourseShowcaseTable;
+  brand_profile: BrandProfileTable;
+  teacher_profile: TeacherProfileTable;
+  credential: CredentialTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {
     event_id: Generated<string>;
     at: Generated<Date>;

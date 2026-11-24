@@ -23,6 +23,7 @@ import { PlatformStudentsPage } from "./pages/StudentsPage";
 import { PlatformEnginePage } from "./pages/EnginePage";
 import { PlatformGrowthPage, PlatformJoinPage, PlatformReferralsPage } from "./pages/GrowthPage";
 import { ShowcaseCoursePage, ShowcaseHomePage, ShowcaseOrgPage } from "./showcase";
+import { BrandPage, MyPublicProfilePage, ShowcaseBrandPage } from "./brand";
 import {
   PlatformClassLessonPage,
   PlatformCoursePage,
@@ -84,6 +85,7 @@ function Shell({ children }: { children: ReactNode }) {
             ) : null}
             {session.role === "staff" ? <Link to="/engine">Engine</Link> : null}
             {session.role === "staff" ? <Link to="/growth">Growth</Link> : null}
+            {session.role === "staff" ? <Link to="/brand">Brand</Link> : null}
             {session.role === "learner" || session.role === "guardian" ? (
               <Link to="/my-makeups">Make-ups</Link>
             ) : null}
@@ -95,6 +97,7 @@ function Shell({ children }: { children: ReactNode }) {
               <Link to="/referrals">Refer a friend</Link>
             ) : null}
             {session.role === "teacher" ? <Link to="/teaching">Teaching</Link> : null}
+            {session.role === "teacher" ? <Link to="/public-profile">Public profile</Link> : null}
             {session.orgAdmin ? <Link to="/access">Access</Link> : null}
           </nav>
         ) : null}
@@ -152,7 +155,24 @@ export function App() {
               <Route path="/join" element={<PlatformJoinPage />} />
               <Route path="/showcase" element={<ShowcaseHomePage />} />
               <Route path="/showcase/:org" element={<ShowcaseOrgPage />} />
+              <Route path="/showcase/:org/about" element={<ShowcaseBrandPage />} />
               <Route path="/showcase/:org/:ref" element={<ShowcaseCoursePage />} />
+              <Route
+                path="/brand"
+                element={
+                  <Protected>
+                    <BrandPage />
+                  </Protected>
+                }
+              />
+              <Route
+                path="/public-profile"
+                element={
+                  <Protected>
+                    <MyPublicProfilePage />
+                  </Protected>
+                }
+              />
               <Route
                 path="/referrals"
                 element={

@@ -88,3 +88,4 @@ jobs:
           node e2e/platform-speaking-journey.mjs || echo "platform speaking E2E skipped/soft-failed (non-blocking)"
           node e2e/platform-growth-journey.mjs || echo "platform growth E2E skipped/soft-failed (non-blocking)"
           node e2e/platform-showcase-journey.mjs || echo "platform showcase E2E skipped/soft-failed (non-blocking)"
+          node e2e/platform-brand-journey.mjs || echo "platform brand E2E skipped/soft-failed (non-blocking)"

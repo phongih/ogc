@@ -22,6 +22,13 @@ import type {
   ReferralProgram,
   GrowthResult,
   GrowthMetrics,
+  BrandAdmin,
+  BrandProfileInput,
+  BrandResult,
+  CredentialClaim,
+  MyPublicProfile,
+  MyPublicProfileInput,
+  PublicBrand,
   ShowcaseDetail,
   ShowcaseEnquiry,
   ShowcaseOrg,
@@ -536,6 +543,37 @@ export const platformApi = {
       `/v1/courses/${encodeURIComponent(ref)}/showcase`,
       body,
     ),
+  // Brand & provider profile (owner 24/11): staff brand page, a teacher's own public profile.
+  brandAdmin: (s: PlatformSession) => staffRead<BrandAdmin>(s, "/v1/brand"),
+  saveBrandProfile: (s: PlatformSession, p: BrandProfileInput) =>
+    result<BrandResult>(s, "POST", "/v1/brand/profile", p),
+  claimOrgCredential: (s: PlatformSession, c: CredentialClaim) =>
+    result<BrandResult>(s, "POST", "/v1/brand/credentials", c),
+  decideCredential: (
+    s: PlatformSession,
+    id: string,
+    verb: "verify" | "reject" | "withdraw",
+    body: { seen?: boolean; reason?: string },
+  ) =>
+    result<BrandResult>(s, "POST", `/v1/brand/credentials/${encodeURIComponent(id)}/${verb}`, body),
+  myPublicProfile: (s: PlatformSession) => staffRead<MyPublicProfile>(s, "/v1/me/public-profile"),
+  saveMyPublicProfile: (s: PlatformSession, p: MyPublicProfileInput) =>
+    result<BrandResult>(s, "POST", "/v1/me/public-profile", p),
+  claimMyCredential: (s: PlatformSession, c: CredentialClaim) =>
+    result<BrandResult>(s, "POST", "/v1/me/public-profile/credentials", c),
+  withdrawMyCredential: (s: PlatformSession, id: string, reason: string) =>
+    result<BrandResult>(
+      s,
+      "POST",
+      `/v1/me/public-profile/credentials/${encodeURIComponent(id)}/withdraw`,
+      { reason },
+    ),
+  publicBrand: async (slug: string) => {
+    const r = await send(null, "GET", `/v1/public/showcase/${encodeURIComponent(slug)}/profile`);
+    if (r.status === 404) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as PublicBrand;
+  },
   showcaseOrgs: async () => {
     const r = await send(null, "GET", "/v1/public/showcase");
     if (r.status !== 200) throw new ApiError(r.status, r.body);

@@ -38,6 +38,7 @@ export const PolicyAction = z.enum([
   "partners:manage",
   "courses:link",
   "courses:author",
+  "brand:manage",
 ]);
 export type PolicyAction = z.infer<typeof PolicyAction>;
 
@@ -171,6 +172,14 @@ export const POLICY_CATALOG: CatalogEntry[] = [
     description:
       "Course Studio: write courses (a teacher their own, staff every course of the org); staff also approve another person's course for publication",
     roles: ["staff", "teacher"],
+    criteria: [],
+    readonlyFields: [],
+  },
+  {
+    action: "brand:manage",
+    description:
+      "Brand profile: edit the organization's public profile, claim its badges, verify or withdraw badges claimed by someone else",
+    roles: ["staff"],
     criteria: [],
     readonlyFields: [],
   },
