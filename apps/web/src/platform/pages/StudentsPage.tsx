@@ -7,6 +7,7 @@ import { StudentsApiContext, type StudentsApi } from "../../features/students/st
 import { platformApi } from "../client";
 import { useSignedIn } from "../App";
 import { PolicyBanner } from "../workforce";
+import { MissionReviewCard } from "../missions";
 import { SpeakingReviewCard } from "../speaking";
 
 export function PlatformStudentsPage() {
@@ -25,6 +26,7 @@ export function PlatformStudentsPage() {
       <StudentsView back={null} />
       <div className="mt-4">
         <SpeakingReviewCard />
+        <MissionReviewCard />
       </div>
     </StudentsApiContext.Provider>
   );

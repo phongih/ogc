@@ -19,6 +19,7 @@ export const RewardKind = z.enum([
   "practice_scored",
   "speaking_approved",
   "makeup_done",
+  "mission_approved",
 ]);
 export type RewardKind = z.infer<typeof RewardKind>;
 
@@ -29,6 +30,7 @@ export const BadgeKind = z.enum([
   "makeup_on_time",
   "streak",
   "level",
+  "explorer",
 ]);
 export type BadgeKind = z.infer<typeof BadgeKind>;
 
@@ -158,6 +160,13 @@ export const DEFAULT_GAMIFICATION: GamificationSettings = {
       enabled: true,
       xp: 15,
     },
+    {
+      kind: "mission_approved",
+      name: "Mission approved",
+      description: "The class teacher approved a real-world mission (Mission Box).",
+      enabled: true,
+      xp: 20,
+    },
   ],
   badges: [
     {
@@ -208,6 +217,14 @@ export const DEFAULT_GAMIFICATION: GamificationSettings = {
       enabled: true,
       threshold: 5,
     },
+    {
+      kind: "explorer",
+      title: "Explorer",
+      icon: "🧭",
+      how: "Have a real-world mission approved by your teacher.",
+      enabled: true,
+      threshold: null,
+    },
   ],
   levelSize: 100,
   leaderboardEnabled: true,
@@ -218,6 +235,7 @@ export type RewardEvidence =
   // score: the quiz % (also skill evidence); practice: the practice / mini-game % (XP only)
   | { kind: "activity"; at: string; title: string; score: number | null; practice?: number | null }
   | { kind: "speaking"; at: string; title: string }
+  | { kind: "mission"; at: string; title: string } // approved by the class teacher (XP only)
   | { kind: "makeup"; at: string; dueAt: string; unitTitle: string; className: string };
 
 export interface DerivedRewards {
@@ -226,6 +244,7 @@ export interface DerivedRewards {
   perfect: string | null;
   speaking: string | null;
   onTimeMakeup: string | null;
+  mission: string | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -249,6 +268,7 @@ export function deriveRewards(
     perfect: null,
     speaking: null,
     onTimeMakeup: null,
+    mission: null,
   };
   for (const e of evidence) {
     if (e.kind === "speaking") {
@@ -260,6 +280,16 @@ export function deriveRewards(
           kind: r.kind,
           xp: r.xp,
           evidence: `${e.title} · approved by your teacher`,
+        });
+    } else if (e.kind === "mission") {
+      out.mission = earliest(out.mission, e.at);
+      const r = ruleOn(s, "mission_approved");
+      if (r)
+        events.push({
+          at: e.at,
+          kind: r.kind,
+          xp: r.xp,
+          evidence: `Mission: ${e.title} · approved by your teacher`,
         });
     } else if (e.kind === "activity") {
       out.first = earliest(out.first, e.at);
@@ -349,6 +379,7 @@ export function gamificationView(input: {
     makeup_on_time: d.onTimeMakeup,
     streak: null,
     level: null,
+    explorer: d.mission,
   };
   const badges: BadgeView[] = s.badges
     .filter((b) => b.enabled)

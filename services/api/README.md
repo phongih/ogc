@@ -252,19 +252,29 @@ Migration 0016: `brand_profile` (one per organization), `teacher_profile` (a tea
 
 ## Course Studio blocks (part A)
 
-Owner decisions 24/11 (no migration). The block registry (`@ogc/contracts` `BLOCK_REGISTRY`) has 14 kinds; every one is validated fail-closed in "draft" and "submit" modes, nested items included (unknown fields refused at every level).
+Owner decisions 24/11 (no migration). The block registry (`@ogc/contracts` `BLOCK_REGISTRY`) has 15 kinds (with `mission_box`, below); every one is validated fail-closed in "draft" and "submit" modes, nested items included (unknown fields refused at every level).
 
 - `image` (https link, caption, credit) and `book_page` (title + 1–12 pages of heading and text, read one page at a time).
 - `vocab` is now a deck: a title and 1–12 cards (word, meaning, example, translation, https image link). An older single-card block — still in published versions, which never change — is valid and reads as a deck of one (`normalizeBlock`); a draft saved again stores the new form.
 - `practice` (1–10 multiple-choice questions), `eagle_match` (2–8 left–right pairs) and `time_detective` (3–8 events written in the right order) are scored for XP only ("Practice scored", a second line "… · practice N%") — never skill evidence: only the `quiz` block feeds Use of English, as before.
 - Before a lesson is completed the learner's view hides every answer: practice `correct` −1, match `right` blanked with the right-hand items given separately as `choices`, detective events reordered. The shown order is alphabetical, reversed if that happens to be the answer's order, so it never gives the answer away. Completing needs every practice answer (`practice`: block id → the option per question / the chosen right-hand item per pair, each once / the shown events' order); the answers are stored with the quiz answers (arrays) and the completed view returns `practice` and `practiceScore`.
 
+### Mission Box
+
+Migration 0018 (owner 24/11, part B): `course_mission_attempt`. A `mission_box` block (title, task, why it matters) is a real-world task, reviewed like a speaking rehearsal but never skill evidence.
+
+- Completing a lesson needs every mission confirmed (`missions`: block id → the learner's note, '' allowed, ≤300); each one becomes attempt 1, waiting for the class teacher. The lesson view returns `missions` (the latest attempt per block).
+- `GET /v1/mission-reviews`: the waiting missions of the caller's classes (`mayReview` only for the class teacher; staff see the queue). `POST /v1/mission-reviews/decide`: approve, or return with a note (3–300) — only the teacher of the learner's class, only the waiting attempt; audited (`courses:review_mission`).
+- `POST /v1/me/class-courses/:ref/:lessonId/mission/:blockId`: send a returned mission again with a new note (the next attempt).
+- The database decides a review once (trigger), allows one waiting attempt per block, requires a note on a return, and lets the app change only the review columns.
+- An approval earns XP through the new reward "Mission approved" (+20 by default, tunable with `rewards:manage`) and the Explorer badge — nothing reaches the skill profile, Students or the Engine. The demo stores the confirmed notes and has no review.
+
 ## Gamification
 
 Migration 0017: `reward_settings`, `reward_rule`, `badge_rule` — only the organization's settings within the closed catalog (an organization without rows uses the defaults). Owner decisions 22/11 (demo) and 24/11 (Platform). The rules live in `@ogc/contracts` (`deriveRewards`, `streakOf`, `rankClass`, `gamificationView`, `applyGamificationUpdate`); the demo uses the same functions.
 
-- Rewards are derived from learning evidence on every read; nothing records XP, nothing is awarded by hand, nothing counts logging in. Evidence: a completed class-course lesson (activity, +10) and its quiz score (scored practice, up to +20 at 100%), a speaking rehearsal the class teacher approved (+25), a make-up done — attended, or self-study confirmed (+15). Every reward line names its evidence ("Making plans · scored 100%").
-- XP + level (100 XP per level), a streak of learning days in center time (Asia/Ho_Chi_Minh; it still stands if the last learning day was yesterday), badges (First step, Perfect score, Heard you, Caught up — before the deadline, Learning streak 7 days, Level up 5), a weekly leaderboard of the learner's class (equal XP share a rank).
+- Rewards are derived from learning evidence on every read; nothing records XP, nothing is awarded by hand, nothing counts logging in. Evidence: a completed class-course lesson (activity, +10) and its quiz score (scored practice, up to +20 at 100%), a speaking rehearsal the class teacher approved (+25), a make-up done — attended, or self-study confirmed (+15), a mission the class teacher approved (+20), and the XP of practice blocks. Every reward line names its evidence ("Making plans · scored 100%").
+- XP + level (100 XP per level), a streak of learning days in center time (Asia/Ho_Chi_Minh; it still stands if the last learning day was yesterday), badges (First step, Perfect score, Heard you, Caught up — before the deadline, Learning streak 7 days, Level up 5, Explorer), a weekly leaderboard of the learner's class (equal XP share a rank).
 - `GET /v1/me/rewards`: a learner their own; a guardian each linked child, with the child's rank but no classmates' names. Teachers and staff → 403 (they keep seeing evidence only).
 - `GET /v1/rewards/settings` (staff), `POST /v1/rewards/settings` (staff with `rewards:manage`): enable / XP 0–100 per reward, enable / threshold 1–365 per badge (only streak and level have one), XP per level 10–1000, leaderboard on / off. Unknown fields or kinds are refused; a partial change keeps the rest; audited.
 

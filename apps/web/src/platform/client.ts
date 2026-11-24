@@ -40,6 +40,8 @@ import type {
   ShowcaseSettings,
   CourseSpeakingReviewItem,
   SpeakingReviewQueue,
+  MissionReviewItem,
+  MissionReviewQueue,
   StudioCourse,
   StudioOverview,
   StudioResult,
@@ -500,12 +502,26 @@ export const platformApi = {
     reflections: Record<string, string>,
     speaking: Record<string, number[]>,
     practice: Record<string, number[]>,
+    missions: Record<string, string>,
   ) =>
     result<AuthoringResult & { score?: number | null; practiceScore?: number | null }>(
       s,
       "POST",
       `/v1/me/class-courses/${encodeURIComponent(ref)}/${encodeURIComponent(lessonId)}/complete`,
-      { answers, reflections, speaking, practice },
+      { answers, reflections, speaking, practice, missions },
+    ),
+  retryMission: (
+    s: PlatformSession,
+    ref: string,
+    lessonId: string,
+    blockId: string,
+    note: string,
+  ) =>
+    result<AuthoringResult>(
+      s,
+      "POST",
+      `/v1/me/class-courses/${encodeURIComponent(ref)}/${encodeURIComponent(lessonId)}/mission/${encodeURIComponent(blockId)}`,
+      { note },
     ),
   retrySpeaking: (
     s: PlatformSession,
@@ -665,6 +681,22 @@ export const platformApi = {
   },
 
   // Speaking review: the class teacher decides; center staff only see the queue.
+  missionReviews: (s: PlatformSession) => staffRead<MissionReviewQueue>(s, "/v1/mission-reviews"),
+  decideMission: (
+    s: PlatformSession,
+    item: Pick<MissionReviewItem, "learnerId" | "ref" | "lessonId" | "blockId" | "attempt">,
+    decision: "approve" | "return",
+    note: string,
+  ) =>
+    result<AuthoringResult>(s, "POST", "/v1/mission-reviews/decide", {
+      learnerId: item.learnerId,
+      ref: item.ref,
+      lessonId: item.lessonId,
+      blockId: item.blockId,
+      attempt: item.attempt,
+      decision,
+      note,
+    }),
   speakingReviews: (s: PlatformSession) =>
     staffRead<SpeakingReviewQueue>(s, "/v1/speaking-reviews"),
   decideSpeaking: (

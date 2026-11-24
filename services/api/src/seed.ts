@@ -1162,6 +1162,7 @@ export async function seedDev(
         ])
           await c.query(`delete from ${t}`);
         await c.query("delete from course_speaking_attempt");
+        await c.query("delete from course_mission_attempt");
         await c.query("delete from course_lesson_done");
         await c.query("delete from course_progress");
         await c.query("delete from class_course_link");

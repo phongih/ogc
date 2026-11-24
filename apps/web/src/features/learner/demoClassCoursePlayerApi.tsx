@@ -15,7 +15,8 @@ export function DemoClassCoursePlayerApi({ children }: { children: ReactNode }) 
       scoreNote: "counts in your skill profile",
       mine: () => classCourses.mine(viewer),
       lesson: (ref, id) => classCourses.lesson(viewer, ref, id),
-      complete: (ref, id, a, r, sp, pr) => classCourses.complete(viewer, ref, id, a, r, sp, pr),
+      complete: (ref, id, a, r, sp, pr, m) =>
+        classCourses.complete(viewer, ref, id, a, r, sp, pr, m),
       onChanged: (qc) => refreshLearningState(qc),
     }),
     [viewer],

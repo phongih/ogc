@@ -24,6 +24,7 @@ export interface ClassCoursePlayerApi {
     reflections: Record<string, string>,
     speaking: Record<string, number[]>,
     practice: Record<string, number[]>,
+    missions: Record<string, string>,
   ): Promise<AuthoringResult & { score?: number | null; practiceScore?: number | null }>;
   /** Try a returned speaking rehearsal again (Platform; absent in the demo). */
   retrySpeaking?(
@@ -31,6 +32,13 @@ export interface ClassCoursePlayerApi {
     lessonId: string,
     blockId: string,
     choices: number[],
+  ): Promise<AuthoringResult>;
+  /** Send a returned Mission Box again with a new note (Platform; absent in the demo). */
+  retryMission?(
+    ref: string,
+    lessonId: string,
+    blockId: string,
+    note: string,
   ): Promise<AuthoringResult>;
   onChanged(qc: QueryClient): Promise<unknown> | void;
 }

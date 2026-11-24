@@ -34,7 +34,8 @@ export type BlockKind =
   | "book_page"
   | "practice"
   | "eagle_match"
-  | "time_detective";
+  | "time_detective"
+  | "mission_box";
 
 /** One turn of a speaking rehearsal: the coach's line, the replies to choose from (one is the
  *  natural one), a model line and a pronunciation / usage tip shown after submitting. */
@@ -90,7 +91,10 @@ export type CourseBlock =
   // reordered so the order gives nothing away); authors never send it.
   | { id: string; kind: "eagle_match"; prompt: string; pairs: MatchPair[]; choices?: string[] }
   // `events` are in the correct order for authors; the learner gets them reordered.
-  | { id: string; kind: "time_detective"; prompt: string; events: string[] };
+  | { id: string; kind: "time_detective"; prompt: string; events: string[] }
+  // A real-world task (owner 24/11): the learner confirms it with an optional note; the class
+  // teacher approves or returns it. XP only ("Mission approved") — never skill evidence.
+  | { id: string; kind: "mission_box"; title: string; task: string; whyItMatters: string };
 
 export type BlockOf<K extends BlockKind> = Extract<CourseBlock, { kind: K }>;
 
@@ -115,6 +119,7 @@ export const AUTHORING_LIMITS = {
   pairsMax: 8,
   eventsMin: 3,
   eventsMax: 8,
+  missionNote: 300,
 } as const;
 
 /** Hosts a video link may point to. The link opens in a new tab — OGC never embeds it. */
@@ -223,6 +228,12 @@ export const BLOCK_REGISTRY: { [K in BlockKind]: BlockSpec<K> } = {
         { left: "", right: "" },
       ],
     }),
+  },
+  mission_box: {
+    kind: "mission_box",
+    label: "Mission Box",
+    hint: "A real-world task; the learner confirms it and the class teacher approves — XP only",
+    make: (id) => ({ id, kind: "mission_box", title: "", task: "", whyItMatters: "" }),
   },
   time_detective: {
     kind: "time_detective",
@@ -372,6 +383,7 @@ export function blockIssue(b: unknown, mode: ValidationMode): string | null {
     practice: ["title", "questions"],
     eagle_match: ["prompt", "pairs"],
     time_detective: ["prompt", "events"],
+    mission_box: ["title", "task", "whyItMatters"],
   };
   for (const k of Object.keys(x))
     if (k !== "id" && k !== "kind" && !allowed[kind].includes(k)) return `${label}: unknown field`;
@@ -514,6 +526,12 @@ export function blockIssue(b: unknown, mode: ValidationMode): string | null {
       }
       return null;
     }
+    case "mission_box":
+      return (
+        need("title", AUTHORING_LIMITS.shortText) ??
+        need("task", AUTHORING_LIMITS.longText) ??
+        opt("whyItMatters", AUTHORING_LIMITS.shortText)
+      );
     case "time_detective": {
       const e = need("prompt", AUTHORING_LIMITS.shortText);
       if (e) return e;
@@ -840,9 +858,44 @@ export interface MyLessonView {
     speaking?: Record<string, number[]>; // speaking block → the reply chosen at each turn
     practice?: Record<string, number[]>; // practice / match / detective block → the answer
     practiceScore?: number | null; // % of practice items right (XP only, never skill evidence)
+    missions?: Record<string, string>; // demo: mission block → the note confirmed (no review)
   } | null;
   /** Speaking rehearsals of this lesson (Platform): the latest attempt per speaking block. */
   speaking?: SpeakingAttemptView[];
+  missions?: MissionAttemptView[];
+}
+
+/** A Mission Box the learner confirmed (owner 24/11): reviewed by the class teacher, XP only. */
+export interface MissionAttemptView {
+  blockId: string;
+  attempt: number; // 1, 2, … (a returned mission may be sent again)
+  note: string; // the learner's observation ('' when none)
+  status: SpeakingAttemptStatus;
+  submittedAt: string;
+  reviewedAt: string | null;
+  reviewerName: string | null;
+  reviewNote: string | null; // the class teacher's note (needed when returned)
+}
+/** A mission waiting for the class teacher (Platform). */
+export interface MissionReviewItem {
+  learnerId: string;
+  learnerName: string;
+  className: string;
+  ref: string;
+  courseTitle: string;
+  version: number;
+  lessonId: string;
+  lessonTitle: string;
+  blockId: string;
+  attempt: number;
+  title: string;
+  task: string;
+  note: string;
+  submittedAt: string;
+}
+export interface MissionReviewQueue {
+  items: MissionReviewItem[];
+  mayReview: boolean;
 }
 
 export type SpeakingAttemptStatus = "pending" | "approved" | "returned";
@@ -892,5 +945,6 @@ export interface ClassCoursePlayerPort {
     reflections: Record<string, string>,
     speaking?: Record<string, number[]>, // speaking block id → the reply chosen at each turn
     practice?: Record<string, number[]>, // practice / match / detective block id → the answer
+    missions?: Record<string, string>, // mission block id → the learner's note ('' allowed)
   ): Promise<AuthoringResult & { score?: number | null; practiceScore?: number | null }>;
 }

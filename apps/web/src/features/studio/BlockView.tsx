@@ -11,6 +11,7 @@ import {
   normalizeBlock,
   type BlockOf,
   type CourseBlock,
+  type MissionAttemptView,
   type SpeakingAttemptView,
 } from "@ogc/contracts";
 
@@ -33,12 +34,22 @@ export interface Interaction {
   // practice / Eagle Flight Match / Time Detective: the learner's answer (XP only)
   practice?: number[];
   onPractice?: (c: number[]) => void;
+  // Mission Box: "I did this mission" and an optional note; the class teacher's review (Platform)
+  mission?: { done: boolean; note: string };
+  onMission?: (m: { done: boolean; note: string }) => void;
+  missionAttempt?: MissionAttemptView | null;
 }
 
 const SPEAKING_STATUS: Record<SpeakingAttemptView["status"], string> = {
   pending: "Waiting for your teacher — it counts for Speaking once approved",
   approved: "Approved by your teacher — counts for Speaking",
   returned: "Returned by your teacher — try again",
+};
+
+const MISSION_STATUS: Record<MissionAttemptView["status"], string> = {
+  pending: "Waiting for your teacher — XP once approved",
+  approved: "Approved by your teacher",
+  returned: "Returned by your teacher — send it again",
 };
 
 export function BlockView({ b: raw, io }: { b: CourseBlock; io?: Interaction }) {
@@ -160,6 +171,8 @@ export function BlockView({ b: raw, io }: { b: CourseBlock; io?: Interaction }) 
           )}
         </div>
       );
+    case "mission_box":
+      return <MissionBox b={b} io={io} />;
     case "speaking":
       return (
         <section
@@ -226,6 +239,62 @@ export function BlockView({ b: raw, io }: { b: CourseBlock; io?: Interaction }) 
         </section>
       );
   }
+}
+
+function MissionBox({ b, io }: { b: BlockOf<"mission_box">; io?: Interaction | undefined }) {
+  const m = io?.mission ?? { done: false, note: "" };
+  const a = io?.missionAttempt;
+  return (
+    <section
+      aria-label={`Mission: ${b.title || "Mission Box"}`}
+      className="space-y-2 rounded-ogc border-2 border-dashed border-brand p-3"
+    >
+      <p className="font-medium">🧭 {b.title || "Mission Box"}</p>
+      <p className="whitespace-pre-line">{b.task}</p>
+      {b.whyItMatters ? (
+        <p className="text-sm text-muted">Why it matters: {b.whyItMatters}</p>
+      ) : null}
+      {!io ? (
+        <p className="text-xs text-muted">
+          The learner does it in real life and confirms it (optional note); the class teacher
+          approves it for XP — never a skill score.
+        </p>
+      ) : io.onMission ? (
+        <div className="space-y-1">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              aria-label={`I did this mission: ${b.title}`}
+              checked={m.done}
+              onChange={(e) => io.onMission?.({ ...m, done: e.target.checked })}
+            />
+            I did this mission
+          </label>
+          <textarea
+            aria-label={`What did you notice? ${b.title}`}
+            placeholder="What did you notice? (optional)"
+            className="w-full rounded-ogc border border-border bg-surface p-2 text-sm"
+            rows={2}
+            maxLength={300}
+            value={m.note}
+            onChange={(e) => io.onMission?.({ ...m, note: e.target.value })}
+          />
+        </div>
+      ) : m.done ? (
+        <p className="text-sm">✓ You did this mission{m.note ? ` · “${m.note}”` : ""}</p>
+      ) : null}
+      {a ? (
+        <p
+          className={`text-sm ${a.status === "returned" ? "text-danger" : ""}`}
+          data-testid={`mission-status-${b.id}`}
+        >
+          {MISSION_STATUS[a.status]}
+          {a.attempt > 1 ? ` · try ${a.attempt}` : ""}
+          {a.reviewNote ? ` · “${a.reviewNote}”` : ""}
+        </p>
+      ) : null}
+    </section>
+  );
 }
 
 function VocabDeck({ b, interactive }: { b: BlockOf<"vocab">; interactive: boolean }) {

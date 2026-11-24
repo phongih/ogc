@@ -20,6 +20,7 @@ export interface LessonDone {
   reflections: Record<string, string>;
   speaking?: Record<string, number[]>; // speaking block → reply per turn (no teacher review in the demo)
   practice?: Record<string, number[]>; // practice / match / detective block → the answer (XP only)
+  missions?: Record<string, string>; // mission block → the learner's note (no teacher review in the demo)
 }
 export interface CourseProgressRecord {
   ref: string;

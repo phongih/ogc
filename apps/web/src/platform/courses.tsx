@@ -64,10 +64,11 @@ export function PlatformClassCoursePlayerApi({ children }: { children: ReactNode
       scoreNote: null, // no skill profile on the Platform yet
       mine: () => platformApi.myClassCourses(s),
       lesson: (ref, id) => platformApi.myClassLesson(s, ref, id),
-      complete: (ref, id, a, r, sp, pr) =>
-        platformApi.completeClassLesson(s, ref, id, a, r, sp, pr),
+      complete: (ref, id, a, r, sp, pr, m) =>
+        platformApi.completeClassLesson(s, ref, id, a, r, sp, pr, m),
       retrySpeaking: (ref, id, block, choices) =>
         platformApi.retrySpeaking(s, ref, id, block, choices),
+      retryMission: (ref, id, block, note) => platformApi.retryMission(s, ref, id, block, note),
       onChanged: (qc) => qc.invalidateQueries(),
     }),
     [s],
