@@ -99,6 +99,8 @@ export interface Lead {
   centerName: string;
   source: LeadSource;
   referredBy: string | null; // referrer's display name (referral leads)
+  /** Where a public-showcase enquiry came from, e.g. "Showcase · CS-A2-EVERYDAY v2 · Trial · trial lesson". */
+  origin?: string | null;
   campaignId: string | null;
   channel: ContactChannel | null;
   needs: LearningNeed[];

@@ -17,6 +17,7 @@ import {
   PlatformStudioLinksApi,
 } from "../courses";
 import { PolicyBanner } from "../workforce";
+import { ShowcaseSettingsCard } from "../showcase";
 
 export function PlatformCoursesPage() {
   return (
@@ -33,6 +34,7 @@ export function PlatformCoursePage() {
     <PlatformCourseStudioApi>
       <PolicyBanner />
       <CourseEditorView base="/courses" />
+      <ShowcaseSettingsCard />
     </PlatformCourseStudioApi>
   );
 }

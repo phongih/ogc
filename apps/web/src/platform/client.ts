@@ -22,6 +22,11 @@ import type {
   ReferralProgram,
   GrowthResult,
   GrowthMetrics,
+  ShowcaseDetail,
+  ShowcaseEnquiry,
+  ShowcaseOrg,
+  ShowcasePage,
+  ShowcaseSettings,
   CourseSpeakingReviewItem,
   SpeakingReviewQueue,
   StudioCourse,
@@ -517,6 +522,64 @@ export const platformApi = {
       `/v1/growth/leads/${encodeURIComponent(id)}/${verb}`,
       verb === "reject" ? { reason } : {},
     ),
+  // Public course showcase (owner 23/11): staff settings + the public page (no sign-in).
+  showcaseSettings: (s: PlatformSession, ref: string) =>
+    staffRead<ShowcaseSettings>(s, `/v1/courses/${encodeURIComponent(ref)}/showcase`),
+  saveShowcase: (
+    s: PlatformSession,
+    ref: string,
+    body: Pick<ShowcaseSettings, "isPublic" | "offer" | "catalogCode" | "needs">,
+  ) =>
+    result<{ ok: true } | { ok: false; reason: string; detail?: string }>(
+      s,
+      "POST",
+      `/v1/courses/${encodeURIComponent(ref)}/showcase`,
+      body,
+    ),
+  showcaseOrgs: async () => {
+    const r = await send(null, "GET", "/v1/public/showcase");
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as ShowcaseOrg[];
+  },
+  showcasePage: async (slug: string, q: { level?: string; needs?: string[]; center?: string }) => {
+    const p = new URLSearchParams();
+    if (q.level) p.set("level", q.level);
+    if (q.needs?.length) p.set("needs", q.needs.join(","));
+    if (q.center) p.set("center", q.center);
+    const r = await send(
+      null,
+      "GET",
+      `/v1/public/showcase/${encodeURIComponent(slug)}${p.size ? `?${p}` : ""}`,
+    );
+    if (r.status === 404) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as ShowcasePage;
+  },
+  showcaseCourse: async (slug: string, ref: string) => {
+    const r = await send(
+      null,
+      "GET",
+      `/v1/public/showcase/${encodeURIComponent(slug)}/courses/${encodeURIComponent(ref)}`,
+    );
+    if (r.status === 404) return null;
+    if (r.status !== 200) throw new ApiError(r.status, r.body);
+    return r.body as ShowcaseDetail;
+  },
+  showcaseEnquire: async (
+    slug: string,
+    ref: string,
+    body: ShowcaseEnquiry,
+  ): Promise<{ ok: true } | { ok: false; reason: string; detail?: string }> => {
+    const r = await send(
+      null,
+      "POST",
+      `/v1/public/showcase/${encodeURIComponent(slug)}/courses/${encodeURIComponent(ref)}/enquiries`,
+      body,
+    );
+    const b = r.body as { ok?: boolean } | null;
+    if (b && typeof b === "object" && "ok" in b) return b as { ok: true };
+    throw new ApiError(r.status, r.body);
+  },
   joinInfo: async (code: string) => {
     const r = await send(null, "GET", `/v1/public/referrals/${encodeURIComponent(code)}`);
     if (r.status !== 200) throw new ApiError(r.status, r.body);

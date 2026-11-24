@@ -959,6 +959,30 @@ async function seedGrowth(c: pg.Client, now: number, org: string): Promise<void>
   });
 }
 
+/**
+ * The public course showcase (owner 23/11): each organization's public page, and the courses staff
+ * chose to show — A2 Everyday English (trial lesson), B1 Speaking Confidence (paid), IELTS Writing
+ * Task 1 (free). The caller scoped the connection to `org`.
+ */
+async function seedShowcase(
+  c: pg.Client,
+  org: string,
+  slug: string,
+  name: string,
+  shown: [string, string, string, string[]][],
+): Promise<void> {
+  await c.query(
+    "insert into public_org (slug, org_id, name) values ($1, $2, $3) on conflict (slug) do nothing",
+    [slug, org, name],
+  );
+  for (const [ref, offer, code, needs] of shown)
+    await c.query(
+      `insert into course_showcase (org_id, course_ref, is_public, offer, catalog_code, needs, updated_by, updated_at)
+       values ($1, $2, true, $3, $4, $5, 'Sam (Org Staff)', now())`,
+      [org, ref, offer, code, needs],
+    );
+}
+
 /** The Decision Engine's fixed rule set (R-1… in the shared default order); the caller scoped the org. */
 async function seedEngineRules(c: pg.Client): Promise<void> {
   for (const [i, r] of DEFAULT_ENGINE_RULES.entries())
@@ -1017,6 +1041,7 @@ export async function seedDev(
         await c.query("delete from course_lesson_done");
         await c.query("delete from course_progress");
         await c.query("delete from class_course_link");
+        await c.query("delete from course_showcase");
         await c.query("delete from course_review");
         await c.query("delete from course_version");
         await c.query("delete from authored_course");
@@ -1183,6 +1208,11 @@ export async function seedDev(
     await seedGrowth(c, now, NOVA);
     await seedCourses(c, now, { tara: TARA, ben: BEN });
     await seedClassCourses(c, now, { a2Morning: A2M, b1Evening: B1E, an: L(3), linh: L(1) });
+    await seedShowcase(c, NOVA, "nova-learning", "Nova Learning", [
+      ["CS-A2-EVERYDAY", "trial", "ENG-A2", ["speaking_confidence", "travel"]],
+      ["CS-B1-SPEAK", "paid", "ENG-B1", ["speaking_confidence", "work_english"]],
+      ["CS-IELTS-W1", "free", "IELTS-B2", ["exam_prep"]],
+    ]);
     await seedEngineRules(c);
     // Skill profile: the demo's synthetic placement results (Khoa and Vy have none, as in the demo).
     await c.query(
@@ -1208,6 +1238,7 @@ export async function seedDev(
     );
     await seedLumenCourse(c, now);
     await seedGrowth(c, now, LUMEN);
+    await seedShowcase(c, LUMEN, "lumen-edu", "Lumen Edu", []);
     await seedEngineRules(c);
     await c.query(
       "insert into learner (org_id, id, display_name) values ($1, '00000000-0000-4000-8000-0000000Lo201', 'Learner (Lumen)')",

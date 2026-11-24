@@ -548,6 +548,11 @@ function LeadDetail({ lead: l }: { lead: Lead }) {
           {l.needs.length ? ` · ${l.needs.map((n) => NEED_LABEL[n]).join(", ")}` : ""}
           {l.note ? ` · “${l.note}”` : ""}
         </p>
+        {l.origin ? (
+          <p className="text-sm" data-testid={`origin-${l.learnerName}`}>
+            Origin: {l.origin}
+          </p>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <h3 className="mb-1 text-sm font-medium">Why this score</h3>
