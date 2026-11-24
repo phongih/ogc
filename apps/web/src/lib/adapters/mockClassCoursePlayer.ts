@@ -109,7 +109,16 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
       });
     }),
 
-  complete: (viewer, ref, lessonId, answers, reflections, speaking = {}, practice = {}) =>
+  complete: (
+    viewer,
+    ref,
+    lessonId,
+    answers,
+    reflections,
+    speaking = {},
+    practice = {},
+    missions = {},
+  ) =>
     withFault("classCourses.complete", () => {
       const s = scope(viewer);
       if (!s) return refuse("not_allowed", "learners complete their own lessons");
@@ -126,12 +135,16 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
       );
       const talks = lesson.blocks.filter((b): b is BlockOf<"speaking"> => b.kind === "speaking");
       const games = lesson.blocks.filter(isPracticeBlock);
+      const tasks = lesson.blocks.filter(
+        (b): b is BlockOf<"mission_box"> => b.kind === "mission_box",
+      );
       const known = new Set([...quizzes, ...prompts].map((b) => b.id));
       if (
         Object.keys(answers).some((k) => !known.has(k)) ||
         Object.keys(reflections).some((k) => !known.has(k)) ||
         Object.keys(speaking).some((k) => !talks.some((t) => t.id === k)) ||
-        Object.keys(practice).some((k) => !games.some((g) => g.id === k))
+        Object.keys(practice).some((k) => !games.some((g) => g.id === k)) ||
+        Object.keys(missions).some((k) => !tasks.some((m) => m.id === k))
       )
         return refuse("invalid", "answers for blocks that are not in this lesson");
       const keepS: Record<string, number[]> = {};
@@ -177,6 +190,17 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
           );
         keepP[g.id] = c;
       }
+      const keepM: Record<string, string> = {};
+      for (const m of tasks) {
+        if (!(m.id in missions)) return refuse("invalid", "confirm every mission you did");
+        const n = missions[m.id];
+        if (typeof n !== "string" || n.trim().length > AUTHORING_LIMITS.missionNote)
+          return refuse(
+            "invalid",
+            `a mission note is at most ${AUTHORING_LIMITS.missionNote} characters`,
+          );
+        keepM[m.id] = n.trim();
+      }
       const score = lessonQuizScore(lesson, keepA);
       const practiceScore = lessonPracticeScore(lesson, keepP);
       // The first completed lesson pins the learner to this version.
@@ -187,6 +211,7 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
         reflections: keepR,
         ...(talks.length ? { speaking: keepS } : {}),
         ...(games.length ? { practice: keepP } : {}),
+        ...(tasks.length ? { missions: keepM } : {}),
       });
       return latency<Out>({ ok: true, score, practiceScore });
     }),

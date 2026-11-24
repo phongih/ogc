@@ -71,13 +71,18 @@ export function ClassLessonView() {
   const [speaking, setSpeaking] = useState<Record<string, number[]>>({});
   const [retry, setRetry] = useState<Record<string, number[]>>({});
   const [practice, setPractice] = useState<Record<string, number[]>>({});
+  const [missions, setMissions] = useState<Record<string, { done: boolean; note: string }>>({});
+  const [missionAgain, setMissionAgain] = useState<Record<string, string>>({});
   const done = useMutation({
     mutationFn: () => {
       // a Time Detective left untouched is answered in the order it was shown
       const all = { ...practice };
       for (const b of q.data?.lesson.blocks ?? [])
         if (b.kind === "time_detective" && !all[b.id]) all[b.id] = b.events.map((_, i) => i);
-      return api.complete(ref, lessonId, answers, reflections, speaking, all);
+      // only the missions the learner ticked are sent: an unticked one is refused (fail-closed)
+      const did: Record<string, string> = {};
+      for (const [id, m] of Object.entries(missions)) if (m.done) did[id] = m.note;
+      return api.complete(ref, lessonId, answers, reflections, speaking, all, did);
     },
     onSuccess: () => api.onChanged(qc),
   });
@@ -86,6 +91,14 @@ export function ClassLessonView() {
       api.retrySpeaking!(ref, lessonId, blockId, retry[blockId] ?? []),
     onSuccess: async (r, blockId) => {
       if (r.ok) setRetry((x) => ({ ...x, [blockId]: [] }));
+      await api.onChanged(qc);
+    },
+  });
+  const resend = useMutation({
+    mutationFn: (blockId: string) =>
+      api.retryMission!(ref, lessonId, blockId, missionAgain[blockId] ?? ""),
+    onSuccess: async (r, blockId) => {
+      if (r.ok) setMissionAgain((x) => ({ ...x, [blockId]: "" }));
       await api.onChanged(qc);
     },
   });
@@ -124,6 +137,24 @@ export function ClassLessonView() {
           };
     // flip cards and book pages are read, not answered: interactive, with nothing to record
     if (b.kind === "vocab" || b.kind === "book_page") return {};
+    if (b.kind === "mission_box") {
+      const attempt = v.missions?.find((a) => a.blockId === b.id) ?? null;
+      if (!c)
+        return {
+          mission: missions[b.id] ?? { done: false, note: "" },
+          onMission: (m) => setMissions((x) => ({ ...x, [b.id]: m })),
+        };
+      if (attempt?.status === "returned" && api.retryMission)
+        return {
+          mission: { done: true, note: missionAgain[b.id] ?? "" },
+          onMission: (m) => setMissionAgain((x) => ({ ...x, [b.id]: m.note })),
+          missionAttempt: attempt,
+        };
+      return {
+        mission: { done: true, note: c.missions?.[b.id] ?? attempt?.note ?? "" },
+        missionAttempt: attempt,
+      };
+    }
     if (b.kind === "speaking") {
       const attempt = v.speaking?.find((a) => a.blockId === b.id) ?? null;
       if (!c) return { choices: speaking[b.id] ?? [], onChoose: choose(setSpeaking, b.id) };
@@ -135,6 +166,9 @@ export function ClassLessonView() {
   };
   const returned = c
     ? (v.speaking ?? []).filter((a) => a.status === "returned" && api.retrySpeaking)
+    : [];
+  const sendAgain = c
+    ? (v.missions ?? []).filter((a) => a.status === "returned" && api.retryMission)
     : [];
   const mine = course.data?.find((x) => x.ref === ref);
   const nextId = mine?.lessons[v.index + 1]?.lessonId;
@@ -157,6 +191,18 @@ export function ClassLessonView() {
             Send the rehearsal again
           </Button>
           <Refused r={again.data} />
+        </div>
+      ))}
+      {sendAgain.map((a) => (
+        <div key={a.blockId} className="flex items-center gap-2">
+          <Button
+            onClick={() => resend.mutate(a.blockId)}
+            disabled={resend.isPending}
+            aria-label={`Send the mission again (${a.blockId})`}
+          >
+            Send the mission again
+          </Button>
+          <Refused r={resend.data} />
         </div>
       ))}
       {c ? (

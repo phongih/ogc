@@ -9,6 +9,7 @@ import { SelfStudyToConfirmView } from "../../features/makeup/SelfStudyToConfirm
 import { PlatformMakeupApi } from "../makeup";
 import { EngineNotificationsView } from "../../features/engine/EngineNotificationsView";
 import { PlatformNotificationsApi } from "../engine";
+import { MissionReviewCard } from "../missions";
 import { SpeakingReviewCard } from "../speaking";
 
 export function TeachingPage() {
@@ -39,6 +40,7 @@ export function TeachingPage() {
       </div>
       <div className="mb-4">
         <SpeakingReviewCard />
+        <MissionReviewCard />
       </div>
       <div className="mb-4">
         <PlatformMakeupApi>

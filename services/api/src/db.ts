@@ -231,7 +231,12 @@ export interface RewardSettingsTable {
 }
 export interface RewardRuleTable {
   org_id: string;
-  kind: "activity_completed" | "practice_scored" | "speaking_approved" | "makeup_done";
+  kind:
+    | "activity_completed"
+    | "practice_scored"
+    | "speaking_approved"
+    | "makeup_done"
+    | "mission_approved";
   enabled: boolean;
   xp: number;
 }
@@ -243,9 +248,24 @@ export interface BadgeRuleTable {
     | "speaking_approved"
     | "makeup_on_time"
     | "streak"
-    | "level";
+    | "level"
+    | "explorer";
   enabled: boolean;
   threshold: number | null;
+}
+export interface CourseMissionAttemptTable {
+  org_id: string;
+  learner_id: string;
+  course_ref: string;
+  lesson_id: string;
+  block_id: string;
+  attempt: number;
+  note: string;
+  submitted_at: Date;
+  status: Generated<"pending" | "approved" | "returned">;
+  reviewed_at: Date | null;
+  reviewed_by: string | null;
+  review_note: string | null;
 }
 export interface LeadHistoryTable {
   org_id: string;
@@ -674,6 +694,7 @@ export interface DB {
   teacher_profile: TeacherProfileTable;
   credential: CredentialTable;
   reward_settings: RewardSettingsTable;
+  course_mission_attempt: CourseMissionAttemptTable;
   reward_rule: RewardRuleTable;
   badge_rule: BadgeRuleTable;
   audit_event: Omit<AuditEventTable, "event_id" | "at"> & {

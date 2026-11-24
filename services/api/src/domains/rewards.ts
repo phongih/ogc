@@ -67,7 +67,7 @@ export async function evidenceByLearner(
   tx: TenantTx,
   now: number,
 ): Promise<Map<string, RewardEvidence[]>> {
-  const [lessons, speaking, ledger] = await Promise.all([
+  const [lessons, speaking, ledger, missions] = await Promise.all([
     sql<{
       learner_id: string;
       at: Date;
@@ -94,6 +94,17 @@ export async function evidenceByLearner(
                              and v.version = p.version
        where a.status = 'approved'`.execute(tx),
     loadLedger(tx),
+    sql<{ learner_id: string; at: Date; title: string | null }>`
+      select a.learner_id, a.reviewed_at as at,
+             (select bl->>'title' from jsonb_array_elements(v.content->'lessons') l,
+                     jsonb_array_elements(l->'blocks') bl
+               where l->>'id' = a.lesson_id and bl->>'id' = a.block_id limit 1) as title
+        from course_mission_attempt a
+        join course_progress p on p.org_id = a.org_id and p.learner_id = a.learner_id
+                              and p.course_ref = a.course_ref
+        join course_version v on v.org_id = p.org_id and v.course_ref = p.course_ref
+                             and v.version = p.version
+       where a.status = 'approved'`.execute(tx),
   ]);
   const out = new Map<string, RewardEvidence[]>();
   const add = (id: string, e: RewardEvidence) => out.set(id, [...(out.get(id) ?? []), e]);
@@ -117,6 +128,8 @@ export async function evidenceByLearner(
       at: iso(r.at),
       title: `Speaking · ${r.title ?? "lesson"}`,
     });
+  for (const r of missions.rows)
+    add(r.learner_id, { kind: "mission", at: iso(r.at), title: r.title ?? "Mission" });
   for (const m of makeupItems(ledger, now)) {
     if (m.status !== "done") continue;
     add(m.learnerId, {

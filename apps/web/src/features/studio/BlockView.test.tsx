@@ -2,6 +2,7 @@
 // one at a time; the editor's preview (no interaction) shows everything at once. SYNTHETIC.
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import type { CourseBlock } from "@ogc/contracts";
 import { BlockView } from "./BlockView";
@@ -60,5 +61,75 @@ describe("reading blocks", () => {
     expect(screen.getByText("a bird's home")).toBeVisible();
     expect(screen.queryByRole("button", { name: /Flip/ })).toBeNull();
     expect(screen.getByText("It grows.")).toBeVisible();
+  });
+});
+
+const MISSION: CourseBlock = {
+  id: "m",
+  kind: "mission_box",
+  title: "Seed & Stem Explorer",
+  task: "Find 1 leaf and 1 seed around your house.",
+  whyItMatters: "Plants use seeds to grow new life.",
+};
+
+describe("Mission Box", () => {
+  it("the editor preview explains the review; no checkbox", () => {
+    render(<BlockView b={MISSION} />);
+    expect(screen.getByText("🧭 Seed & Stem Explorer")).toBeVisible();
+    expect(screen.getByText("Why it matters: Plants use seeds to grow new life.")).toBeVisible();
+    expect(screen.getByText(/never a skill score/)).toBeVisible();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("the learner ticks it and may add a note", async () => {
+    const user = userEvent.setup();
+    let last = { done: false, note: "" };
+    function Host() {
+      const [m, setM] = useState(last);
+      return (
+        <BlockView
+          b={MISSION}
+          io={{
+            mission: m,
+            onMission: (x) => {
+              last = x;
+              setM(x);
+            },
+          }}
+        />
+      );
+    }
+    render(<Host />);
+    await user.click(
+      screen.getByRole("checkbox", { name: "I did this mission: Seed & Stem Explorer" }),
+    );
+    await user.type(screen.getByRole("textbox", { name: /What did you notice/ }), "A brown seed");
+    expect(last).toEqual({ done: true, note: "A brown seed" });
+  });
+
+  it("after completion: what was confirmed and the teacher's review", () => {
+    render(
+      <BlockView
+        b={MISSION}
+        io={{
+          mission: { done: true, note: "A brown seed" },
+          missionAttempt: {
+            blockId: "m",
+            attempt: 2,
+            note: "A brown seed",
+            status: "returned",
+            submittedAt: "2026-11-24T05:00:00Z",
+            reviewedAt: "2026-11-24T06:00:00Z",
+            reviewerName: "Tara",
+            reviewNote: "Tell me its colour.",
+          },
+        }}
+      />,
+    );
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.getByText("✓ You did this mission · “A brown seed”")).toBeVisible();
+    expect(screen.getByTestId("mission-status-m")).toHaveTextContent(
+      "Returned by your teacher — send it again · try 2 · “Tell me its colour.”",
+    );
   });
 });

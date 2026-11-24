@@ -57,6 +57,7 @@ describe.skipIf(!hasPg)("foundation — PostgreSQL", () => {
           "0015_showcase.sql",
           "0016_brand_profile.sql",
           "0017_gamification.sql",
+          "0018_mission_box.sql",
         ],
       });
     });

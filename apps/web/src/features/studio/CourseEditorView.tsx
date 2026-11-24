@@ -982,6 +982,34 @@ function BlockFields({
           />
         </div>
       );
+    case "mission_box":
+      return (
+        <div className="space-y-1">
+          <Field
+            label={at("Mission title")}
+            value={b.title}
+            max={L.shortText}
+            onChange={(title) => onChange({ ...b, title })}
+          />
+          <Field
+            label={at("Mission task")}
+            long
+            value={b.task}
+            max={L.longText}
+            onChange={(task) => onChange({ ...b, task })}
+          />
+          <Field
+            label={at("Why it matters")}
+            value={b.whyItMatters}
+            max={L.shortText}
+            onChange={(whyItMatters) => onChange({ ...b, whyItMatters })}
+          />
+          <p className="text-xs text-muted">
+            The class teacher approves each mission; an approval earns XP (Rewards), never a skill
+            score.
+          </p>
+        </div>
+      );
     case "reflection":
       return (
         <Field

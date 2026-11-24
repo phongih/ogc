@@ -65,8 +65,8 @@ const PRACTICE: BlockOf<"practice"> = {
 };
 
 describe("new blocks: validation, hiding, scoring (no database)", () => {
-  it("every registry block is a valid draft; 14 kinds; unknown fields refused at every level", () => {
-    expect(BLOCK_KINDS).toHaveLength(14);
+  it("every registry block is a valid draft; 15 kinds; unknown fields refused at every level", () => {
+    expect(BLOCK_KINDS).toHaveLength(15);
     for (const k of BLOCK_KINDS)
       expect(blockIssue(BLOCK_REGISTRY[k].make("x"), "draft")).toBeNull();
     for (const [b, re] of [

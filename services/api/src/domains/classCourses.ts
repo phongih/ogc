@@ -30,6 +30,9 @@ import type {
   BlockOf,
   ClassCourseLink,
   CourseSpeakingReviewItem,
+  MissionAttemptView,
+  MissionReviewItem,
+  MissionReviewQueue,
   CourseVersion,
   LearnerStudioProgress,
   LinkStatus,
@@ -393,6 +396,47 @@ export async function speakingReturned(tx: TenantTx): Promise<Map<string, number
     if (r.status === "returned") out.set(r.learner_id, (out.get(r.learner_id) ?? 0) + 1);
   return out;
 }
+
+// ── Mission Box (owner 24/11): the class teacher reviews; XP only, never skill evidence ─────
+type MissionRow = {
+  learner_id: string;
+  course_ref: string;
+  lesson_id: string;
+  block_id: string;
+  attempt: number;
+  note: string;
+  submitted_at: Date;
+  status: "pending" | "approved" | "returned";
+  reviewed_at: Date | null;
+  reviewed_by: string | null;
+  review_note: string | null;
+};
+const missionView = (r: MissionRow): MissionAttemptView => ({
+  blockId: r.block_id,
+  attempt: r.attempt,
+  note: r.note,
+  status: r.status,
+  submittedAt: r.submitted_at.toISOString(),
+  reviewedAt: iso(r.reviewed_at),
+  reviewerName: r.reviewed_by,
+  reviewNote: r.review_note,
+});
+/** The latest attempt of each mission (learner, course, lesson, block). */
+async function latestMissions(tx: TenantTx, learnerId?: string): Promise<MissionRow[]> {
+  let q = tx.selectFrom("course_mission_attempt").selectAll();
+  if (learnerId) q = q.where("learner_id", "=", learnerId);
+  const rows = (await q.orderBy("attempt", "desc").execute()) as MissionRow[];
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    const key = [r.learner_id, r.course_ref, r.lesson_id, r.block_id].join("|");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+/** A learner's note on a mission: a string, trimmed, at most 300 characters ('' allowed). */
+const missionNote = (raw: unknown): string | null =>
+  typeof raw === "string" && raw.trim().length <= AUTHORING_LIMITS.missionNote ? raw.trim() : null;
 
 /** The replies chosen in a speaking block: one valid option per turn. */
 function speakingChoices(b: BlockOf<"speaking">, raw: unknown): number[] | null {
@@ -810,6 +854,9 @@ export function registerClassCourses(app: Api): void {
       const speaking = (await latestAttempts(tx, learnerId))
         .filter((a) => a.course_ref === ref && a.lesson_id === lessonId)
         .map(attemptView);
+      const missions = (await latestMissions(tx, learnerId))
+        .filter((a) => a.course_ref === ref && a.lesson_id === lessonId)
+        .map(missionView);
       const out: MyLessonView = {
         ref,
         version: v.version,
@@ -820,6 +867,7 @@ export function registerClassCourses(app: Api): void {
           ? { ...done, practiceScore: lessonPracticeScore(lesson, done.practice) }
           : null,
         speaking,
+        missions,
       };
       return out;
     }),
@@ -1051,6 +1099,180 @@ export function registerClassCourses(app: Api): void {
     return { ok: true };
   }
 
+  // ── missions: send again, and the class teacher's review ───────────────────────────────────
+  const missionOf = (b: Book, ref: string, learnerId: string, lessonId: string, id: string) => {
+    const v = versionFor(b, ref, learnerId);
+    const lesson = v?.content.lessons.find((l) => l.id === lessonId);
+    const block = lesson?.blocks.find((x) => x.id === id && x.kind === "mission_box") as
+      BlockOf<"mission_box"> | undefined;
+    return v && lesson && block ? { v, lesson, block } : null;
+  };
+  app.secured(
+    "POST",
+    "/v1/me/class-courses/:ref/:lessonId/mission/:blockId",
+    async (caller, req) => {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const params = req.params as { ref: string; lessonId: string; blockId: string };
+      await caller.write<Plain>(
+        "POST /v1/me/class-courses/:ref/:lessonId/mission/:blockId",
+        { params, body },
+        async (tx) => {
+          await lock(tx, caller);
+          const r = await resend(tx, caller, params, body);
+          return {
+            status: r.ok ? 200 : STATUS[r.reason],
+            body: r,
+            audit: {
+              action: "courses:learn",
+              resource: { ...params, step: "mission" },
+              outcome: r.ok ? ("allowed" as const) : ("denied" as const),
+              ...(r.ok ? {} : { reason: r.reason }),
+            },
+          };
+        },
+      );
+    },
+  );
+  async function resend(
+    tx: TenantTx,
+    caller: Caller,
+    { ref, lessonId, blockId }: { ref: string; lessonId: string; blockId: string },
+    body: Record<string, unknown>,
+  ): Promise<Plain> {
+    const learnerId = await learnerOf(tx, caller);
+    if (!learnerId) return no("not_allowed", "learners send their own missions");
+    const b = await loadBook(tx);
+    if (!openTo(b, learnerId).some((o) => o.ref === ref)) return no("not_found");
+    if (!missionOf(b, ref, learnerId, lessonId, blockId)) return no("not_found");
+    const last = (await latestMissions(tx, learnerId)).find(
+      (a) => a.course_ref === ref && a.lesson_id === lessonId && a.block_id === blockId,
+    );
+    if (!last || last.status !== "returned")
+      return no("invalid_step", "only a mission the teacher returned can be sent again");
+    const note = missionNote(body.note ?? "");
+    if (note === null)
+      return no("invalid", `a mission note is at most ${AUTHORING_LIMITS.missionNote} characters`);
+    await tx
+      .insertInto("course_mission_attempt")
+      .values({
+        org_id: sql`ogc_current_org()`,
+        learner_id: learnerId,
+        course_ref: ref,
+        lesson_id: lessonId,
+        block_id: blockId,
+        attempt: last.attempt + 1,
+        note,
+        submitted_at: new Date(caller.now()),
+      } as never)
+      .execute();
+    return { ok: true };
+  }
+
+  app.secured("GET", "/v1/mission-reviews", async (caller, _req, reply) =>
+    caller.tenant(async (tx) => {
+      const b = await loadBook(tx);
+      const who = await whoAmI(tx, caller);
+      const vis = visible(b, caller, who);
+      if (!vis) return reply.code(403).send({ error: "not_allowed" });
+      const items: MissionReviewItem[] = [];
+      for (const a of await latestMissions(tx)) {
+        if (a.status !== "pending") continue;
+        const cls = classesFor(b, vis.list, a.learner_id, a.course_ref)[0];
+        const found = cls && missionOf(b, a.course_ref, a.learner_id, a.lesson_id, a.block_id);
+        if (!cls || !found) continue;
+        items.push({
+          learnerId: a.learner_id,
+          learnerName:
+            (b.roster.get(cls[0]) ?? []).find((r) => r.learnerId === a.learner_id)?.name ??
+            a.learner_id,
+          className: cls[1].name,
+          ref: a.course_ref,
+          courseTitle: found.v.content.title,
+          version: found.v.version,
+          lessonId: a.lesson_id,
+          lessonTitle: found.lesson.title,
+          blockId: a.block_id,
+          attempt: a.attempt,
+          title: found.block.title,
+          task: found.block.task,
+          note: a.note,
+          submittedAt: a.submitted_at.toISOString(),
+        });
+      }
+      items.sort((x, z) => x.submittedAt.localeCompare(z.submittedAt));
+      const out: MissionReviewQueue = { items, mayReview: vis.role === "teacher" };
+      return out;
+    }),
+  );
+
+  app.secured("POST", "/v1/mission-reviews/decide", async (caller, req) => {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    await caller.write<Plain>("POST /v1/mission-reviews/decide", { body }, async (tx) => {
+      await lock(tx, caller);
+      const r = await reviewMission(tx, caller, body);
+      return {
+        status: r.ok ? 200 : STATUS[r.reason],
+        body: r,
+        audit: {
+          action: "courses:review_mission",
+          resource: {
+            learnerId: String(body.learnerId ?? ""),
+            ref: String(body.ref ?? ""),
+            lessonId: String(body.lessonId ?? ""),
+            blockId: String(body.blockId ?? ""),
+          },
+          outcome: r.ok ? ("allowed" as const) : ("denied" as const),
+          ...(r.ok ? { after: { decision: body.decision } } : { reason: r.reason }),
+        },
+      };
+    });
+  });
+  async function reviewMission(
+    tx: TenantTx,
+    caller: Caller,
+    body: Record<string, unknown>,
+  ): Promise<Plain> {
+    const str = (x: unknown) => (typeof x === "string" ? x : "");
+    const learnerId = str(body.learnerId);
+    const ref = str(body.ref);
+    const lessonId = str(body.lessonId);
+    const blockId = str(body.blockId);
+    const decision = body.decision;
+    if (decision !== "approve" && decision !== "return")
+      return no("invalid", "decision is approve or return");
+    const note = typeof body.note === "string" ? body.note.trim() : "";
+    if (decision === "return" && (note.length < 3 || note.length > 300))
+      return no("invalid", "a returned mission needs a note for the learner (3–300)");
+    if (decision === "approve" && note.length > 300) return no("invalid", "the note is too long");
+    const who = await whoAmI(tx, caller);
+    if (!who.teacherId) return no("not_allowed", "the class teacher reviews missions");
+    const b = await loadBook(tx);
+    const mine = [...b.classes.entries()].filter(([, x]) => x.teacherId === who.teacherId);
+    if (!classesFor(b, mine, learnerId, ref).length)
+      return no("not_allowed", "only the teacher of the learner's class reviews it");
+    const last = (await latestMissions(tx, learnerId)).find(
+      (a) => a.course_ref === ref && a.lesson_id === lessonId && a.block_id === blockId,
+    );
+    if (!last) return no("not_found");
+    if (last.status !== "pending" || last.attempt !== body.attempt)
+      return no("invalid_step", "this mission is not waiting for review");
+    await tx
+      .updateTable("course_mission_attempt")
+      .set({
+        status: decision === "approve" ? "approved" : "returned",
+        reviewed_at: new Date(caller.now()),
+        reviewed_by: who.name,
+        review_note: note || null,
+      })
+      .where("learner_id", "=", learnerId)
+      .where("course_ref", "=", ref)
+      .where("lesson_id", "=", lessonId)
+      .where("block_id", "=", blockId)
+      .where("attempt", "=", last.attempt)
+      .execute();
+    return { ok: true };
+  }
+
   async function complete(
     tx: TenantTx,
     caller: Caller,
@@ -1072,9 +1294,16 @@ export function registerClassCourses(app: Api): void {
     const reflections = body.reflections;
     const spoken = body.speaking ?? {};
     const practiced = body.practice ?? {};
+    const confirmed = body.missions ?? {};
     const isObj = (x: unknown): x is Record<string, unknown> =>
       !!x && typeof x === "object" && !Array.isArray(x);
-    if (!isObj(answers) || !isObj(reflections) || !isObj(spoken) || !isObj(practiced))
+    if (
+      !isObj(answers) ||
+      !isObj(reflections) ||
+      !isObj(spoken) ||
+      !isObj(practiced) ||
+      !isObj(confirmed)
+    )
       return { ok: false, reason: "invalid", detail: "answers and reflections are required" };
     const quizzes = lesson.blocks.filter((x): x is BlockOf<"quiz"> => x.kind === "quiz");
     const prompts = lesson.blocks.filter(
@@ -1085,11 +1314,16 @@ export function registerClassCourses(app: Api): void {
     const knownS = new Set(rehearsals.map((x) => x.id));
     const games = lesson.blocks.filter(isPracticeBlock);
     const knownP = new Set(games.map((x) => x.id));
+    const tasks = lesson.blocks.filter(
+      (x): x is BlockOf<"mission_box"> => x.kind === "mission_box",
+    );
+    const knownM = new Set(tasks.map((x) => x.id));
     if (
       Object.keys(answers).some((x) => !known.has(x)) ||
       Object.keys(reflections).some((x) => !known.has(x)) ||
       Object.keys(spoken).some((x) => !knownS.has(x)) ||
-      Object.keys(practiced).some((x) => !knownP.has(x))
+      Object.keys(practiced).some((x) => !knownP.has(x)) ||
+      Object.keys(confirmed).some((x) => !knownM.has(x))
     )
       return {
         ok: false,
@@ -1140,6 +1374,19 @@ export function registerClassCourses(app: Api): void {
         };
       keepP[g.id] = c;
     }
+    const keepM: Record<string, string> = {};
+    for (const m of tasks) {
+      if (!(m.id in confirmed))
+        return { ok: false, reason: "invalid", detail: "confirm every mission you did" };
+      const n = missionNote(confirmed[m.id]);
+      if (n === null)
+        return {
+          ok: false,
+          reason: "invalid",
+          detail: `a mission note is at most ${AUTHORING_LIMITS.missionNote} characters`,
+        };
+      keepM[m.id] = n;
+    }
     const score = lessonQuizScore(lesson, keepA);
     const practiceScore = lessonPracticeScore(lesson, keepP);
     // The first completed lesson pins the learner to this version.
@@ -1181,6 +1428,21 @@ export function registerClassCourses(app: Api): void {
           attempt: 1,
           choices: JSON.stringify(keepS[r.id]),
           score: speakingScore(r, keepS[r.id]),
+          submitted_at: new Date(caller.now()),
+        } as never)
+        .execute();
+    // Each mission goes to the class teacher (attempt 1, pending) — XP only once approved.
+    for (const m of tasks)
+      await tx
+        .insertInto("course_mission_attempt")
+        .values({
+          org_id: sql`ogc_current_org()`,
+          learner_id: learnerId,
+          course_ref: ref,
+          lesson_id: lessonId,
+          block_id: m.id,
+          attempt: 1,
+          note: keepM[m.id],
           submitted_at: new Date(caller.now()),
         } as never)
         .execute();
