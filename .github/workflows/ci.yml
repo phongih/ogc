@@ -47,6 +47,7 @@ jobs:
       - run: node ops/release/check-bundle.mjs demo apps/web/dist
       - run: node ops/release/check-bundle.mjs platform apps/web/dist-platform
       - run: node ops/release/test/release.test.mjs # release toolkit (browser smoke self-skips without Playwright)
+      - run: node ops/backup/test/backup.test.mjs # VM 2 backup script (fake GCS + stubs)
       # Optional E2E: provisions a browser only on a hosted runner. Non-blocking so the
       # core gates above remain authoritative; the local script resolves a pre-installed
       # Playwright instead of downloading one.
