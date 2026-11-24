@@ -23,7 +23,8 @@ export interface ClassCoursePlayerApi {
     answers: Record<string, number>,
     reflections: Record<string, string>,
     speaking: Record<string, number[]>,
-  ): Promise<AuthoringResult & { score?: number | null }>;
+    practice: Record<string, number[]>,
+  ): Promise<AuthoringResult & { score?: number | null; practiceScore?: number | null }>;
   /** Try a returned speaking rehearsal again (Platform; absent in the demo). */
   retrySpeaking?(
     ref: string,

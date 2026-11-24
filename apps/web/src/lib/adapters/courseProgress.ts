@@ -19,6 +19,7 @@ export interface LessonDone {
   answers: Record<string, number>;
   reflections: Record<string, string>;
   speaking?: Record<string, number[]>; // speaking block → reply per turn (no teacher review in the demo)
+  practice?: Record<string, number[]>; // practice / match / detective block → the answer (XP only)
 }
 export interface CourseProgressRecord {
   ref: string;

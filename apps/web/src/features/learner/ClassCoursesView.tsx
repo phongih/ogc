@@ -70,8 +70,15 @@ export function ClassLessonView() {
   const [reflections, setReflections] = useState<Record<string, string>>({});
   const [speaking, setSpeaking] = useState<Record<string, number[]>>({});
   const [retry, setRetry] = useState<Record<string, number[]>>({});
+  const [practice, setPractice] = useState<Record<string, number[]>>({});
   const done = useMutation({
-    mutationFn: () => api.complete(ref, lessonId, answers, reflections, speaking),
+    mutationFn: () => {
+      // a Time Detective left untouched is answered in the order it was shown
+      const all = { ...practice };
+      for (const b of q.data?.lesson.blocks ?? [])
+        if (b.kind === "time_detective" && !all[b.id]) all[b.id] = b.events.map((_, i) => i);
+      return api.complete(ref, lessonId, answers, reflections, speaking, all);
+    },
     onSuccess: () => api.onChanged(qc),
   });
   const again = useMutation({
@@ -106,6 +113,14 @@ export function ClassLessonView() {
         : {
             reflection: reflections[b.id] ?? "",
             onReflection: (t) => setReflections((r) => ({ ...r, [b.id]: t })),
+          };
+    if (b.kind === "practice" || b.kind === "eagle_match" || b.kind === "time_detective")
+      return c
+        ? { practice: c.practice?.[b.id] ?? [], revealed: true }
+        : {
+            practice:
+              practice[b.id] ?? (b.kind === "time_detective" ? b.events.map((_, i) => i) : []),
+            onPractice: (x) => setPractice((p) => ({ ...p, [b.id]: x })),
           };
     if (b.kind === "speaking") {
       const attempt = v.speaking?.find((a) => a.blockId === b.id) ?? null;
@@ -147,6 +162,9 @@ export function ClassLessonView() {
           Lesson completed
           {c.score !== null
             ? ` · quiz ${c.score}%${api.scoreNote ? ` (${api.scoreNote})` : ""}`
+            : ""}
+          {c.practiceScore !== undefined && c.practiceScore !== null
+            ? ` · practice ${c.practiceScore}% (XP only, not your skill profile)`
             : ""}
           .
         </p>

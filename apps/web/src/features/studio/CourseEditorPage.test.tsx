@@ -31,8 +31,8 @@ describe("Course Studio editor", () => {
     await user.click(within(editor).getByRole("button", { name: /3\. Short debates/ }));
     await user.selectOptions(within(editor).getByLabelText("Block type"), "vocab");
     await user.click(within(editor).getByRole("button", { name: "Add block" }));
-    await user.type(within(editor).getByLabelText("Word · block 2"), "to rebut");
-    await user.type(within(editor).getByLabelText("Meaning · block 2"), "to argue against");
+    await user.type(within(editor).getByLabelText("Word 1 · block 2"), "to rebut");
+    await user.type(within(editor).getByLabelText("Meaning 1 · block 2"), "to argue against");
     expect(within(editor).getByTestId("draft-state")).toHaveTextContent("Unsaved changes");
     await user.click(within(editor).getByRole("button", { name: "Save draft" }));
     await waitFor(() =>

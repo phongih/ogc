@@ -250,6 +250,15 @@ Migration 0016: `brand_profile` (one per organization), `teacher_profile` (a tea
 - Public, no grant: `GET /v1/public/showcase/:slug/profile` (tagline, about, colors, centers, verified unexpired organization badges, opted-in teachers with their verified badges, number of courses shown). A course page (`…/courses/:ref`) adds the provider block and the opted-in teachers of the classes that run its catalog course. Who added or verified a badge is never public. Partners are not shown.
 - Seed (Nova): profile and colors; CR-1 verified (Credly mock), CR-2 a certificate waiting for verification, CR-3 Tara verified, CR-4 Tara revoked at the mock register (waiting), CR-5 Ben verified. Tara is public; Ben is not.
 
+## Course Studio blocks (part A)
+
+Owner decisions 24/11 (no migration). The block registry (`@ogc/contracts` `BLOCK_REGISTRY`) has 14 kinds; every one is validated fail-closed in "draft" and "submit" modes, nested items included (unknown fields refused at every level).
+
+- `image` (https link, caption, credit) and `book_page` (title + 1–12 pages of heading and text, read one page at a time).
+- `vocab` is now a deck: a title and 1–12 cards (word, meaning, example, translation, https image link). An older single-card block — still in published versions, which never change — is valid and reads as a deck of one (`normalizeBlock`); a draft saved again stores the new form.
+- `practice` (1–10 multiple-choice questions), `eagle_match` (2–8 left–right pairs) and `time_detective` (3–8 events written in the right order) are scored for XP only ("Practice scored", a second line "… · practice N%") — never skill evidence: only the `quiz` block feeds Use of English, as before.
+- Before a lesson is completed the learner's view hides every answer: practice `correct` −1, match `right` blanked with the right-hand items given separately as `choices`, detective events reordered. The shown order is alphabetical, reversed if that happens to be the answer's order, so it never gives the answer away. Completing needs every practice answer (`practice`: block id → the option per question / the chosen right-hand item per pair, each once / the shown events' order); the answers are stored with the quiz answers (arrays) and the completed view returns `practice` and `practiceScore`.
+
 ## Gamification
 
 Migration 0017: `reward_settings`, `reward_rule`, `badge_rule` — only the organization's settings within the closed catalog (an organization without rows uses the defaults). Owner decisions 22/11 (demo) and 24/11 (Platform). The rules live in `@ogc/contracts` (`deriveRewards`, `streakOf`, `rankClass`, `gamificationView`, `applyGamificationUpdate`); the demo uses the same functions.

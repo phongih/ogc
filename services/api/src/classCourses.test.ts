@@ -321,6 +321,7 @@ describe.skipIf(!hasPg)("class courses + My Learning — API", () => {
     expect((await complete(linh, "CS-A2-EVERYDAY", "a2-l1", { "a2-l1-b4": 1 })).json()).toEqual({
       ok: true,
       score: 100,
+      practiceScore: null,
     });
     const done = await lesson(linh, "CS-A2-EVERYDAY", "a2-l1");
     expect((done.lesson.blocks.find((b) => b.kind === "quiz") as { correct: number }).correct).toBe(
@@ -351,7 +352,7 @@ describe.skipIf(!hasPg)("class courses + My Learning — API", () => {
           { "a2-l2-b4": "By bus." },
         )
       ).json(),
-    ).toEqual({ ok: true, score: 0 });
+    ).toEqual({ ok: true, score: 0, practiceScore: null });
     const [after] = await mine(linh);
     expect([after.completedLessons, after.pct, after.lessons.map((l) => l.score)]).toEqual([
       3,

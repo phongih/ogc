@@ -57,7 +57,10 @@ describe("course studio — blocks are validated fail-closed", () => {
   });
 
   it("links: https only; video only YouTube / Vimeo; no javascript:", () => {
-    const vocab = (imageUrl: string) => ({ ...BLOCK_REGISTRY.vocab.make("v"), imageUrl });
+    const vocab = (imageUrl: string) => {
+      const b = BLOCK_REGISTRY.vocab.make("v");
+      return { ...b, cards: [{ ...b.cards[0]!, imageUrl }] };
+    };
     expect(blockIssue(vocab("https://img.example.org/a.png"), "draft")).toBeNull();
     expect(blockIssue(vocab("http://img.example.org/a.png"), "draft")).toMatch(/https/);
     expect(blockIssue(vocab("javascript:alert(1)"), "draft")).toMatch(/https/);
@@ -351,7 +354,7 @@ describe("course studio — learners take the class course in My Learning", () =
         { "a2-l2-b3": 0 },
         { "a2-l2-b4": "By bus" },
       ),
-    ).toEqual({ ok: true, score: 100 });
+    ).toEqual({ ok: true, score: 100, practiceScore: null });
     expect(
       await P.complete(as(LINH), "CS-A2-EVERYDAY", "a2-l2", { "a2-l2-b3": 0 }, { "a2-l2-b4": "x" }),
     ).toMatchObject({ reason: "invalid_step" });

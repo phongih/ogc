@@ -150,6 +150,7 @@ describe.skipIf(!hasPg)("skill profile + Current Students — API", () => {
     expect((await complete(minh, "a2-l1", { "a2-l1-b4": 1 })).json()).toEqual({
       ok: true,
       score: 100,
+      practiceScore: null,
     });
     const up = (await skills(minh)).skills.use_of_english;
     expect([up.level, up.evidenceCount]).toEqual([71, 1]); // 0.4 × 100 + 0.6 × 52
@@ -157,7 +158,7 @@ describe.skipIf(!hasPg)("skill profile + Current Students — API", () => {
     now += 60_000;
     expect(
       (await complete(minh, "a2-l2", { "a2-l2-b3": 1 }, { "a2-l2-b4": "By bus." })).json(),
-    ).toEqual({ ok: true, score: 0 });
+    ).toEqual({ ok: true, score: 0, practiceScore: null });
     const down = (await skills(minh)).skills.use_of_english;
     expect([down.level, down.evidenceCount]).toEqual([43, 2]); // 0.6 × 71
     const c = await card(await as(TARA), "Minh T.");

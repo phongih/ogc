@@ -19,7 +19,11 @@ import {
   AUTHORING_LIMITS,
   authorize,
   hideLessonAnswers,
+  isPracticeBlock,
+  lessonPracticeScore,
   lessonQuizScore,
+  normalizeLesson,
+  practiceChoices,
   speakingScore,
 } from "@ogc/contracts";
 import type {
@@ -77,6 +81,7 @@ interface Done {
   answers: Record<string, number>;
   reflections: Record<string, string>;
   speaking: Record<string, number[]>;
+  practice: Record<string, number[]>; // stored with the quiz answers (arrays); XP only
 }
 interface Book {
   classes: Map<string, { name: string; centerId: string; teacherId: string | null }>;
@@ -116,10 +121,16 @@ async function loadBook(tx: TenantTx): Promise<Book> {
   const doneMap = new Map<string, Map<string, Done>>();
   for (const d of done) {
     const m = doneMap.get(k(d.learner_id, d.course_ref)) ?? new Map<string, Done>();
+    const answers: Record<string, number> = {};
+    const practice: Record<string, number[]> = {};
+    for (const [id, a] of Object.entries((d.answers ?? {}) as Record<string, unknown>))
+      if (Array.isArray(a)) practice[id] = a as number[];
+      else answers[id] = a as number;
     m.set(d.lesson_id, {
       at: d.at.toISOString(),
       score: d.score,
-      answers: d.answers as Record<string, number>,
+      answers,
+      practice,
       reflections: d.reflections as Record<string, string>,
       speaking: (d.speaking ?? {}) as Record<string, number[]>,
     });
@@ -794,7 +805,7 @@ export function registerClassCourses(app: Api): void {
       const v = versionFor(b, ref, learnerId);
       const idx = v ? v.content.lessons.findIndex((l) => l.id === lessonId) : -1;
       if (!v || idx < 0) return reply.code(404).send({ error: "not_found" });
-      const lesson = v.content.lessons[idx];
+      const lesson = normalizeLesson(v.content.lessons[idx]);
       const done = b.done.get(k(learnerId, ref))?.get(lessonId) ?? null;
       const speaking = (await latestAttempts(tx, learnerId))
         .filter((a) => a.course_ref === ref && a.lesson_id === lessonId)
@@ -805,7 +816,9 @@ export function registerClassCourses(app: Api): void {
         lesson: done ? lesson : hideLessonAnswers(lesson),
         index: idx,
         total: v.content.lessons.length,
-        completed: done,
+        completed: done
+          ? { ...done, practiceScore: lessonPracticeScore(lesson, done.practice) }
+          : null,
         speaking,
       };
       return out;
@@ -813,7 +826,7 @@ export function registerClassCourses(app: Api): void {
   );
 
   type Out =
-    | { ok: true; score: number | null }
+    | { ok: true; score: number | null; practiceScore: number | null }
     | { ok: false; reason: StudioRefusal | "not_allowed"; detail?: string };
   app.secured("POST", "/v1/me/class-courses/:ref/:lessonId/complete", async (caller, req) => {
     const body = (req.body ?? {}) as Record<string, unknown>;
@@ -1050,16 +1063,18 @@ export function registerClassCourses(app: Api): void {
     const b = await loadBook(tx);
     if (!openTo(b, learnerId).some((o) => o.ref === ref)) return { ok: false, reason: "not_found" };
     const v = versionFor(b, ref, learnerId);
-    const lesson = v?.content.lessons.find((l) => l.id === lessonId);
-    if (!v || !lesson) return { ok: false, reason: "not_found" };
+    const found = v?.content.lessons.find((l) => l.id === lessonId);
+    if (!v || !found) return { ok: false, reason: "not_found" };
+    const lesson = normalizeLesson(found);
     if (b.done.get(k(learnerId, ref))?.has(lessonId))
       return { ok: false, reason: "invalid_step", detail: "already completed" };
     const answers = body.answers;
     const reflections = body.reflections;
     const spoken = body.speaking ?? {};
+    const practiced = body.practice ?? {};
     const isObj = (x: unknown): x is Record<string, unknown> =>
       !!x && typeof x === "object" && !Array.isArray(x);
-    if (!isObj(answers) || !isObj(reflections) || !isObj(spoken))
+    if (!isObj(answers) || !isObj(reflections) || !isObj(spoken) || !isObj(practiced))
       return { ok: false, reason: "invalid", detail: "answers and reflections are required" };
     const quizzes = lesson.blocks.filter((x): x is BlockOf<"quiz"> => x.kind === "quiz");
     const prompts = lesson.blocks.filter(
@@ -1068,10 +1083,13 @@ export function registerClassCourses(app: Api): void {
     const rehearsals = lesson.blocks.filter((x): x is BlockOf<"speaking"> => x.kind === "speaking");
     const known = new Set([...quizzes, ...prompts].map((x) => x.id));
     const knownS = new Set(rehearsals.map((x) => x.id));
+    const games = lesson.blocks.filter(isPracticeBlock);
+    const knownP = new Set(games.map((x) => x.id));
     if (
       Object.keys(answers).some((x) => !known.has(x)) ||
       Object.keys(reflections).some((x) => !known.has(x)) ||
-      Object.keys(spoken).some((x) => !knownS.has(x))
+      Object.keys(spoken).some((x) => !knownS.has(x)) ||
+      Object.keys(practiced).some((x) => !knownP.has(x))
     )
       return {
         ok: false,
@@ -1106,7 +1124,24 @@ export function registerClassCourses(app: Api): void {
         return { ok: false, reason: "invalid", detail: "choose a reply at every speaking turn" };
       keepS[r.id] = c;
     }
+    const keepP: Record<string, number[]> = {};
+    for (const g of games) {
+      const c = practiceChoices(g, practiced[g.id]);
+      if (!c)
+        return {
+          ok: false,
+          reason: "invalid",
+          detail:
+            g.kind === "practice"
+              ? "answer every practice question"
+              : g.kind === "eagle_match"
+                ? "match every item, each once"
+                : "put every event in order",
+        };
+      keepP[g.id] = c;
+    }
     const score = lessonQuizScore(lesson, keepA);
+    const practiceScore = lessonPracticeScore(lesson, keepP);
     // The first completed lesson pins the learner to this version.
     if (!b.pins.has(k(learnerId, ref)))
       await tx
@@ -1127,7 +1162,8 @@ export function registerClassCourses(app: Api): void {
         lesson_id: lessonId,
         at: new Date(caller.now()),
         score,
-        answers: JSON.stringify(keepA),
+        // practice answers (arrays) sit with the quiz answers (numbers): one block id each
+        answers: JSON.stringify({ ...keepA, ...keepP }),
         reflections: JSON.stringify(keepR),
         speaking: JSON.stringify(keepS),
       } as never)
@@ -1148,6 +1184,6 @@ export function registerClassCourses(app: Api): void {
           submitted_at: new Date(caller.now()),
         } as never)
         .execute();
-    return { ok: true, score };
+    return { ok: true, score, practiceScore };
   }
 }

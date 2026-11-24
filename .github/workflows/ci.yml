@@ -90,3 +90,4 @@ jobs:
           node e2e/platform-showcase-journey.mjs || echo "platform showcase E2E skipped/soft-failed (non-blocking)"
           node e2e/platform-brand-journey.mjs || echo "platform brand E2E skipped/soft-failed (non-blocking)"
           node e2e/platform-rewards-journey.mjs || echo "platform rewards E2E skipped/soft-failed (non-blocking)"
+          node e2e/platform-blocks-journey.mjs || echo "platform blocks E2E skipped/soft-failed (non-blocking)"

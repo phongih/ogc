@@ -29,7 +29,12 @@ export type BlockKind =
   | "quiz"
   | "video"
   | "reflection"
-  | "speaking";
+  | "speaking"
+  | "image"
+  | "book_page"
+  | "practice"
+  | "eagle_match"
+  | "time_detective";
 
 /** One turn of a speaking rehearsal: the coach's line, the replies to choose from (one is the
  *  natural one), a model line and a pronunciation / usage tip shown after submitting. */
@@ -43,24 +48,49 @@ export interface SpeakingTurn {
 
 export type CalloutTone = "info" | "tip" | "warning";
 
+/** One card of a vocabulary deck. */
+export interface VocabCard {
+  word: string;
+  meaning: string;
+  example: string;
+  translation: string;
+  imageUrl: string;
+}
+export interface BookPage {
+  heading: string;
+  body: string;
+}
+export interface PracticeQuestion {
+  question: string;
+  options: string[];
+  correct: number;
+}
+export interface MatchPair {
+  left: string;
+  right: string;
+}
+
 export type CourseBlock =
   | { id: string; kind: "heading"; text: string }
   | { id: string; kind: "text"; text: string }
   | { id: string; kind: "callout"; tone: CalloutTone; text: string }
   | { id: string; kind: "divider" }
-  | {
-      id: string;
-      kind: "vocab";
-      word: string;
-      meaning: string;
-      example: string;
-      translation: string;
-      imageUrl: string;
-    }
+  // A deck of flip cards (owner 24/11). Older single-card blocks are read as a deck of one
+  // (normalizeBlock) — published versions are never rewritten.
+  | { id: string; kind: "vocab"; title: string; cards: VocabCard[] }
   | { id: string; kind: "quiz"; question: string; options: string[]; correct: number }
   | { id: string; kind: "video"; url: string; caption: string }
   | { id: string; kind: "reflection"; prompt: string }
-  | { id: string; kind: "speaking"; scenario: string; turns: SpeakingTurn[] };
+  | { id: string; kind: "speaking"; scenario: string; turns: SpeakingTurn[] }
+  | { id: string; kind: "image"; url: string; caption: string; credit: string }
+  | { id: string; kind: "book_page"; title: string; pages: BookPage[] }
+  // Practice and mini-games: scored for XP ("Practice scored") only — never skill evidence.
+  | { id: string; kind: "practice"; title: string; questions: PracticeQuestion[] }
+  // `choices` exists only in the learner's view before completion (the right-hand side,
+  // reordered so the order gives nothing away); authors never send it.
+  | { id: string; kind: "eagle_match"; prompt: string; pairs: MatchPair[]; choices?: string[] }
+  // `events` are in the correct order for authors; the learner gets them reordered.
+  | { id: string; kind: "time_detective"; prompt: string; events: string[] };
 
 export type BlockOf<K extends BlockKind> = Extract<CourseBlock, { kind: K }>;
 
@@ -78,6 +108,13 @@ export const AUTHORING_LIMITS = {
   speakingTurnsMax: 8,
   speakingOptionsMax: 4,
   note: 300,
+  deckCards: 12,
+  bookPages: 12,
+  practiceQuestions: 10,
+  pairsMin: 2,
+  pairsMax: 8,
+  eventsMin: 3,
+  eventsMax: 8,
 } as const;
 
 /** Hosts a video link may point to. The link opens in a new tab — OGC never embeds it. */
@@ -117,17 +154,9 @@ export const BLOCK_REGISTRY: { [K in BlockKind]: BlockSpec<K> } = {
   },
   vocab: {
     kind: "vocab",
-    label: "Vocabulary card",
-    hint: "Word, meaning, example, translation, image link",
-    make: (id) => ({
-      id,
-      kind: "vocab",
-      word: "",
-      meaning: "",
-      example: "",
-      translation: "",
-      imageUrl: "",
-    }),
+    label: "Vocabulary cards",
+    hint: "A deck of up to 12 flip cards: word, meaning, example, translation, image link",
+    make: (id) => ({ id, kind: "vocab", title: "", cards: [emptyCard()] }),
   },
   quiz: {
     kind: "quiz",
@@ -158,7 +187,80 @@ export const BLOCK_REGISTRY: { [K in BlockKind]: BlockSpec<K> } = {
       turns: [{ coach: "", options: ["", ""], natural: 0, model: "", tip: "" }],
     }),
   },
+  image: {
+    kind: "image",
+    label: "Image",
+    hint: "A picture by https link, with a caption and its credit",
+    make: (id) => ({ id, kind: "image", url: "", caption: "", credit: "" }),
+  },
+  book_page: {
+    kind: "book_page",
+    label: "Book pages",
+    hint: "A short reading in pages (heading + text) instead of one long block",
+    make: (id) => ({ id, kind: "book_page", title: "", pages: [{ heading: "", body: "" }] }),
+  },
+  practice: {
+    kind: "practice",
+    label: "Practice",
+    hint: "Practice questions — scored for XP only, never for the skill profile",
+    make: (id) => ({
+      id,
+      kind: "practice",
+      title: "",
+      questions: [{ question: "", options: ["", ""], correct: 0 }],
+    }),
+  },
+  eagle_match: {
+    kind: "eagle_match",
+    label: "Eagle Flight Match",
+    hint: "Match each item on the left with one on the right — scored for XP only",
+    make: (id) => ({
+      id,
+      kind: "eagle_match",
+      prompt: "",
+      pairs: [
+        { left: "", right: "" },
+        { left: "", right: "" },
+      ],
+    }),
+  },
+  time_detective: {
+    kind: "time_detective",
+    label: "Time Detective",
+    hint: "Put events in order (write them in the right order) — scored for XP only",
+    make: (id) => ({ id, kind: "time_detective", prompt: "", events: ["", "", ""] }),
+  },
 };
+function emptyCard(): VocabCard {
+  return { word: "", meaning: "", example: "", translation: "", imageUrl: "" };
+}
+
+/** Older single-card vocabulary blocks read as a deck of one; everything else as it is. */
+export function normalizeBlock(b: CourseBlock): CourseBlock {
+  const x = b as unknown as Record<string, unknown>;
+  if (x.kind === "vocab" && !Array.isArray(x.cards) && typeof x.word === "string")
+    return {
+      id: b.id,
+      kind: "vocab",
+      title: "",
+      cards: [
+        {
+          word: x.word,
+          meaning: typeof x.meaning === "string" ? x.meaning : "",
+          example: typeof x.example === "string" ? x.example : "",
+          translation: typeof x.translation === "string" ? x.translation : "",
+          imageUrl: typeof x.imageUrl === "string" ? x.imageUrl : "",
+        },
+      ],
+    };
+  return b;
+}
+export function normalizeLesson<L extends { blocks: CourseBlock[] }>(l: L): L {
+  return { ...l, blocks: l.blocks.map(normalizeBlock) };
+}
+export function normalizeContent<C extends { lessons: { blocks: CourseBlock[] }[] }>(c: C): C {
+  return { ...c, lessons: c.lessons.map(normalizeLesson) };
+}
 export const BLOCK_KINDS = Object.keys(BLOCK_REGISTRY) as BlockKind[];
 
 export interface CourseLesson {
@@ -197,11 +299,62 @@ export function urlIssue(url: string, hosts: string[] | null): string | null {
   return null;
 }
 
+const distinct = (xs: string[]) => new Set(xs.map((t) => t.trim().toLowerCase())).size;
+
+/** A nested object with exactly these string fields (required ones filled on submit). */
+function fields(
+  o: unknown,
+  name: string,
+  mode: ValidationMode,
+  spec: [string, number, boolean][],
+): string | null {
+  if (!o || typeof o !== "object" || Array.isArray(o)) return `${name}: not valid`;
+  const r = o as Record<string, unknown>;
+  if (Object.keys(r).some((k) => !spec.some(([f]) => f === k))) return `${name}: unknown field`;
+  for (const [f, max, required] of spec) {
+    const v = r[f];
+    if (!isStr(v)) return `${name}: ${f} is missing`;
+    if (tooLong(v, max)) return `${name}: ${f} is too long (max ${max})`;
+    if (required && mode === "submit" && v.trim() === "") return `${name}: ${f} is empty`;
+  }
+  return null;
+}
+
+/** question + options + correct (quiz block, practice question). */
+function optionsIssue(x: Record<string, unknown>, label: string, mode: ValidationMode) {
+  const q = x.question;
+  if (!isStr(q)) return `${label}: question is missing`;
+  if (tooLong(q, AUTHORING_LIMITS.shortText))
+    return `${label}: question is too long (max ${AUTHORING_LIMITS.shortText})`;
+  if (mode === "submit" && q.trim() === "") return `${label}: question is empty`;
+  const o = x.options;
+  if (!Array.isArray(o) || !o.every(isStr)) return `${label}: options are missing`;
+  if (o.length < AUTHORING_LIMITS.optionsMin || o.length > AUTHORING_LIMITS.optionsMax)
+    return `${label}: ${AUTHORING_LIMITS.optionsMin}–${AUTHORING_LIMITS.optionsMax} options`;
+  if (o.some((t) => tooLong(t, 120))) return `${label}: an option is too long (max 120)`;
+  if (
+    !Number.isInteger(x.correct) ||
+    (x.correct as number) < 0 ||
+    (x.correct as number) >= o.length
+  )
+    return `${label}: pick the correct option`;
+  if (mode === "submit") {
+    if (o.some((t) => t.trim() === "")) return `${label}: an option is empty`;
+    if (distinct(o) !== o.length) return `${label}: two options are the same`;
+  }
+  return null;
+}
+
 export function blockIssue(b: unknown, mode: ValidationMode): string | null {
   if (!b || typeof b !== "object") return "not a block";
   const x = b as Record<string, unknown>;
   if (!isStr(x.id) || !x.id) return "block without an id";
   if (!isStr(x.kind) || !(x.kind in BLOCK_REGISTRY)) return `unknown block kind`;
+  if (x.kind === "vocab" && !("cards" in x) && "word" in x) {
+    // an older single card: check it as the deck of one it is read as
+    const card = Object.fromEntries(Object.entries(x).filter(([k]) => k !== "id" && k !== "kind"));
+    return blockIssue({ id: x.id, kind: "vocab", title: "", cards: [card] }, mode);
+  }
   const kind = x.kind as BlockKind;
   const label = BLOCK_REGISTRY[kind].label;
   const allowed: Record<BlockKind, string[]> = {
@@ -209,11 +362,16 @@ export function blockIssue(b: unknown, mode: ValidationMode): string | null {
     text: ["text"],
     callout: ["tone", "text"],
     divider: [],
-    vocab: ["word", "meaning", "example", "translation", "imageUrl"],
+    vocab: ["title", "cards"],
     quiz: ["question", "options", "correct"],
     video: ["url", "caption"],
     reflection: ["prompt"],
     speaking: ["scenario", "turns"],
+    image: ["url", "caption", "credit"],
+    book_page: ["title", "pages"],
+    practice: ["title", "questions"],
+    eagle_match: ["prompt", "pairs"],
+    time_detective: ["prompt", "events"],
   };
   for (const k of Object.keys(x))
     if (k !== "id" && k !== "kind" && !allowed[kind].includes(k)) return `${label}: unknown field`;
@@ -240,15 +398,25 @@ export function blockIssue(b: unknown, mode: ValidationMode): string | null {
     case "divider":
       return null;
     case "vocab": {
-      const e =
-        need("word", 60) ??
-        need("meaning", AUTHORING_LIMITS.shortText) ??
-        opt("example", AUTHORING_LIMITS.shortText) ??
-        opt("translation", AUTHORING_LIMITS.shortText) ??
-        opt("imageUrl", AUTHORING_LIMITS.url);
+      const e = opt("title", AUTHORING_LIMITS.shortText);
       if (e) return e;
-      const u = urlIssue(x.imageUrl as string, null);
-      return u ? `${label}: image ${u}` : null;
+      const cards = x.cards;
+      if (!Array.isArray(cards) || cards.length < 1 || cards.length > AUTHORING_LIMITS.deckCards)
+        return `${label}: 1–${AUTHORING_LIMITS.deckCards} cards`;
+      for (const [i, c] of (cards as unknown[]).entries()) {
+        const n = `${label}, card ${i + 1}`;
+        const r = fields(c, n, mode, [
+          ["word", 60, true],
+          ["meaning", AUTHORING_LIMITS.shortText, true],
+          ["example", AUTHORING_LIMITS.shortText, false],
+          ["translation", AUTHORING_LIMITS.shortText, false],
+          ["imageUrl", AUTHORING_LIMITS.url, false],
+        ]);
+        if (r) return r;
+        const u = urlIssue((c as VocabCard).imageUrl, null);
+        if (u) return `${n}: image ${u}`;
+      }
+      return null;
     }
     case "quiz": {
       const e = need("question", AUTHORING_LIMITS.shortText);
@@ -279,6 +447,91 @@ export function blockIssue(b: unknown, mode: ValidationMode): string | null {
     }
     case "reflection":
       return need("prompt", AUTHORING_LIMITS.shortText);
+    case "image": {
+      const e =
+        need("url", AUTHORING_LIMITS.url) ??
+        opt("caption", AUTHORING_LIMITS.shortText) ??
+        opt("credit", AUTHORING_LIMITS.shortText);
+      if (e) return e;
+      const u = urlIssue(x.url as string, null);
+      return u ? `${label}: ${u}` : null;
+    }
+    case "book_page": {
+      const e = opt("title", AUTHORING_LIMITS.shortText);
+      if (e) return e;
+      const pages = x.pages;
+      if (!Array.isArray(pages) || pages.length < 1 || pages.length > AUTHORING_LIMITS.bookPages)
+        return `${label}: 1–${AUTHORING_LIMITS.bookPages} pages`;
+      for (const [i, pg] of (pages as unknown[]).entries()) {
+        const r = fields(pg, `${label}, page ${i + 1}`, mode, [
+          ["heading", AUTHORING_LIMITS.shortText, false],
+          ["body", AUTHORING_LIMITS.longText, true],
+        ]);
+        if (r) return r;
+      }
+      return null;
+    }
+    case "practice": {
+      const e = opt("title", AUTHORING_LIMITS.shortText);
+      if (e) return e;
+      const qs = x.questions;
+      if (!Array.isArray(qs) || qs.length < 1 || qs.length > AUTHORING_LIMITS.practiceQuestions)
+        return `${label}: 1–${AUTHORING_LIMITS.practiceQuestions} questions`;
+      for (const [i, q] of (qs as unknown[]).entries()) {
+        const n = `${label}, question ${i + 1}`;
+        if (!q || typeof q !== "object") return `${n}: not a question`;
+        const qq = q as Record<string, unknown>;
+        if (Object.keys(qq).some((k) => !["question", "options", "correct"].includes(k)))
+          return `${n}: unknown field`;
+        const r = optionsIssue(qq, n, mode);
+        if (r) return r;
+      }
+      return null;
+    }
+    case "eagle_match": {
+      const e = need("prompt", AUTHORING_LIMITS.shortText);
+      if (e) return e;
+      const pairs = x.pairs;
+      if (
+        !Array.isArray(pairs) ||
+        pairs.length < AUTHORING_LIMITS.pairsMin ||
+        pairs.length > AUTHORING_LIMITS.pairsMax
+      )
+        return `${label}: ${AUTHORING_LIMITS.pairsMin}–${AUTHORING_LIMITS.pairsMax} pairs`;
+      for (const [i, pr] of (pairs as unknown[]).entries()) {
+        const r = fields(pr, `${label}, pair ${i + 1}`, mode, [
+          ["left", 120, true],
+          ["right", 120, true],
+        ]);
+        if (r) return r;
+      }
+      if (mode === "submit") {
+        const ps = pairs as MatchPair[];
+        if (distinct(ps.map((p) => p.left)) < ps.length)
+          return `${label}: two left items are the same`;
+        if (distinct(ps.map((p) => p.right)) < ps.length)
+          return `${label}: two right items are the same`;
+      }
+      return null;
+    }
+    case "time_detective": {
+      const e = need("prompt", AUTHORING_LIMITS.shortText);
+      if (e) return e;
+      const ev = x.events;
+      if (
+        !Array.isArray(ev) ||
+        !ev.every(isStr) ||
+        ev.length < AUTHORING_LIMITS.eventsMin ||
+        ev.length > AUTHORING_LIMITS.eventsMax
+      )
+        return `${label}: ${AUTHORING_LIMITS.eventsMin}–${AUTHORING_LIMITS.eventsMax} events`;
+      if (ev.some((t) => tooLong(t, 120))) return `${label}: an event is too long (max 120)`;
+      if (mode === "submit") {
+        if (ev.some((t) => t.trim() === "")) return `${label}: an event is empty`;
+        if (distinct(ev) < ev.length) return `${label}: two events are the same`;
+      }
+      return null;
+    }
     case "speaking": {
       const e = need("scenario", AUTHORING_LIMITS.shortText);
       if (e) return e;
@@ -380,18 +633,100 @@ export function speakingScore(block: BlockOf<"speaking">, choices: readonly numb
   return Math.round((right / block.turns.length) * 100);
 }
 
+// ── Practice & mini-games (owner 24/11): scored for XP only, never skill evidence ───────────
+export const PRACTICE_KINDS = ["practice", "eagle_match", "time_detective"] as const;
+export type PracticeBlock = BlockOf<"practice" | "eagle_match" | "time_detective">;
+export const isPracticeBlock = (b: CourseBlock): b is PracticeBlock =>
+  (PRACTICE_KINDS as readonly string[]).includes(b.kind);
+
+/** Shown order: alphabetical — reversed if that happens to be the answer's own order. */
+function presented(xs: readonly string[]): string[] {
+  const sorted = [...xs].sort((a, b) => a.localeCompare(b) || (a < b ? -1 : a > b ? 1 : 0));
+  return sorted.every((t, i) => t === xs[i]) && xs.length > 1 ? sorted.reverse() : sorted;
+}
+/** Eagle Flight Match: the right-hand items in the order the learner sees them. */
+export const matchChoices = (b: BlockOf<"eagle_match">) => presented(b.pairs.map((p) => p.right));
+/** Time Detective: the events in the order the learner first sees them. */
+export const detectiveCards = (b: BlockOf<"time_detective">) => presented(b.events);
+
+const isPerm = (c: number[], n: number) =>
+  c.length === n && new Set(c).size === n && c.every((x) => Number.isInteger(x) && x >= 0 && x < n);
+
+/** The learner's answer to a practice block, checked: practice — the option picked per question;
+ *  match — for each left item, the index of the right item chosen (each used once); detective —
+ *  the shown cards' indices in the order the learner put them. Null when incomplete or invalid. */
+export function practiceChoices(b: PracticeBlock, raw: unknown): number[] | null {
+  if (!Array.isArray(raw) || !raw.every((x) => Number.isInteger(x))) return null;
+  const c = raw as number[];
+  if (b.kind === "practice")
+    return c.length === b.questions.length &&
+      c.every((x, i) => x >= 0 && x < b.questions[i]!.options.length)
+      ? [...c]
+      : null;
+  if (b.kind === "eagle_match") return isPerm(c, b.pairs.length) ? [...c] : null;
+  return isPerm(c, b.events.length) ? [...c] : null;
+}
+
+/** Items right out of items in one practice block. */
+export function practiceItems(b: PracticeBlock, c: readonly number[]) {
+  if (b.kind === "practice")
+    return {
+      right: b.questions.filter((q, i) => c[i] === q.correct).length,
+      total: b.questions.length,
+    };
+  if (b.kind === "eagle_match") {
+    const shown = matchChoices(b);
+    return {
+      right: b.pairs.filter((p, i) => shown[c[i]!] === p.right).length,
+      total: b.pairs.length,
+    };
+  }
+  const shown = detectiveCards(b);
+  return { right: b.events.filter((e, i) => shown[c[i]!] === e).length, total: b.events.length };
+}
+
+/** A lesson's practice score: % of all practice items right, or null without practice blocks. */
+export function lessonPracticeScore(
+  lesson: CourseLesson,
+  practice: Record<string, readonly number[]>,
+): number | null {
+  const blocks = lesson.blocks.filter(isPracticeBlock);
+  if (!blocks.length) return null;
+  let right = 0;
+  let total = 0;
+  for (const b of blocks) {
+    const r = practiceItems(b, practice[b.id] ?? []);
+    right += r.right;
+    total += r.total;
+  }
+  return Math.round((right / total) * 100);
+}
+
 /** Before a lesson is completed the learner must not see the answers: quiz `correct` and a
  *  speaking turn's natural reply become -1, its model line and tip are blanked. */
 export function hideLessonAnswers(l: CourseLesson): CourseLesson {
   return {
     ...l,
-    blocks: l.blocks.map((b) =>
-      b.kind === "quiz"
-        ? { ...b, correct: -1 }
-        : b.kind === "speaking"
-          ? { ...b, turns: b.turns.map((t) => ({ ...t, natural: -1, model: "", tip: "" })) }
-          : b,
-    ),
+    blocks: l.blocks.map(normalizeBlock).map((b): CourseBlock => {
+      switch (b.kind) {
+        case "quiz":
+          return { ...b, correct: -1 };
+        case "speaking":
+          return { ...b, turns: b.turns.map((t) => ({ ...t, natural: -1, model: "", tip: "" })) };
+        case "practice":
+          return { ...b, questions: b.questions.map((q) => ({ ...q, correct: -1 })) };
+        case "eagle_match":
+          return {
+            ...b,
+            pairs: b.pairs.map((p) => ({ left: p.left, right: "" })),
+            choices: matchChoices(b),
+          };
+        case "time_detective":
+          return { ...b, events: detectiveCards(b) };
+        default:
+          return b;
+      }
+    }),
   };
 }
 
@@ -503,6 +838,8 @@ export interface MyLessonView {
     answers: Record<string, number>;
     reflections: Record<string, string>;
     speaking?: Record<string, number[]>; // speaking block → the reply chosen at each turn
+    practice?: Record<string, number[]>; // practice / match / detective block → the answer
+    practiceScore?: number | null; // % of practice items right (XP only, never skill evidence)
   } | null;
   /** Speaking rehearsals of this lesson (Platform): the latest attempt per speaking block. */
   speaking?: SpeakingAttemptView[];
@@ -554,5 +891,6 @@ export interface ClassCoursePlayerPort {
     answers: Record<string, number>,
     reflections: Record<string, string>,
     speaking?: Record<string, number[]>, // speaking block id → the reply chosen at each turn
-  ): Promise<AuthoringResult & { score?: number | null }>;
+    practice?: Record<string, number[]>, // practice / match / detective block id → the answer
+  ): Promise<AuthoringResult & { score?: number | null; practiceScore?: number | null }>;
 }
