@@ -10,7 +10,7 @@
  * rehearsal block (owner 23/11; the demo keeps it in its Speaking studio).
  */
 import type pg from "pg";
-import type { CourseContent, CourseLesson } from "@ogc/contracts";
+import type { CourseBlock, CourseContent, CourseLesson } from "@ogc/contracts";
 
 const DAY = 86_400_000;
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
@@ -37,6 +37,7 @@ const A2_L1: CourseLesson = {
       kind: "text",
       text: "Listen to how Mai asks for prices. Notice the polite questions: “How much is…?” and “Can I have…?”",
     },
+    // an older single vocabulary card — read as a deck of one (normalizeBlock)
     {
       id: "a2-l1-b3",
       kind: "vocab",
@@ -45,7 +46,7 @@ const A2_L1: CourseLesson = {
       example: "Can I have a kilo of mangoes, please?",
       translation: "một ký",
       imageUrl: "",
-    },
+    } as unknown as CourseBlock,
     {
       id: "a2-l1-b4",
       kind: "quiz",
@@ -212,6 +213,7 @@ const IELTS_V1: CourseContent = {
       id: "iw-l1",
       title: "Trend words",
       blocks: [
+        // an older single vocabulary card — read as a deck of one (normalizeBlock)
         {
           id: "iw-l1-b1",
           kind: "vocab",
@@ -220,7 +222,7 @@ const IELTS_V1: CourseContent = {
           example: "Sales plateaued in the second half of the year.",
           translation: "chững lại",
           imageUrl: "",
-        },
+        } as unknown as CourseBlock,
         {
           id: "iw-l1-b2",
           kind: "quiz",

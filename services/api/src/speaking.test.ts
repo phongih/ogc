@@ -193,7 +193,11 @@ describe.skipIf(!hasPg)("speaking review — API", () => {
     }
     const stray = await post({ [BLOCK]: [0, 1, 2, 0], "a2-l3-b4": [0] });
     expect([stray.statusCode, stray.json().reason]).toEqual([422, "invalid"]);
-    expect((await post({ [BLOCK]: [0, 1, 2, 2] })).json()).toEqual({ ok: true, score: 100 });
+    expect((await post({ [BLOCK]: [0, 1, 2, 2] })).json()).toEqual({
+      ok: true,
+      score: 100,
+      practiceScore: null,
+    });
     const after = await lesson(minh);
     expect(after.completed?.speaking).toEqual({ [BLOCK]: [0, 1, 2, 2] });
     expect(after.speaking).toMatchObject([

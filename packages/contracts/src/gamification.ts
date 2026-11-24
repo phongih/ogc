@@ -215,7 +215,8 @@ export const DEFAULT_GAMIFICATION: GamificationSettings = {
 
 /** One piece of learning evidence, as the rewards read it (never a login, never time in app). */
 export type RewardEvidence =
-  | { kind: "activity"; at: string; title: string; score: number | null }
+  // score: the quiz % (also skill evidence); practice: the practice / mini-game % (XP only)
+  | { kind: "activity"; at: string; title: string; score: number | null; practice?: number | null }
   | { kind: "speaking"; at: string; title: string }
   | { kind: "makeup"; at: string; dueAt: string; unitTitle: string; className: string };
 
@@ -265,12 +266,16 @@ export function deriveRewards(
       const done = ruleOn(s, "activity_completed");
       if (done)
         events.push({ at: e.at, kind: done.kind, xp: done.xp, evidence: `${e.title} · completed` });
-      if (e.score !== null) {
-        if (e.score === 100) out.perfect = earliest(out.perfect, e.at);
+      for (const [pct, what] of [
+        [e.score, "scored"],
+        [e.practice ?? null, "practice"],
+      ] as const) {
+        if (pct === null) continue;
+        if (pct === 100) out.perfect = earliest(out.perfect, e.at);
         const sc = ruleOn(s, "practice_scored");
-        const xp = sc ? Math.round((sc.xp * e.score) / 100) : 0;
+        const xp = sc ? Math.round((sc.xp * pct) / 100) : 0;
         if (sc && xp > 0)
-          events.push({ at: e.at, kind: sc.kind, xp, evidence: `${e.title} · scored ${e.score}%` });
+          events.push({ at: e.at, kind: sc.kind, xp, evidence: `${e.title} · ${what} ${pct}%` });
       }
     } else {
       if (e.at <= e.dueAt) out.onTimeMakeup = earliest(out.onTimeMakeup, e.at);

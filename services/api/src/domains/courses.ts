@@ -13,7 +13,7 @@
  * SYNTHETIC content only; no EduOS code or content.
  */
 import { sql } from "kysely";
-import { AUTHORING_LIMITS, authorize, contentIssue } from "@ogc/contracts";
+import { AUTHORING_LIMITS, authorize, contentIssue, normalizeBlock } from "@ogc/contracts";
 import type {
   AuthoredCourseDetail,
   AuthoredCourseSummary,
@@ -93,7 +93,8 @@ function normalized(c: CourseContent): CourseContent {
     lessons: c.lessons.map((l) => ({
       id: l.id,
       title: l.title,
-      blocks: l.blocks.map((b) => ({ ...b }) as CourseBlock),
+      // an older single vocabulary card is saved as the deck of one it reads as
+      blocks: l.blocks.map((b) => normalizeBlock({ ...b } as CourseBlock)),
     })),
   };
 }

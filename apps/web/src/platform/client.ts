@@ -499,12 +499,13 @@ export const platformApi = {
     answers: Record<string, number>,
     reflections: Record<string, string>,
     speaking: Record<string, number[]>,
+    practice: Record<string, number[]>,
   ) =>
-    result<AuthoringResult & { score?: number | null }>(
+    result<AuthoringResult & { score?: number | null; practiceScore?: number | null }>(
       s,
       "POST",
       `/v1/me/class-courses/${encodeURIComponent(ref)}/${encodeURIComponent(lessonId)}/complete`,
-      { answers, reflections, speaking },
+      { answers, reflections, speaking, practice },
     ),
   retrySpeaking: (
     s: PlatformSession,

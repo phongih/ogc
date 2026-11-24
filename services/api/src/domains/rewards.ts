@@ -15,10 +15,13 @@ import {
   DEFAULT_GAMIFICATION,
   deriveRewards,
   gamificationView,
+  lessonPracticeScore,
+  normalizeLesson,
   weeklyXpOf,
 } from "@ogc/contracts";
 import type {
   BadgeKind,
+  CourseLesson,
   GamificationSettings,
   GamificationUpdate,
   GamificationUpdateResult,
@@ -65,10 +68,16 @@ export async function evidenceByLearner(
   now: number,
 ): Promise<Map<string, RewardEvidence[]>> {
   const [lessons, speaking, ledger] = await Promise.all([
-    sql<{ learner_id: string; at: Date; score: number | null; title: string | null }>`
-      select d.learner_id, d.at, d.score,
-             (select l->>'title' from jsonb_array_elements(v.content->'lessons') l
-               where l->>'id' = d.lesson_id limit 1) as title
+    sql<{
+      learner_id: string;
+      at: Date;
+      score: number | null;
+      answers: unknown;
+      lesson: unknown;
+    }>`
+      select d.learner_id, d.at, d.score, d.answers,
+             (select l from jsonb_array_elements(v.content->'lessons') l
+               where l->>'id' = d.lesson_id limit 1) as lesson
         from course_lesson_done d
         join course_progress p on p.org_id = d.org_id and p.learner_id = d.learner_id
                               and p.course_ref = d.course_ref
@@ -88,13 +97,20 @@ export async function evidenceByLearner(
   ]);
   const out = new Map<string, RewardEvidence[]>();
   const add = (id: string, e: RewardEvidence) => out.set(id, [...(out.get(id) ?? []), e]);
-  for (const r of lessons.rows)
+  for (const r of lessons.rows) {
+    const lesson = r.lesson as CourseLesson | null;
+    // practice / match / detective answers are the arrays among the stored answers
+    const practice: Record<string, number[]> = {};
+    for (const [id, a] of Object.entries((r.answers ?? {}) as Record<string, unknown>))
+      if (Array.isArray(a)) practice[id] = a as number[];
     add(r.learner_id, {
       kind: "activity",
       at: iso(r.at),
-      title: r.title ?? "Lesson",
+      title: lesson?.title ?? "Lesson",
       score: r.score,
+      practice: lesson ? lessonPracticeScore(normalizeLesson(lesson), practice) : null,
     });
+  }
   for (const r of speaking.rows)
     add(r.learner_id, {
       kind: "speaking",

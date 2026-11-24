@@ -12,7 +12,15 @@ import type {
   ClassCoursePlayerPort,
   MyClassCourse,
 } from "@ogc/contracts";
-import { AUTHORING_LIMITS, hideLessonAnswers, lessonQuizScore } from "@ogc/contracts";
+import {
+  AUTHORING_LIMITS,
+  hideLessonAnswers,
+  isPracticeBlock,
+  lessonPracticeScore,
+  lessonQuizScore,
+  normalizeLesson,
+  practiceChoices,
+} from "@ogc/contracts";
 import { classes, rosters } from "../../fixtures/teaching";
 import { learnerById } from "../../fixtures/learners";
 import { courseOf, latestVersion } from "./mockCourseAuthoring";
@@ -23,7 +31,7 @@ import { withFault } from "./faults";
 
 const latency = <T>(v: T, ms = 60): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(v), ms));
-type Out = AuthoringResult & { score?: number | null };
+type Out = AuthoringResult & { score?: number | null; practiceScore?: number | null };
 const refuse = (reason: Exclude<AuthoringResult, { ok: true }>["reason"], detail?: string) =>
   latency<Out>({ ok: false, reason, ...(detail ? { detail } : {}) });
 
@@ -84,7 +92,7 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
       const v = versionFor(ref, s.learnerId, s.orgId);
       const idx = v ? v.content.lessons.findIndex((l) => l.id === lessonId) : -1;
       if (!v || idx < 0) return latency(null);
-      const lesson = v.content.lessons[idx];
+      const lesson = normalizeLesson(v.content.lessons[idx]);
       const done = recordOf(ref, s.learnerId)?.lessons[lessonId] ?? null;
       return latency({
         ref,
@@ -92,18 +100,24 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
         lesson: done ? JSON.parse(JSON.stringify(lesson)) : hideAnswers(lesson),
         index: idx,
         total: v.content.lessons.length,
-        completed: done ? JSON.parse(JSON.stringify(done)) : null,
+        completed: done
+          ? {
+              ...JSON.parse(JSON.stringify(done)),
+              practiceScore: lessonPracticeScore(lesson, done.practice ?? {}),
+            }
+          : null,
       });
     }),
 
-  complete: (viewer, ref, lessonId, answers, reflections, speaking = {}) =>
+  complete: (viewer, ref, lessonId, answers, reflections, speaking = {}, practice = {}) =>
     withFault("classCourses.complete", () => {
       const s = scope(viewer);
       if (!s) return refuse("not_allowed", "learners complete their own lessons");
       if (!s.open.some((o) => o.ref === ref)) return refuse("not_found");
       const v = versionFor(ref, s.learnerId, s.orgId);
-      const lesson = v?.content.lessons.find((l) => l.id === lessonId);
-      if (!v || !lesson) return refuse("not_found");
+      const found = v?.content.lessons.find((l) => l.id === lessonId);
+      if (!v || !found) return refuse("not_found");
+      const lesson = normalizeLesson(found);
       if (recordOf(ref, s.learnerId)?.lessons[lessonId])
         return refuse("invalid_step", "already completed");
       const quizzes = lesson.blocks.filter((b): b is BlockOf<"quiz"> => b.kind === "quiz");
@@ -111,11 +125,13 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
         (b): b is BlockOf<"reflection"> => b.kind === "reflection",
       );
       const talks = lesson.blocks.filter((b): b is BlockOf<"speaking"> => b.kind === "speaking");
+      const games = lesson.blocks.filter(isPracticeBlock);
       const known = new Set([...quizzes, ...prompts].map((b) => b.id));
       if (
         Object.keys(answers).some((k) => !known.has(k)) ||
         Object.keys(reflections).some((k) => !known.has(k)) ||
-        Object.keys(speaking).some((k) => !talks.some((t) => t.id === k))
+        Object.keys(speaking).some((k) => !talks.some((t) => t.id === k)) ||
+        Object.keys(practice).some((k) => !games.some((g) => g.id === k))
       )
         return refuse("invalid", "answers for blocks that are not in this lesson");
       const keepS: Record<string, number[]> = {};
@@ -147,7 +163,22 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
       for (const q of quizzes) keepA[q.id] = answers[q.id];
       const keepR: Record<string, string> = {};
       for (const p of prompts) keepR[p.id] = reflections[p.id].trim();
+      const keepP: Record<string, number[]> = {};
+      for (const g of games) {
+        const c = practiceChoices(g, practice[g.id]);
+        if (!c)
+          return refuse(
+            "invalid",
+            g.kind === "practice"
+              ? "answer every practice question"
+              : g.kind === "eagle_match"
+                ? "match every item, each once"
+                : "put every event in order",
+          );
+        keepP[g.id] = c;
+      }
       const score = lessonQuizScore(lesson, keepA);
+      const practiceScore = lessonPracticeScore(lesson, keepP);
       // The first completed lesson pins the learner to this version.
       recordLesson(ref, s.learnerId, s.orgId, v.version, lessonId, {
         at: new Date().toISOString(),
@@ -155,7 +186,8 @@ export const mockClassCoursePlayer: ClassCoursePlayerPort = {
         answers: keepA,
         reflections: keepR,
         ...(talks.length ? { speaking: keepS } : {}),
+        ...(games.length ? { practice: keepP } : {}),
       });
-      return latency<Out>({ ok: true, score });
+      return latency<Out>({ ok: true, score, practiceScore });
     }),
 };

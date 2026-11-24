@@ -3,7 +3,7 @@
  * Draft → submit for review → a different person approves → immutable published version.
  * Teachers edit their own courses, staff every course of the org (courses:author). SYNTHETIC.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -15,7 +15,13 @@ import type {
   CourseContent,
   CourseLesson,
 } from "@ogc/contracts";
-import { AUTHORING_LIMITS, BLOCK_KINDS, BLOCK_REGISTRY, contentIssue } from "@ogc/contracts";
+import {
+  AUTHORING_LIMITS,
+  BLOCK_KINDS,
+  BLOCK_REGISTRY,
+  contentIssue,
+  normalizeContent,
+} from "@ogc/contracts";
 import { useCourseStudioApi } from "./courseStudioApi";
 import { formatCenterDate, formatCenterDateTime } from "../../lib/centerTime";
 import { Button, Card, EmptyState, ErrorState, PageHeader, Spinner } from "../../ui";
@@ -267,10 +273,12 @@ function ReadOnly({ content }: { content: CourseContent }) {
 function Editor({ c }: { c: AuthoredCourseDetail }) {
   const api = useCourseStudioApi();
   const act = useAct();
-  const [draft, setDraft] = useState<CourseContent>(c.draft);
+  // older single vocabulary cards open as a deck of one (saved in the new form when edited)
+  const base = useMemo(() => normalizeContent(c.draft), [c.draft]);
+  const [draft, setDraft] = useState<CourseContent>(base);
   const [lessonIx, setLessonIx] = useState(0);
   const [preview, setPreview] = useState(false);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(c.draft);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(base);
   useEffect(() => {
     if (lessonIx >= draft.lessons.length) setLessonIx(Math.max(0, draft.lessons.length - 1));
   }, [draft.lessons.length, lessonIx]);
@@ -560,6 +568,56 @@ function Field({
   );
 }
 
+/** A list inside a block (cards, pages, questions, pairs, events): edit, add, remove. */
+function Items<T>({
+  what,
+  n,
+  items,
+  min = 1,
+  max,
+  make,
+  onChange,
+  render,
+}: {
+  what: string;
+  n: number;
+  items: T[];
+  min?: number;
+  max: number;
+  make: () => T;
+  onChange: (items: T[]) => void;
+  render: (item: T, i: number, set: (item: T) => void) => ReactNode;
+}) {
+  return (
+    <div className="space-y-2">
+      {items.map((it, i) => (
+        <fieldset key={i} className="space-y-1 rounded-ogc border border-border p-2">
+          <legend className="text-xs text-muted">
+            {what} {i + 1}
+          </legend>
+          {render(it, i, (x) => onChange(items.map((y, j) => (j === i ? x : y))))}
+          <button
+            type="button"
+            className="text-xs text-muted disabled:opacity-40"
+            disabled={items.length <= min}
+            onClick={() => onChange(items.filter((_, j) => j !== i))}
+          >
+            Remove {what} {i + 1} · block {n}
+          </button>
+        </fieldset>
+      ))}
+      <button
+        type="button"
+        className="text-xs text-brand disabled:opacity-40"
+        disabled={items.length >= max}
+        onClick={() => onChange([...items, make()])}
+      >
+        + {what} · block {n}
+      </button>
+    </div>
+  );
+}
+
 function BlockFields({
   b,
   n,
@@ -617,36 +675,235 @@ function BlockFields({
       return <hr className="border-border" />;
     case "vocab":
       return (
-        <div className="grid gap-1 sm:grid-cols-2">
+        <div className="space-y-2">
           <Field
-            label={at("Word")}
-            value={b.word}
-            max={60}
-            onChange={(word) => onChange({ ...b, word })}
-          />
-          <Field
-            label={at("Meaning")}
-            value={b.meaning}
+            label={at("Deck title")}
+            value={b.title}
             max={L.shortText}
-            onChange={(meaning) => onChange({ ...b, meaning })}
+            onChange={(title) => onChange({ ...b, title })}
           />
-          <Field
-            label={at("Example sentence")}
-            value={b.example}
-            max={L.shortText}
-            onChange={(example) => onChange({ ...b, example })}
+          <Items
+            what="card"
+            n={n}
+            items={b.cards}
+            max={L.deckCards}
+            make={() => ({ word: "", meaning: "", example: "", translation: "", imageUrl: "" })}
+            onChange={(cards) => onChange({ ...b, cards })}
+            render={(c, i, set) => (
+              <div className="grid gap-1 sm:grid-cols-2">
+                <Field
+                  label={at(`Word ${i + 1}`)}
+                  value={c.word}
+                  max={60}
+                  onChange={(word) => set({ ...c, word })}
+                />
+                <Field
+                  label={at(`Meaning ${i + 1}`)}
+                  value={c.meaning}
+                  max={L.shortText}
+                  onChange={(meaning) => set({ ...c, meaning })}
+                />
+                <Field
+                  label={at(`Example sentence ${i + 1}`)}
+                  value={c.example}
+                  max={L.shortText}
+                  onChange={(example) => set({ ...c, example })}
+                />
+                <Field
+                  label={at(`Translation ${i + 1}`)}
+                  value={c.translation}
+                  max={L.shortText}
+                  onChange={(translation) => set({ ...c, translation })}
+                />
+                <Field
+                  label={at(`Image link (https) ${i + 1}`)}
+                  value={c.imageUrl}
+                  max={L.url}
+                  onChange={(imageUrl) => set({ ...c, imageUrl })}
+                />
+              </div>
+            )}
           />
-          <Field
-            label={at("Translation")}
-            value={b.translation}
-            max={L.shortText}
-            onChange={(translation) => onChange({ ...b, translation })}
-          />
+        </div>
+      );
+    case "image":
+      return (
+        <div className="grid gap-1 sm:grid-cols-3">
           <Field
             label={at("Image link (https)")}
-            value={b.imageUrl}
+            value={b.url}
             max={L.url}
-            onChange={(imageUrl) => onChange({ ...b, imageUrl })}
+            onChange={(url) => onChange({ ...b, url })}
+          />
+          <Field
+            label={at("Caption")}
+            value={b.caption}
+            max={L.shortText}
+            onChange={(caption) => onChange({ ...b, caption })}
+          />
+          <Field
+            label={at("Credit")}
+            value={b.credit}
+            max={L.shortText}
+            onChange={(credit) => onChange({ ...b, credit })}
+          />
+        </div>
+      );
+    case "book_page":
+      return (
+        <div className="space-y-2">
+          <Field
+            label={at("Book title")}
+            value={b.title}
+            max={L.shortText}
+            onChange={(title) => onChange({ ...b, title })}
+          />
+          <Items
+            what="page"
+            n={n}
+            items={b.pages}
+            max={L.bookPages}
+            make={() => ({ heading: "", body: "" })}
+            onChange={(pages) => onChange({ ...b, pages })}
+            render={(pg, i, set) => (
+              <div className="space-y-1">
+                <Field
+                  label={at(`Page heading ${i + 1}`)}
+                  value={pg.heading}
+                  max={L.shortText}
+                  onChange={(heading) => set({ ...pg, heading })}
+                />
+                <Field
+                  label={at(`Page text ${i + 1}`)}
+                  long
+                  value={pg.body}
+                  max={L.longText}
+                  onChange={(body) => set({ ...pg, body })}
+                />
+              </div>
+            )}
+          />
+        </div>
+      );
+    case "practice":
+      return (
+        <div className="space-y-2">
+          <Field
+            label={at("Practice title")}
+            value={b.title}
+            max={L.shortText}
+            onChange={(title) => onChange({ ...b, title })}
+          />
+          <Items
+            what="question"
+            n={n}
+            items={b.questions}
+            max={L.practiceQuestions}
+            make={() => ({ question: "", options: ["", ""], correct: 0 })}
+            onChange={(questions) => onChange({ ...b, questions })}
+            render={(q, i, set) => (
+              <div className="space-y-1">
+                <Field
+                  label={at(`Practice question ${i + 1}`)}
+                  value={q.question}
+                  max={L.shortText}
+                  onChange={(question) => set({ ...q, question })}
+                />
+                {q.options.map((o, j) => (
+                  <div key={j} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`pc-${b.id}-${i}`}
+                      aria-label={`Correct option ${j + 1} of question ${i + 1} · block ${n}`}
+                      checked={q.correct === j}
+                      onChange={() => set({ ...q, correct: j })}
+                    />
+                    <input
+                      aria-label={`Option ${j + 1} of question ${i + 1} · block ${n}`}
+                      className={input}
+                      value={o}
+                      maxLength={120}
+                      onChange={(e) =>
+                        set({
+                          ...q,
+                          options: q.options.map((x, k) => (k === j ? e.target.value : x)),
+                        })
+                      }
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  className="text-xs text-brand disabled:opacity-40"
+                  disabled={q.options.length >= L.optionsMax}
+                  onClick={() => set({ ...q, options: [...q.options, ""] })}
+                >
+                  + option · question {i + 1} · block {n}
+                </button>
+              </div>
+            )}
+          />
+        </div>
+      );
+    case "eagle_match":
+      return (
+        <div className="space-y-2">
+          <Field
+            label={at("Match instructions")}
+            value={b.prompt}
+            max={L.shortText}
+            onChange={(prompt) => onChange({ ...b, prompt })}
+          />
+          <Items
+            what="pair"
+            n={n}
+            items={b.pairs}
+            min={L.pairsMin}
+            max={L.pairsMax}
+            make={() => ({ left: "", right: "" })}
+            onChange={(pairs) => onChange({ ...b, pairs })}
+            render={(pr, i, set) => (
+              <div className="grid gap-1 sm:grid-cols-2">
+                <Field
+                  label={at(`Left ${i + 1}`)}
+                  value={pr.left}
+                  max={120}
+                  onChange={(left) => set({ ...pr, left })}
+                />
+                <Field
+                  label={at(`Right ${i + 1}`)}
+                  value={pr.right}
+                  max={120}
+                  onChange={(right) => set({ ...pr, right })}
+                />
+              </div>
+            )}
+          />
+        </div>
+      );
+    case "time_detective":
+      return (
+        <div className="space-y-2">
+          <Field
+            label={at("Order instructions")}
+            value={b.prompt}
+            max={L.shortText}
+            onChange={(prompt) => onChange({ ...b, prompt })}
+          />
+          <p className="text-xs text-muted">
+            Write the events in the right order — learners get them mixed up.
+          </p>
+          <Items
+            what="event"
+            n={n}
+            items={b.events}
+            min={L.eventsMin}
+            max={L.eventsMax}
+            make={() => ""}
+            onChange={(events) => onChange({ ...b, events })}
+            render={(t, i, set) => (
+              <Field label={at(`Event ${i + 1}`)} value={t} max={120} onChange={set} />
+            )}
           />
         </div>
       );
