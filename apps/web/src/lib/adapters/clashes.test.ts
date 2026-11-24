@@ -1,6 +1,6 @@
 // P2 · no double-booking: a teacher cannot teach two overlapping sessions, a room cannot hold two.
 import { as } from "../../test/grants";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyCenterDraft } from "@ogc/contracts";
 import { __resetAttendanceForTests } from "./mockAttendance";
 import { mockSchedule } from "./mockSchedule";
@@ -67,6 +67,23 @@ describe("schedule changes refuse double-bookings", () => {
 });
 
 describe("center setup refuses double-bookings", () => {
+  // These cases assert the weekday of the first upcoming colliding session ("on Tue,",
+  // "on Sat,"). The adapter projects a draft class forward from Date.now() and keeps a
+  // session "upcoming" until 4h after it starts, so a real clock makes the asserted
+  // weekday depend on the time of day the suite runs (e.g. after 22:00 on a Tuesday the
+  // 18:00 Tue session has dropped out and the next collision is Thursday). Freeze the
+  // clock to Monday 04:00 of the current week — deterministic weekday, same week as the
+  // now-relative fixtures. Only Date is faked, so timers stay real.
+  beforeEach(() => {
+    const real = new Date();
+    const monday = new Date(real);
+    monday.setDate(real.getDate() - ((real.getDay() + 6) % 7));
+    monday.setHours(4, 0, 0, 0);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(monday);
+  });
+  afterEach(() => vi.useRealTimers());
+
   const base = () => ({
     ...emptyCenterDraft(),
     brandId: brands[0].id,

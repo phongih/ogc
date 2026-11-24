@@ -1,5 +1,5 @@
 // P2 · Center operations page (staff): cancel-with-replacement and substitute, in the UI.
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderApp } from "../../test/harness";
@@ -7,6 +7,7 @@ import { __resetAttendanceForTests } from "../../lib/adapters/mockAttendance";
 import { sessionStore } from "../../lib/adapters/sessionStore";
 
 beforeEach(() => __resetAttendanceForTests());
+afterEach(() => vi.useRealTimers());
 
 describe("Center operations", () => {
   it("staff cancel a session only with a replacement time; the class keeps the lesson", async () => {
@@ -53,6 +54,17 @@ describe("Center operations", () => {
   });
 
   it("reassigning B1 Evening to Ben is refused: he already teaches A2 Evening Tue/Thu 18:00", async () => {
+    // The clash alert names the first upcoming colliding session ("on Tue,"). The adapter
+    // projects from Date.now() and drops a session 4h after it starts, so a real clock
+    // makes the weekday depend on the run time (after 22:00 Tue the next collision is Thu).
+    // Freeze the clock to Monday 04:00 of the current week; only Date is faked so the
+    // testing-library/userEvent timers stay real.
+    const real = new Date();
+    const monday = new Date(real);
+    monday.setDate(real.getDate() - ((real.getDay() + 6) % 7));
+    monday.setHours(4, 0, 0, 0);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(monday);
     const user = userEvent.setup();
     renderApp("/app/operations", "staff");
     const b1 = await screen.findByRole("region", { name: "B1 Evening — Tue/Thu" });
