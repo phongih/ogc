@@ -18,6 +18,12 @@ export interface ResolvedMember {
   orgAdmin: boolean;
 }
 
+/** What iios-mock's resolve needs from the kernel. KernelDirectory is the real implementation;
+ *  tests may pass a stub. */
+export interface KernelResolver {
+  resolve(orgId: string, principalSub: string): Promise<ResolvedMember | null>;
+}
+
 export interface KernelOrg {
   role: string; // kernel org-login role, e.g. iios_app_o_alpha
   password: string;
@@ -47,7 +53,7 @@ const DERIVE = `
       ELSE NULL
     END AS role`;
 
-export class KernelDirectory {
+export class KernelDirectory implements KernelResolver {
   private readonly pools = new Map<string, pg.Pool>();
   private readonly purpose: string;
 
