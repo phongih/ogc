@@ -9,10 +9,12 @@ INSERT INTO iios.org_roles (role_name, org_id) VALUES ('iios_app_o_alpha', '0000
 UPDATE iios.org_roles SET org_id = '00000000-0000-4000-8000-000000000002' WHERE role_name = 'iios_app_o_beta';
 INSERT INTO iios.org_roles (role_name, org_id) VALUES ('iios_app_o_beta', '00000000-0000-4000-8000-000000000002') ON CONFLICT (role_name) DO UPDATE SET org_id = EXCLUDED.org_id;
 
--- catalog + capabilities referenced by the grants below.
+-- catalog + capabilities + purposes referenced by grants and by bind_principal.
 INSERT INTO authz.catalog_versions (version, is_current) VALUES ('cat-2', true) ON CONFLICT (version) DO NOTHING;
 INSERT INTO authz.capabilities (catalog_version, capability, grantable) VALUES ('cat-2', 'org.admin', true) ON CONFLICT DO NOTHING;
 INSERT INTO authz.capabilities (catalog_version, capability, grantable) VALUES ('cat-2', 'evidence.read', true) ON CONFLICT DO NOTHING;
+INSERT INTO authz.purposes (catalog_version, purpose) VALUES ('cat-2', 'ogc.platform') ON CONFLICT DO NOTHING;
+INSERT INTO authz.purposes (catalog_version, purpose) VALUES ('cat-2', 'progress') ON CONFLICT DO NOTHING;
 
 -- centers + one class per org (for teacher assignments and learner enrollments).
 INSERT INTO app.centers (org_id, center_id, name) VALUES ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000c01', 'Center 1') ON CONFLICT DO NOTHING;

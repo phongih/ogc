@@ -66,10 +66,14 @@ for (const o of ORGS) {
   w(`INSERT INTO iios.org_roles (role_name, org_id) VALUES (${q(o.role)}, ${q(o.id)}) ON CONFLICT (role_name) DO UPDATE SET org_id = EXCLUDED.org_id;`);
 }
 w(``);
-w(`-- catalog + capabilities referenced by the grants below.`);
+w(`-- catalog + capabilities + purposes referenced by grants and by bind_principal.`);
 w(`INSERT INTO authz.catalog_versions (version, is_current) VALUES ('cat-2', true) ON CONFLICT (version) DO NOTHING;`);
 for (const cap of ["org.admin", "evidence.read"]) {
   w(`INSERT INTO authz.capabilities (catalog_version, capability, grantable) VALUES ('cat-2', ${q(cap)}, true) ON CONFLICT DO NOTHING;`);
+}
+// Purposes bind_principal will accept. 'ogc.platform' is the purpose iios-mock signs grants with.
+for (const pz of ["ogc.platform", "progress"]) {
+  w(`INSERT INTO authz.purposes (catalog_version, purpose) VALUES ('cat-2', ${q(pz)}) ON CONFLICT DO NOTHING;`);
 }
 w(``);
 w(`-- centers + one class per org (for teacher assignments and learner enrollments).`);
