@@ -70,9 +70,25 @@ PGHOST=127.0.0.1 PGPORT=5433 PGUSER=bootstrap PGPASSWORD="$PWB" \
 Nothing above touches the main `postgres`/`ogc` cluster or the running `iios-mock`
 service. The kernel holds only synthetic data.
 
+## Synthetic directory (S3a, OGC-ADR-043)
+
+`seed-synthetic.sql` (generated from `services/iios-mock/src/seed.ts` by `gen-seed.mjs`)
+seeds the synthetic directory — organizations, centers, classes, principals and the grants
+that define each principal's role — so the kernel can answer identity/role/orgAdmin for
+`resolve`. `seed-kernel.sh` applies it as bootstrap; idempotent.
+
+```bash
+# after apply-kernel.sh, with the same bootstrap env:
+PGHOST=127.0.0.1 PGPORT=5433 PGUSER=bootstrap PGPASSWORD="$PWB" bash seed-kernel.sh
+# phải ra: seed-kernel: synthetic directory applied to dak
+```
+
+Regenerate after changing `seed.ts`: `node ops/iios/gen-seed.mjs > ops/iios/seed-synthetic.sql`.
+
 ## Verification
 
 CI proves the kernel's sealed-principal / RLS / C14 invariants against the identical
-vendored SQL (`services/iios-mock/src/kernel.test.ts`, OGC-ADR-041). It cannot host a
-single-superuser `bootstrap` cluster, so the **guard** and the on-cluster properties are
-verified by `verify-kernel.sh` against the live IIOS cluster after provisioning.
+vendored SQL (`services/iios-mock/src/kernel.test.ts`, OGC-ADR-041), and the synthetic
+directory's resolve derivation (`services/iios-mock/src/seed.test.ts`, OGC-ADR-043). It
+cannot host a single-superuser `bootstrap` cluster, so the **guard** and the on-cluster
+properties are verified by `verify-kernel.sh` against the live IIOS cluster after provisioning.
