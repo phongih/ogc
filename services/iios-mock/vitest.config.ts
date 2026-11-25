@@ -6,5 +6,8 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // kernel.test.ts and seed.test.ts each stand up the global IIOS roles and the `dak`
+    // database; running test files in parallel would race on those shared objects.
+    fileParallelism: false,
   },
 });
