@@ -3,6 +3,7 @@ import pg from "pg";
 import { migrate, pgStore, seedIfMissing } from "./pgStore.js";
 import { seedPolicies } from "./seed.js";
 import { buildIiosMock } from "./server.js";
+import { kernelFromEnv } from "./kernel/config.js";
 
 function need(name: string): string {
   const v = process.env[name];
@@ -32,11 +33,20 @@ if (dbUrl) {
 } else
   console.log("iios-mock: policies in memory (IIOS_MOCK_DATABASE_URL not set) — lost on restart");
 
+// When the IIOS kernel is configured (OGC-ADR-043), role + orgAdmin in resolve come from it.
+const kernel = kernelFromEnv(process.env);
+console.log(
+  kernel
+    ? "iios-mock: resolve role/orgAdmin from the IIOS kernel (OGC_IIOS_KERNEL_HOST set)"
+    : "iios-mock: resolve role/orgAdmin from the seed directory (kernel not configured)",
+);
+
 const { app } = buildIiosMock({
   key,
   clientId: process.env.IIOS_MOCK_CLIENT_ID ?? "ogc",
   clientSecret: need("IIOS_MOCK_CLIENT_SECRET"),
   ...(store ? { store } : {}),
+  ...(kernel ? { kernel } : {}),
 });
 const port = Number(process.env.PORT ?? 8790);
 await app.listen({ host: process.env.HOST ?? "127.0.0.1", port });

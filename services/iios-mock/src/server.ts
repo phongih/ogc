@@ -24,6 +24,7 @@ import {
 } from "./policies.js";
 import { MEMBERS, ORGS, seedPolicies, type Member } from "./seed.js";
 import { open, sign } from "./token.js";
+import type { KernelResolver } from "./kernel/client.js";
 
 export interface IiosMockOptions {
   key: Buffer; // dev signing key, ≥ 32 bytes
@@ -32,6 +33,9 @@ export interface IiosMockOptions {
   now?: () => number; // ms, for tests
   /** Where policies live. Default: in memory (`state`); main.ts passes the PostgreSQL store. */
   store?: PolicyStore;
+  /** When set (S3c, OGC-ADR-043), role + orgAdmin come from the IIOS kernel instead of the
+   *  seed directory; narrowing still comes from the policy store. Membership is the kernel's. */
+  kernel?: KernelResolver;
 }
 
 export interface IiosMockState {
@@ -102,17 +106,33 @@ export function buildIiosMock(opts: IiosMockOptions): {
     if (p.exp * 1000 <= now()) return { state: "expired" };
     if (typeof b.intendedOrgId !== "string" || b.intendedOrgId !== p.org)
       return { state: "cross_tenant" };
-    const m = memberOf(p.sub, p.org);
-    if (!m || m.role === null) return { state: "revoked" }; // membership ended since issue
+    const seedMember = memberOf(p.sub, p.org);
+    let role: "staff" | "teacher" | "learner" | "guardian";
+    let orgAdmin: boolean;
+    if (opts.kernel) {
+      // The kernel is the authority for membership, role and orgAdmin (Option A).
+      const k = await opts.kernel.resolve(p.org, p.sub);
+      if (!k) return { state: "revoked" }; // not (or no longer) a member in the kernel
+      role = k.role;
+      orgAdmin = k.orgAdmin;
+    } else {
+      if (!seedMember || seedMember.role === null) return { state: "revoked" };
+      role = seedMember.role === "admin" ? "staff" : seedMember.role;
+      orgAdmin = seedMember.role === "admin";
+    }
+    // Narrowing stays in the mock policy store, keyed by the member. Prefer the seed member so
+    // behaviour is unchanged; synthesize one from the kernel result if the seed lacks it.
+    const forNarrowing: Member =
+      seedMember ?? { principalId: p.sub, orgId: p.org, displayName: p.sub, role: orgAdmin ? "admin" : role };
     const context = IiosGrantedContext.parse({
       clientId: p.cid,
       orgId: p.org,
       principalId: p.sub,
-      role: m.role === "admin" ? "staff" : m.role,
+      role,
       purpose: p.purpose,
       ...(p.ac ? { activeCenter: p.ac } : {}),
-      orgAdmin: m.role === "admin",
-      narrowing: narrowingFor(m, await store.read(m.orgId)),
+      orgAdmin,
+      narrowing: narrowingFor(forNarrowing, await store.read(p.org)),
       requestId: p.rid,
       grantRef: p.jti,
       expiresAt: new Date(p.exp * 1000).toISOString(),
